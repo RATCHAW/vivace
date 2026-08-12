@@ -273,6 +273,74 @@
         "required": [
           "data"
         ]
+      },
+      "RunRenderState": {
+        "type": "object",
+        "properties": {
+          "render": {
+            "$ref": "#/components/schemas/RunRender"
+          }
+        },
+        "required": [
+          "render"
+        ]
+      },
+      "RunRender": {
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "activity_id": {
+            "type": "integer",
+            "example": 987654321
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "rendering",
+              "done",
+              "error"
+            ],
+            "example": "rendering"
+          },
+          "progress": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "example": 0.42
+          },
+          "output_url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "https://remotionlambda-useast1-abcdef.s3.us-east-1.amazonaws.com/renders/abc/out.mp4"
+          },
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "activity_id",
+          "status",
+          "progress",
+          "output_url",
+          "error",
+          "created_at",
+          "updated_at"
+        ]
       }
     },
     "parameters": {}
@@ -464,6 +532,191 @@
           },
           "502": {
             "description": "Strava rejected or failed the upstream request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/runs/{id}/render": {
+      "get": {
+        "operationId": "getRunRender",
+        "tags": [
+          "Runs"
+        ],
+        "summary": "Get one run's stored render",
+        "description": "Reads the persisted render state for this run and athlete. `render` is null when the run has never been rendered. While a render is in flight, live progress comes from the SSE endpoint, which also keeps this state up to date.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$",
+              "example": "987654321"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The stored render, or null if none exists.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunRenderState"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "startRunRender",
+        "tags": [
+          "Runs"
+        ],
+        "summary": "Render this run's video on Remotion Lambda",
+        "description": "Fetches the run and its streams from Strava, starts a Remotion Lambda render of the story video, and persists the render state. The MP4 lands in the Remotion S3 bucket. Idempotent while a render is in flight or already done — those return the existing state; a failed render is retried.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$",
+              "example": "987654321"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The render that is now in flight (or already finished).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunRenderState"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The stored Strava token lacks the activity:read scope; sign out and back in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Strava or Lambda failed the upstream request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Remotion Lambda is not configured on this server.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/runs/{id}/render/progress": {
+      "get": {
+        "operationId": "streamRunRenderProgress",
+        "tags": [
+          "Runs"
+        ],
+        "summary": "Stream a render's progress (SSE)",
+        "description": "Server-sent events. While the run's render is in flight, polls Remotion Lambda every ~1.5s, persists the result, and emits the updated RunRender as a JSON message. The final message has status `done` or `error`, after which the stream closes; a lone `null` message means there is no render. Consumed with EventSource, not the generated client.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$",
+              "example": "987654321"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "An event stream of RunRender JSON messages.",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Remotion Lambda is not configured on this server.",
             "content": {
               "application/json": {
                 "schema": {

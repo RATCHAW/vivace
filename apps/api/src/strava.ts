@@ -1,5 +1,6 @@
 import {
   createStravaClient,
+  getActivityById,
   getActivityStreams,
   getLoggedInAthlete,
   getLoggedInAthleteActivities,
@@ -98,6 +99,18 @@ export async function fetchRuns(accessToken: string): Promise<Run[]> {
   return data
     .filter((a) => `${a.sport_type ?? a.type ?? ""}`.includes("Run"))
     .map((a) => toRun(a as StravaActivityResponse));
+}
+
+/** `GET /activities/{id}` through the generated SDK — one run by id. */
+export async function fetchRun(accessToken: string, id: number): Promise<Run> {
+  const { data, response } = await getActivityById({
+    client: createStravaClient(accessToken),
+    path: { id },
+  });
+
+  if (!data) throw new StravaApiError(response?.status ?? 502);
+
+  return toRun(data as StravaActivityResponse);
 }
 
 const STREAM_KEYS = [

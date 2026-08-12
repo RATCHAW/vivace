@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ModeToggle } from "@/components/mode-toggle";
+import { RenderControls } from "@/components/render-controls";
 import { cn } from "@/lib/utils";
 import { RunVideo } from "@/remotion/run-video/RunVideo";
 import {
@@ -159,6 +160,8 @@ export function Runs() {
               />
             )}
           </div>
+
+          {selected && <RenderControls key={selected.id} run={selected} />}
 
           {!MAPBOX_TOKEN && (
             <p className="mt-4 text-caption text-muted-foreground">

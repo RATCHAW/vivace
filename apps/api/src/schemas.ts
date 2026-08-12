@@ -114,3 +114,34 @@ export const RunStreamsSchema = z
   .openapi("RunStreams");
 
 export type RunStreams = z.infer<typeof RunStreamsSchema>;
+
+/**
+ * One run's Lambda render — the persisted row in `run_render`, as served to
+ * the browser. `output_url` is the public S3 URL of the MP4 once `status` is
+ * `"done"`.
+ */
+export const RunRenderSchema = z
+  .object({
+    activity_id: z.number().int().openapi({ example: 987654321 }),
+    status: z.enum(["rendering", "done", "error"]).openapi({ example: "rendering" }),
+    /** Overall Lambda render progress, 0–1. */
+    progress: z.number().min(0).max(1).openapi({ example: 0.42 }),
+    output_url: z.string().nullable().openapi({
+      example: "https://remotionlambda-useast1-abcdef.s3.us-east-1.amazonaws.com/renders/abc/out.mp4",
+    }),
+    error: z.string().nullable(),
+    created_at: z.iso.datetime(),
+    updated_at: z.iso.datetime(),
+  })
+  .openapi("RunRender");
+
+export type RunRender = z.infer<typeof RunRenderSchema>;
+
+/** Wrapper so "never rendered" is an ordinary 200 with `render: null`. */
+export const RunRenderStateSchema = z
+  .object({
+    render: RunRenderSchema.nullable(),
+  })
+  .openapi("RunRenderState");
+
+export type RunRenderState = z.infer<typeof RunRenderStateSchema>;

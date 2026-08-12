@@ -6,7 +6,7 @@
 // configured and its errors are normalised before the first request goes out.
 
 import { client } from "./generated/client.gen";
-import type { ApiError } from "./generated/types.gen";
+import type { ApiError, RunRender } from "./generated/types.gen";
 
 client.setConfig({
   // Same-origin: Vite proxies /api to the Hono server in dev, nginx in Docker.
@@ -51,6 +51,44 @@ client.interceptors.error.use(
     new ApiRequestError(response?.status ?? 0, error),
 );
 
+/**
+ * Live render progress for one run, over server-sent events.
+ *
+ * The one hand-written call in this app: the generated client (and the
+ * TanStack layer on top of it) can't express a text/event-stream response, so
+ * GET /api/runs/{id}/render/progress is consumed with EventSource instead.
+ * The path mirrors the `streamRunRenderProgress` operation in the OpenAPI
+ * document — change it there and this must follow.
+ *
+ * Each message is a full `RunRender` JSON. The server closes the stream after
+ * a terminal status (`done`/`error`), or after a lone `null` when there is no
+ * render — both of which close the source here so EventSource doesn't
+ * reconnect forever. Returns an unsubscribe function.
+ */
+export function subscribeRunRenderProgress(
+  activityId: number,
+  onUpdate: (render: RunRender) => void,
+): () => void {
+  const source = new EventSource(`/api/runs/${activityId}/render/progress`);
+  source.onmessage = (event) => {
+    const render = JSON.parse(event.data) as RunRender | null;
+    if (render === null) {
+      source.close();
+      return;
+    }
+    onUpdate(render);
+    if (render.status !== "rendering") source.close();
+  };
+  return () => source.close();
+}
+
 export { client };
 export * from "./generated/@tanstack/react-query.gen";
-export type { Athlete, ApiError, Run, RunStreams } from "./generated/types.gen";
+export type {
+  Athlete,
+  ApiError,
+  Run,
+  RunRender,
+  RunRenderState,
+  RunStreams,
+} from "./generated/types.gen";
