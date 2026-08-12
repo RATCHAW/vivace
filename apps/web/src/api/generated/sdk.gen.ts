@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, ServerSentEventsResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { GetHealthData, GetHealthResponses, GetRunRenderData, GetRunRenderErrors, GetRunRenderResponses, GetRunsData, GetRunsErrors, GetRunsResponses, GetRunStreamsData, GetRunStreamsErrors, GetRunStreamsResponses, GetStravaAthleteData, GetStravaAthleteErrors, GetStravaAthleteResponses, PostClientLogsData, PostClientLogsResponses, StartRunRenderData, StartRunRenderErrors, StartRunRenderResponses, StreamRunRenderProgressData, StreamRunRenderProgressErrors, StreamRunRenderProgressResponse, StreamRunRenderProgressResponses } from './types.gen';
+import type { CoachChatData, CoachChatErrors, CoachChatResponse, CoachChatResponses, CreateCoachThreadData, CreateCoachThreadErrors, CreateCoachThreadResponses, DeleteCoachThreadData, DeleteCoachThreadErrors, DeleteCoachThreadResponses, GetCoachThreadData, GetCoachThreadErrors, GetCoachThreadResponses, GetHealthData, GetHealthResponses, GetRunRenderData, GetRunRenderErrors, GetRunRenderResponses, GetRunsData, GetRunsErrors, GetRunsResponses, GetRunStreamsData, GetRunStreamsErrors, GetRunStreamsResponses, GetStravaAthleteData, GetStravaAthleteErrors, GetStravaAthleteResponses, ListCoachThreadsData, ListCoachThreadsErrors, ListCoachThreadsResponses, PostClientLogsData, PostClientLogsResponses, StartRunRenderData, StartRunRenderErrors, StartRunRenderResponses, StreamRunRenderProgressData, StreamRunRenderProgressErrors, StreamRunRenderProgressResponse, StreamRunRenderProgressResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -111,6 +111,85 @@ export const streamRunRenderProgress = <ThrowOnError extends boolean = false>(op
         }],
     url: '/api/runs/{id}/render/progress',
     ...options
+});
+
+/**
+ * List the athlete's coach conversations
+ *
+ * Most recently used first. A thread with no messages has a null title.
+ */
+export const listCoachThreads = <ThrowOnError extends boolean = false>(options?: Options<ListCoachThreadsData, ThrowOnError>): RequestResult<ListCoachThreadsResponses, ListCoachThreadsErrors, ThrowOnError> => (options?.client ?? client).get<ListCoachThreadsResponses, ListCoachThreadsErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'better-auth.session_token',
+            type: 'apiKey'
+        }],
+    url: '/api/coach/threads',
+    ...options
+});
+
+/**
+ * Start a new coach conversation
+ *
+ * Returns an empty thread. Its title is filled in from the first message the athlete sends to it.
+ */
+export const createCoachThread = <ThrowOnError extends boolean = false>(options?: Options<CreateCoachThreadData, ThrowOnError>): RequestResult<CreateCoachThreadResponses, CreateCoachThreadErrors, ThrowOnError> => (options?.client ?? client).post<CreateCoachThreadResponses, CreateCoachThreadErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'better-auth.session_token',
+            type: 'apiKey'
+        }],
+    url: '/api/coach/threads',
+    ...options
+});
+
+/**
+ * Delete one conversation
+ *
+ * Removes the thread and every message in it.
+ */
+export const deleteCoachThread = <ThrowOnError extends boolean = false>(options: Options<DeleteCoachThreadData, ThrowOnError>): RequestResult<DeleteCoachThreadResponses, DeleteCoachThreadErrors, ThrowOnError> => (options.client ?? client).delete<DeleteCoachThreadResponses, DeleteCoachThreadErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'better-auth.session_token',
+            type: 'apiKey'
+        }],
+    url: '/api/coach/threads/{id}',
+    ...options
+});
+
+/**
+ * Read one conversation
+ *
+ * The thread and its full transcript, oldest message first.
+ */
+export const getCoachThread = <ThrowOnError extends boolean = false>(options: Options<GetCoachThreadData, ThrowOnError>): RequestResult<GetCoachThreadResponses, GetCoachThreadErrors, ThrowOnError> => (options.client ?? client).get<GetCoachThreadResponses, GetCoachThreadErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'better-auth.session_token',
+            type: 'apiKey'
+        }],
+    url: '/api/coach/threads/{id}',
+    ...options
+});
+
+/**
+ * Send a message and stream the coach's reply
+ *
+ * Loads the thread's transcript, appends the incoming message, and streams the model's answer as an AI SDK UI message stream — text, reasoning and tool calls as they happen. Both the athlete's message and the finished reply are persisted, so the browser never has to send the history back. Consumed by `useChat` from @ai-sdk/react, not by the generated client.
+ */
+export const coachChat = <ThrowOnError extends boolean = false>(options?: Options<CoachChatData, ThrowOnError, CoachChatResponse>): Promise<ServerSentEventsResult<CoachChatResponses>> => (options?.client ?? client).sse.post<CoachChatResponses, CoachChatErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'better-auth.session_token',
+            type: 'apiKey'
+        }],
+    url: '/api/coach/chat',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options?.headers
+    }
 });
 
 /**

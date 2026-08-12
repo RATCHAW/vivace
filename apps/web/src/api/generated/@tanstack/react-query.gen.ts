@@ -3,8 +3,8 @@
 import { type DefaultError, queryOptions, type UseMutationOptions } from '@tanstack/react-query';
 
 import { client } from '../client.gen';
-import { getHealth, getRunRender, getRuns, getRunStreams, getStravaAthlete, type Options, postClientLogs, startRunRender } from '../sdk.gen';
-import type { GetHealthData, GetHealthResponse, GetRunRenderData, GetRunRenderError, GetRunRenderResponse, GetRunsData, GetRunsError, GetRunsResponse, GetRunStreamsData, GetRunStreamsError, GetRunStreamsResponse, GetStravaAthleteData, GetStravaAthleteError, GetStravaAthleteResponse, PostClientLogsData, PostClientLogsResponse, StartRunRenderData, StartRunRenderError, StartRunRenderResponse } from '../types.gen';
+import { createCoachThread, deleteCoachThread, getCoachThread, getHealth, getRunRender, getRuns, getRunStreams, getStravaAthlete, listCoachThreads, type Options, postClientLogs, startRunRender } from '../sdk.gen';
+import type { CreateCoachThreadData, CreateCoachThreadError, CreateCoachThreadResponse, DeleteCoachThreadData, DeleteCoachThreadError, DeleteCoachThreadResponse, GetCoachThreadData, GetCoachThreadError, GetCoachThreadResponse, GetHealthData, GetHealthResponse, GetRunRenderData, GetRunRenderError, GetRunRenderResponse, GetRunsData, GetRunsError, GetRunsResponse, GetRunStreamsData, GetRunStreamsError, GetRunStreamsResponse, GetStravaAthleteData, GetStravaAthleteError, GetStravaAthleteResponse, ListCoachThreadsData, ListCoachThreadsError, ListCoachThreadsResponse, PostClientLogsData, PostClientLogsResponse, StartRunRenderData, StartRunRenderError, StartRunRenderResponse } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
@@ -155,6 +155,84 @@ export const startRunRenderMutation = (options?: Partial<Options<StartRunRenderD
     };
     return mutationOptions;
 };
+
+export const listCoachThreadsQueryKey = (options?: Options<ListCoachThreadsData>) => createQueryKey('listCoachThreads', options);
+
+/**
+ * List the athlete's coach conversations
+ *
+ * Most recently used first. A thread with no messages has a null title.
+ */
+export const listCoachThreadsOptions = (options?: Options<ListCoachThreadsData>) => queryOptions<ListCoachThreadsResponse, ListCoachThreadsError, ListCoachThreadsResponse, ReturnType<typeof listCoachThreadsQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await listCoachThreads({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: listCoachThreadsQueryKey(options)
+});
+
+/**
+ * Start a new coach conversation
+ *
+ * Returns an empty thread. Its title is filled in from the first message the athlete sends to it.
+ */
+export const createCoachThreadMutation = (options?: Partial<Options<CreateCoachThreadData>>): UseMutationOptions<CreateCoachThreadResponse, CreateCoachThreadError, Options<CreateCoachThreadData>> => {
+    const mutationOptions: UseMutationOptions<CreateCoachThreadResponse, CreateCoachThreadError, Options<CreateCoachThreadData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await createCoachThread({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+/**
+ * Delete one conversation
+ *
+ * Removes the thread and every message in it.
+ */
+export const deleteCoachThreadMutation = (options?: Partial<Options<DeleteCoachThreadData>>): UseMutationOptions<DeleteCoachThreadResponse, DeleteCoachThreadError, Options<DeleteCoachThreadData>> => {
+    const mutationOptions: UseMutationOptions<DeleteCoachThreadResponse, DeleteCoachThreadError, Options<DeleteCoachThreadData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await deleteCoachThread({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const getCoachThreadQueryKey = (options: Options<GetCoachThreadData>) => createQueryKey('getCoachThread', options);
+
+/**
+ * Read one conversation
+ *
+ * The thread and its full transcript, oldest message first.
+ */
+export const getCoachThreadOptions = (options: Options<GetCoachThreadData>) => queryOptions<GetCoachThreadResponse, GetCoachThreadError, GetCoachThreadResponse, ReturnType<typeof getCoachThreadQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getCoachThread({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getCoachThreadQueryKey(options)
+});
 
 /**
  * Forward a batch of browser events

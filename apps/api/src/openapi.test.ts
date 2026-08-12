@@ -26,6 +26,9 @@ describe("openapi", () => {
       "/api/runs/{id}/streams",
       "/api/runs/{id}/render",
       "/api/runs/{id}/render/progress",
+      "/api/coach/threads",
+      "/api/coach/threads/{id}",
+      "/api/coach/chat",
       "/api/logs",
     ]);
     expect(document.components.schemas).toHaveProperty("Athlete");

@@ -75,6 +75,34 @@ export type RunRender = {
     updated_at: string;
 } | null;
 
+export type CoachThread = {
+    id: string;
+    title: string | null;
+    created_at: string;
+    updated_at: string;
+};
+
+export type CoachThreadDetail = {
+    thread: CoachThread;
+    messages: Array<CoachMessage>;
+};
+
+export type CoachMessage = {
+    id: string;
+    role: 'system' | 'user' | 'assistant';
+    parts: Array<{
+        type: string;
+        [key: string]: unknown;
+    }>;
+};
+
+export type CoachChatRequest = {
+    thread_id: string;
+    trigger?: 'submit-message' | 'regenerate-message';
+    message?: CoachMessage;
+    message_id?: string;
+};
+
 export type ClientLogAccepted = {
     accepted: number;
 };
@@ -305,6 +333,155 @@ export type StreamRunRenderProgressResponses = {
 };
 
 export type StreamRunRenderProgressResponse = StreamRunRenderProgressResponses[keyof StreamRunRenderProgressResponses];
+
+export type ListCoachThreadsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/coach/threads';
+};
+
+export type ListCoachThreadsErrors = {
+    /**
+     * No valid session.
+     */
+    401: ApiError;
+};
+
+export type ListCoachThreadsError = ListCoachThreadsErrors[keyof ListCoachThreadsErrors];
+
+export type ListCoachThreadsResponses = {
+    /**
+     * The athlete's conversations.
+     */
+    200: Array<CoachThread>;
+};
+
+export type ListCoachThreadsResponse = ListCoachThreadsResponses[keyof ListCoachThreadsResponses];
+
+export type CreateCoachThreadData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/coach/threads';
+};
+
+export type CreateCoachThreadErrors = {
+    /**
+     * No valid session.
+     */
+    401: ApiError;
+};
+
+export type CreateCoachThreadError = CreateCoachThreadErrors[keyof CreateCoachThreadErrors];
+
+export type CreateCoachThreadResponses = {
+    /**
+     * The new conversation.
+     */
+    201: CoachThread;
+};
+
+export type CreateCoachThreadResponse = CreateCoachThreadResponses[keyof CreateCoachThreadResponses];
+
+export type DeleteCoachThreadData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/coach/threads/{id}';
+};
+
+export type DeleteCoachThreadErrors = {
+    /**
+     * No valid session.
+     */
+    401: ApiError;
+    /**
+     * No such conversation for this athlete.
+     */
+    404: ApiError;
+};
+
+export type DeleteCoachThreadError = DeleteCoachThreadErrors[keyof DeleteCoachThreadErrors];
+
+export type DeleteCoachThreadResponses = {
+    /**
+     * Deleted.
+     */
+    204: void;
+};
+
+export type DeleteCoachThreadResponse = DeleteCoachThreadResponses[keyof DeleteCoachThreadResponses];
+
+export type GetCoachThreadData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/coach/threads/{id}';
+};
+
+export type GetCoachThreadErrors = {
+    /**
+     * No valid session.
+     */
+    401: ApiError;
+    /**
+     * No such conversation for this athlete.
+     */
+    404: ApiError;
+};
+
+export type GetCoachThreadError = GetCoachThreadErrors[keyof GetCoachThreadErrors];
+
+export type GetCoachThreadResponses = {
+    /**
+     * The conversation and its messages.
+     */
+    200: CoachThreadDetail;
+};
+
+export type GetCoachThreadResponse = GetCoachThreadResponses[keyof GetCoachThreadResponses];
+
+export type CoachChatData = {
+    body?: CoachChatRequest;
+    path?: never;
+    query?: never;
+    url: '/api/coach/chat';
+};
+
+export type CoachChatErrors = {
+    /**
+     * The request named no message to answer.
+     */
+    400: ApiError;
+    /**
+     * No valid session.
+     */
+    401: ApiError;
+    /**
+     * No such conversation for this athlete.
+     */
+    404: ApiError;
+    /**
+     * No model API key is configured on this server.
+     */
+    503: ApiError;
+};
+
+export type CoachChatError = CoachChatErrors[keyof CoachChatErrors];
+
+export type CoachChatResponses = {
+    /**
+     * A UI message stream of the coach's reply.
+     */
+    200: string;
+};
+
+export type CoachChatResponse = CoachChatResponses[keyof CoachChatResponses];
 
 export type PostClientLogsData = {
     body: ClientLogBatch;

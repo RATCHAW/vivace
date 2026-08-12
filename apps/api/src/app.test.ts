@@ -83,4 +83,25 @@ describe("api", () => {
       expect(res.status, `${method} ${path}`).toBe(401);
     }
   });
+
+  it("rejects the coach endpoints without a session", async () => {
+    for (const [method, path] of [
+      ["GET", "/api/coach/threads"],
+      ["POST", "/api/coach/threads"],
+      ["GET", "/api/coach/threads/abc"],
+      ["DELETE", "/api/coach/threads/abc"],
+    ] as const) {
+      const res = await app.request(path, { method });
+      expect(res.status, `${method} ${path}`).toBe(401);
+    }
+
+    // The chat route validates its body first, so it needs one to reach the
+    // session check at all.
+    const chat = await app.request("/api/coach/chat", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ thread_id: "abc" }),
+    });
+    expect(chat.status).toBe(401);
+  });
 });

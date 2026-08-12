@@ -5,9 +5,15 @@
 // Import from `@/api`, not from the generated files directly, so the client is
 // configured and its errors are normalised before the first request goes out.
 
+import type { UIMessage } from "ai";
 import { client } from "./generated/client.gen";
 import { postClientLogs } from "./generated/sdk.gen";
-import type { ApiError, ClientLogEvent, RunRender } from "./generated/types.gen";
+import type {
+  ApiError,
+  ClientLogEvent,
+  CoachMessage,
+  RunRender,
+} from "./generated/types.gen";
 
 client.setConfig({
   // Same-origin: Vite proxies /api to the Hono server in dev, nginx in Docker.
@@ -55,7 +61,7 @@ client.interceptors.error.use(
 /**
  * Live render progress for one run, over server-sent events.
  *
- * The one hand-written call in this app: the generated client (and the
+ * One of the three hand-written escapes below: the generated client (and the
  * TanStack layer on top of it) can't express a text/event-stream response, so
  * GET /api/runs/{id}/render/progress is consumed with EventSource instead.
  * The path mirrors the `streamRunRenderProgress` operation in the OpenAPI
@@ -115,6 +121,24 @@ export function sendClientLogs(
   void postClientLogs({ body }).catch(() => {});
 }
 
+/** Where `useChat` posts, mirroring the `coachChat` operation in the document. */
+export const COACH_CHAT_PATH = "/api/coach/chat";
+
+/**
+ * A stored transcript, back in the shape `useChat` wants.
+ *
+ * Hand-written for the same reason as `subscribeRunRenderProgress` above: the
+ * generated client can't express it. A `UIMessage` part is a union that grows
+ * with every model capability,
+ * so the OpenAPI schema describes it as "an object with a `type`" rather than
+ * re-deriving the AI SDK's types in Zod. The API only ever stores parts the SDK
+ * itself produced, so this cast is narrowing back to the truth — and it lives
+ * here, once, instead of at every call site.
+ */
+export function toUIMessages(messages: CoachMessage[]): UIMessage[] {
+  return messages as unknown as UIMessage[];
+}
+
 export { client };
 export * from "./generated/@tanstack/react-query.gen";
 export type {
@@ -122,6 +146,9 @@ export type {
   ApiError,
   ClientLogContext,
   ClientLogEvent,
+  CoachMessage,
+  CoachThread,
+  CoachThreadDetail,
   Run,
   RunRender,
   RunRenderState,

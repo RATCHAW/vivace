@@ -4,6 +4,14 @@ import type { Context } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { cors } from "hono/cors";
 import { streamSSE } from "hono/streaming";
+import {
+  convertToModelMessages,
+  createIdGenerator,
+  stepCountIs,
+  streamText,
+  validateUIMessages,
+  type UIMessage,
+} from "ai";
 import { auth } from "./auth.js";
 import { logger } from "./logger.js";
 import { identify, requestLogger, type AppEnv } from "./request-logger.js";
@@ -11,6 +19,10 @@ import {
   AthleteSchema,
   ClientLogAcceptedSchema,
   ClientLogBatchSchema,
+  CoachChatRequestSchema,
+  CoachThreadDetailSchema,
+  CoachThreadSchema,
+  type CoachThreadDetail,
   ErrorSchema,
   HealthSchema,
   RunRenderStateSchema,
@@ -32,6 +44,24 @@ import {
   toRunRender,
   updateRunRender,
 } from "./render-store.js";
+import {
+  COACH_NOT_CONFIGURED,
+  COACH_PROVIDER_OPTIONS,
+  COACH_SYSTEM_PROMPT,
+  createCoachTools,
+  getCoachConfig,
+} from "./coach.js";
+import {
+  createThread,
+  deleteThread,
+  getMessages,
+  getThread,
+  listThreads,
+  saveMessage,
+  setTitleIfUnset,
+  titleFrom,
+  truncateForRegenerate,
+} from "./chat-store.js";
 
 /** Where the OpenAPI document and Swagger UI live. */
 export const OPENAPI_DOCUMENT_PATH = "/api/openapi.json";
@@ -59,6 +89,7 @@ export const openAPIConfig = {
     { name: "Meta", description: "Liveness and documentation" },
     { name: "Athlete", description: "The signed-in athlete's Strava profile" },
     { name: "Runs", description: "The signed-in athlete's runs and their streams" },
+    { name: "Coach", description: "Conversations with the AI running coach" },
     { name: "Telemetry", description: "Browser events and errors, forwarded to Loki" },
   ],
 };
@@ -597,6 +628,263 @@ app.openapi(runRenderProgressRoute, async (c) => {
       }
       await stream.sleep(PROGRESS_POLL_MS);
     }
+  });
+});
+
+// --- Coach --------------------------------------------------------------------
+
+const ThreadIdParamsSchema = z.object({
+  id: z.string().openapi({
+    param: { name: "id", in: "path" },
+    example: "8f2c1e34-9a1b-4f6d-8f0e-3b6a1c9d2e77",
+  }),
+});
+
+const listCoachThreadsRoute = createRoute({
+  method: "get",
+  path: "/api/coach/threads",
+  operationId: "listCoachThreads",
+  tags: ["Coach"],
+  summary: "List the athlete's coach conversations",
+  description: "Most recently used first. A thread with no messages has a null title.",
+  security: [{ sessionCookie: [] }],
+  responses: {
+    200: {
+      description: "The athlete's conversations.",
+      content: { "application/json": { schema: z.array(CoachThreadSchema) } },
+    },
+    401: {
+      description: "No valid session.",
+      content: { "application/json": { schema: ErrorSchema } },
+    },
+  },
+});
+
+app.openapi(listCoachThreadsRoute, async (c) => {
+  const session = await currentUser(c);
+  if (!session) return c.json({ error: "Not signed in" }, 401);
+  return c.json(await listThreads(session.user.id), 200);
+});
+
+const createCoachThreadRoute = createRoute({
+  method: "post",
+  path: "/api/coach/threads",
+  operationId: "createCoachThread",
+  tags: ["Coach"],
+  summary: "Start a new coach conversation",
+  description:
+    "Returns an empty thread. Its title is filled in from the first message " +
+    "the athlete sends to it.",
+  security: [{ sessionCookie: [] }],
+  responses: {
+    201: {
+      description: "The new conversation.",
+      content: { "application/json": { schema: CoachThreadSchema } },
+    },
+    401: {
+      description: "No valid session.",
+      content: { "application/json": { schema: ErrorSchema } },
+    },
+  },
+});
+
+app.openapi(createCoachThreadRoute, async (c) => {
+  const session = await currentUser(c);
+  if (!session) return c.json({ error: "Not signed in" }, 401);
+  return c.json(await createThread(session.user.id), 201);
+});
+
+const getCoachThreadRoute = createRoute({
+  method: "get",
+  path: "/api/coach/threads/{id}",
+  operationId: "getCoachThread",
+  tags: ["Coach"],
+  summary: "Read one conversation",
+  description: "The thread and its full transcript, oldest message first.",
+  security: [{ sessionCookie: [] }],
+  request: { params: ThreadIdParamsSchema },
+  responses: {
+    200: {
+      description: "The conversation and its messages.",
+      content: { "application/json": { schema: CoachThreadDetailSchema } },
+    },
+    401: {
+      description: "No valid session.",
+      content: { "application/json": { schema: ErrorSchema } },
+    },
+    404: {
+      description: "No such conversation for this athlete.",
+      content: { "application/json": { schema: ErrorSchema } },
+    },
+  },
+});
+
+app.openapi(getCoachThreadRoute, async (c) => {
+  const session = await currentUser(c);
+  if (!session) return c.json({ error: "Not signed in" }, 401);
+
+  const { id } = c.req.valid("param");
+  const thread = await getThread(session.user.id, id);
+  if (!thread) return c.json({ error: "No such conversation" }, 404);
+
+  // The stored parts are UIMessage parts; the schema describes them loosely.
+  const messages = (await getMessages(id)) as CoachThreadDetail["messages"];
+  return c.json({ thread, messages }, 200);
+});
+
+const deleteCoachThreadRoute = createRoute({
+  method: "delete",
+  path: "/api/coach/threads/{id}",
+  operationId: "deleteCoachThread",
+  tags: ["Coach"],
+  summary: "Delete one conversation",
+  description: "Removes the thread and every message in it.",
+  security: [{ sessionCookie: [] }],
+  request: { params: ThreadIdParamsSchema },
+  responses: {
+    204: { description: "Deleted." },
+    401: {
+      description: "No valid session.",
+      content: { "application/json": { schema: ErrorSchema } },
+    },
+    404: {
+      description: "No such conversation for this athlete.",
+      content: { "application/json": { schema: ErrorSchema } },
+    },
+  },
+});
+
+app.openapi(deleteCoachThreadRoute, async (c) => {
+  const session = await currentUser(c);
+  if (!session) return c.json({ error: "Not signed in" }, 401);
+
+  const { id } = c.req.valid("param");
+  const deleted = await deleteThread(session.user.id, id);
+  if (!deleted) return c.json({ error: "No such conversation" }, 404);
+  return c.body(null, 204);
+});
+
+/** Enough room for a few tool calls and the answer that follows them. */
+const COACH_MAX_STEPS = 8;
+
+const coachChatRoute = createRoute({
+  method: "post",
+  path: "/api/coach/chat",
+  operationId: "coachChat",
+  tags: ["Coach"],
+  summary: "Send a message and stream the coach's reply",
+  description:
+    "Loads the thread's transcript, appends the incoming message, and streams " +
+    "the model's answer as an AI SDK UI message stream — text, reasoning and " +
+    "tool calls as they happen. Both the athlete's message and the finished " +
+    "reply are persisted, so the browser never has to send the history back. " +
+    "Consumed by `useChat` from @ai-sdk/react, not by the generated client.",
+  security: [{ sessionCookie: [] }],
+  request: {
+    body: {
+      content: { "application/json": { schema: CoachChatRequestSchema } },
+    },
+  },
+  responses: {
+    200: {
+      description: "A UI message stream of the coach's reply.",
+      content: { "text/event-stream": { schema: z.string() } },
+    },
+    400: {
+      description: "The request named no message to answer.",
+      content: { "application/json": { schema: ErrorSchema } },
+    },
+    401: {
+      description: "No valid session.",
+      content: { "application/json": { schema: ErrorSchema } },
+    },
+    404: {
+      description: "No such conversation for this athlete.",
+      content: { "application/json": { schema: ErrorSchema } },
+    },
+    503: {
+      description: "No model API key is configured on this server.",
+      content: { "application/json": { schema: ErrorSchema } },
+    },
+  },
+});
+
+app.openapi(coachChatRoute, async (c) => {
+  const session = await currentUser(c);
+  if (!session) return c.json({ error: "Not signed in" }, 401);
+
+  const log = c.get("log");
+  const config = getCoachConfig();
+  if (!config) {
+    log.warn({ event: "coach.not_configured" }, "No model API key is configured");
+    return c.json({ error: COACH_NOT_CONFIGURED }, 503);
+  }
+
+  const body = c.req.valid("json");
+  const thread = await getThread(session.user.id, body.thread_id);
+  if (!thread) return c.json({ error: "No such conversation" }, 404);
+
+  const accessToken = await stravaAccessToken(c, session.user.id);
+  if (!accessToken) return c.json({ error: "No Strava access token" }, 401);
+
+  if (body.trigger === "regenerate-message") {
+    if (body.message_id) {
+      await truncateForRegenerate(thread.id, body.message_id);
+    }
+  } else {
+    if (!body.message) return c.json({ error: "No message to answer" }, 400);
+    // `validateUIMessages` is the SDK's own guard against a malformed parts
+    // array reaching the model — the OpenAPI schema only checks the envelope.
+    const [message] = await validateUIMessages({ messages: [body.message] });
+    await saveMessage(thread.id, message);
+    const title = titleFrom(message);
+    if (title) await setTitleIfUnset(thread.id, title);
+  }
+
+  const messages: UIMessage[] = await getMessages(thread.id);
+
+  // The interesting part of a coach turn isn't in the URL: which thread, and
+  // whether the athlete asked something new or re-rolled the last answer.
+  log.info(
+    {
+      event: "coach.turn_started",
+      threadId: thread.id,
+      trigger: body.trigger,
+      messages: messages.length,
+    },
+    "Answering a coach turn",
+  );
+
+  const result = streamText({
+    model: config.model,
+    system: COACH_SYSTEM_PROMPT,
+    messages: await convertToModelMessages(messages),
+    tools: createCoachTools(accessToken),
+    // Every tool call costs a round trip; the cap keeps a confused model from
+    // looping through the athlete's whole history.
+    stopWhen: stepCountIs(COACH_MAX_STEPS),
+    providerOptions: COACH_PROVIDER_OPTIONS,
+  });
+
+  return result.toUIMessageStreamResponse({
+    // With the transcript attached the SDK reuses ids on regenerate, which is
+    // what makes `saveMessage`'s upsert replace rather than duplicate.
+    originalMessages: messages,
+    generateMessageId: createIdGenerator({ prefix: "msg", size: 16 }),
+    onEnd: async ({ responseMessage }) => {
+      await saveMessage(thread.id, responseMessage);
+      log.info({ event: "coach.turn_finished", threadId: thread.id }, "Coach answered");
+    },
+    onError: (error) => {
+      // The default swallows everything as "An error occurred." — a coach that
+      // can't reach its model should say why, to the athlete and to Grafana.
+      // The stream is already open, so this never becomes a 5xx: without a log
+      // line a failing model is invisible on the server.
+      log.error({ event: "coach.turn_failed", threadId: thread.id, err: error }, "Coach failed");
+      return error instanceof Error
+        ? error.message
+        : "The coach could not answer that.";
+    },
   });
 });
 
