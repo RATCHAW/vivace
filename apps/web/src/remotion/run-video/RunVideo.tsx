@@ -83,7 +83,7 @@ export function RunVideo({ activity, streams, mapboxToken }: RunVideoProps) {
   const points = streams.latlng?.data ?? [];
   const hasRoute = points.length >= 2;
   const hasMap = hasRoute && mapboxToken !== "";
-  const metrics = metricsAtProgress(activity, streams, progress);
+  const metrics = metricsAtProgress(activity, streams, progress, fps);
 
   return (
     <AbsoluteFill

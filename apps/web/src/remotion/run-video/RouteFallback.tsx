@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { AbsoluteFill } from "remotion";
-import { projectRoute, sampleIndex, type LatLng } from "./data";
+import { projectRoute, ROUTE_PADDING, sampleIndex, type LatLng } from "./data";
 
 // DESIGN.md {colors.primary} — cobalt as illustration ink on the black canvas.
 const ROUTE_COLOR = "#494fdf";
@@ -22,14 +22,7 @@ export function RouteFallback({
   height: number;
 }) {
   const projected = useMemo(
-    () =>
-      projectRoute(points, width, height, {
-        // Leave room for the title band (top) and the metrics band (bottom).
-        top: 480,
-        bottom: 660,
-        left: 130,
-        right: 130,
-      }),
+    () => projectRoute(points, width, height, ROUTE_PADDING),
     [points, width, height],
   );
 

@@ -1,8 +1,14 @@
-import { useEffect, useRef, useState } from "react";
-import { AbsoluteFill, interpolate, useDelayRender } from "remotion";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { AbsoluteFill, getRemotionEnvironment, useDelayRender } from "remotion";
 import mapboxgl, { type GeoJSONSource, type Map as MapboxMap } from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
-import { sampleIndex, type LatLng } from "./data";
+import {
+  buildCameraTrack,
+  cameraAtProgress,
+  ROUTE_PADDING,
+  sampleIndex,
+  type LatLng,
+} from "./data";
 
 // DESIGN.md {colors.primary} — the cobalt stamp, used here as illustration ink.
 const ROUTE_COLOR = "#494fdf";
@@ -23,14 +29,9 @@ const point = (coordinates: [number, number]) =>
     geometry: { type: "Point", coordinates },
   }) as const;
 
-interface Camera {
-  center: [number, number];
-  zoom: number;
-}
-
 /** Deterministic Mapbox plate: the full route sits faint under a cobalt trace
- *  that draws with `progress`, while the camera eases from a tight shot on the
- *  start point out to the full route. */
+ *  that draws with `progress`, while the camera follows the head of that trace
+ *  — see `buildCameraTrack` for how it stays framed. */
 export function RunMap({
   points,
   progress,
@@ -45,27 +46,33 @@ export function RunMap({
   height: number;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const cameraRef = useRef<{ start: Camera; end: Camera } | null>(null);
   const { delayRender, continueRender } = useDelayRender();
   const [map, setMap] = useState<MapboxMap | null>(null);
   const [loadingHandle] = useState(() => delayRender("Loading Mapbox map"));
+  // A headless render and the <Player> want opposite things from this map — see
+  // the two effects below. Everything that differs hangs off this one flag.
+  const { isRendering } = getRemotionEnvironment();
 
   const coords = points.map(toLngLat);
+  // Pure geometry — the path exists before the first tile does, so the map can
+  // open on the right shot instead of easing into one once the style lands.
+  const track = useMemo(
+    () => buildCameraTrack(points, { width, height, padding: ROUTE_PADDING }),
+    [points, width, height],
+  );
 
   useEffect(() => {
     if (!containerRef.current) return;
 
-    const bounds = coords.reduce(
-      (b, coord) => b.extend(coord),
-      new mapboxgl.LngLatBounds(coords[0], coords[0]),
-    );
+    let disposed = false;
+    const opening = cameraAtProgress(track, progress);
 
     const mapInstance = new mapboxgl.Map({
       accessToken: token,
       container: containerRef.current,
       style: "mapbox://styles/mapbox/dark-v11",
-      center: coords[0],
-      zoom: 13,
+      center: opening?.center ?? coords[0],
+      zoom: opening?.zoom ?? 13,
       interactive: false,
       // Attribution is rendered by the composition as story-legible text.
       attributionControl: false,
@@ -74,21 +81,6 @@ export function RunMap({
     });
 
     mapInstance.on("load", () => {
-      // Leave room for the title band (top) and the metrics band (bottom).
-      const fit = mapInstance.cameraForBounds(bounds, {
-        padding: { top: 480, bottom: 660, left: 130, right: 130 },
-      });
-      const endCamera: Camera = {
-        center: (fit?.center as mapboxgl.LngLat | undefined)?.toArray() as
-          | [number, number]
-          | undefined ?? coords[0],
-        zoom: Math.min(fit?.zoom ?? 13, 16),
-      };
-      cameraRef.current = {
-        start: { center: coords[0], zoom: Math.min(endCamera.zoom + 0.9, 16.5) },
-        end: endCamera,
-      };
-
       mapInstance.addSource("route-full", { type: "geojson", data: lineString(coords) });
       mapInstance.addLayer({
         id: "route-full-line",
@@ -136,40 +128,55 @@ export function RunMap({
         },
       });
 
-      mapInstance.jumpTo(cameraRef.current.start);
       mapInstance.once("idle", () => {
+        if (disposed) return;
         setMap(mapInstance);
         continueRender(loadingHandle);
       });
     });
-    // The map mounts exactly once per composition; RunMap is keyed by activity.
+
+    return () => {
+      // Remotion keeps the tree mounted for the whole of a headless render, so
+      // this only fires under the <Player> — and there an undisposed map is a
+      // leaked WebGL context per run plus, under StrictMode's double-mount, a
+      // second map stacked in the same container. Both maps load in parallel,
+      // whichever idled last won `setMap`, and when that was the hidden one the
+      // runner dot sat frozen while the player played.
+      if (isRendering) return;
+      disposed = true;
+      mapInstance.remove();
+    };
+    // The map is built once per mount; RunMap is keyed by activity upstream.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [continueRender, loadingHandle, token]);
+  }, [continueRender, isRendering, loadingHandle, token]);
 
   useEffect(() => {
-    if (!map || !cameraRef.current) return;
+    if (!map) return;
 
-    const handle = delayRender("Rendering Mapbox frame");
     const idx = sampleIndex(coords.length, progress);
     const trace = map.getSource("route-trace") as GeoJSONSource | undefined;
     const runner = map.getSource("runner-marker") as GeoJSONSource | undefined;
     trace?.setData(lineString(coords.slice(0, Math.max(idx + 1, 2))));
     runner?.setData(point(coords[idx]));
 
-    const { start, end } = cameraRef.current;
-    map.jumpTo({
-      center: [
-        interpolate(progress, [0, 1], [start.center[0], end.center[0]]),
-        interpolate(progress, [0, 1], [start.center[1], end.center[1]]),
-      ],
-      zoom: interpolate(progress, [0, 1], [start.zoom, end.zoom]),
-    });
+    // The camera is framed on the same drawn prefix, so the dot it is tracking
+    // cannot walk off the plate.
+    const camera = cameraAtProgress(track, progress);
+    if (camera) map.jumpTo(camera);
 
-    map.once("idle", () => continueRender(handle));
-    // Force an idle event even when the camera is unchanged between frames.
+    // Holding the frame until the map settles is what makes a headless render
+    // deterministic. The <Player> can't wait — delayRender() is inert there and
+    // playback runs on regardless — and a moving camera keeps requesting tiles,
+    // so one `once("idle")` per frame queues up faster than Mapbox drains it.
+    // Push the frame and let the next one land instead.
+    if (isRendering) {
+      const handle = delayRender("Rendering Mapbox frame");
+      map.once("idle", () => continueRender(handle));
+    }
+    // Force a repaint even when the camera is unchanged between frames.
     map.triggerRepaint();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [continueRender, delayRender, map, progress]);
+  }, [continueRender, delayRender, isRendering, map, progress, track]);
 
   return (
     <AbsoluteFill>
