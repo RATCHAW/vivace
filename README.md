@@ -11,6 +11,7 @@ A Turborepo monorepo: sign in with Strava (and only Strava), then see your basic
 | Auth | [better-auth](https://better-auth.com) with the generic OAuth plugin (Strava) |
 | Database | Postgres (via Docker) |
 | Web | [Vite](https://vite.dev) + React (`apps/web`) |
+| UI | [shadcn/ui](https://ui.shadcn.com) + [Tailwind CSS v4](https://tailwindcss.com) |
 | Tests | [Vitest](https://vitest.dev) |
 | Shared code | `packages/shared` (types used by both apps) |
 
@@ -56,6 +57,30 @@ Strava API (`GET /api/v3/athlete`).
 
 In dev, Vite proxies `/api` → `http://localhost:3000`, so the browser only ever talks
 to one origin.
+
+## UI
+
+**shadcn/ui is the default for anything UI.** Reach for a registry component before
+hand-rolling markup or writing bespoke CSS.
+
+- Config lives in [`apps/web/components.json`](apps/web/components.json) —
+  style `base-nova` ([Base UI](https://base-ui.com) primitives, Lucide icons, Geist).
+- Components are vendored into `apps/web/src/components/ui/` and are **yours to edit**;
+  they are normal source files, not a locked dependency.
+- Design tokens (colours, radii, dark mode) live in `apps/web/src/styles.css`.
+  Style with tokens — `bg-card`, `text-muted-foreground`, `border-border` — not raw
+  hex, so light and dark both stay correct. Brand colours that fall outside the token
+  set get their own `@theme` entry (see `--color-strava`).
+- Dark mode is class-based via `next-themes`; the provider is in `src/main.tsx`.
+
+```sh
+# add a component (button, dialog, table, …) — see https://ui.shadcn.com/docs/components
+pnpm --filter @repo/web ui:add table
+
+# already installed
+# alert  avatar  badge  button  card  dialog  dropdown-menu
+# input  label  separator  skeleton  sonner  tooltip
+```
 
 ## Commands
 
