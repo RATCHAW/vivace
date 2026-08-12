@@ -4,6 +4,7 @@ import { Loader2Icon } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import { Login } from "@/pages/Login";
 import { Home } from "@/pages/Home";
+import { Coach } from "@/pages/Coach";
 
 // Remotion + Mapbox are heavy — only load them when the runs page is visited.
 const Runs = lazy(() =>
@@ -47,6 +48,10 @@ export function App() {
             <Navigate to="/login" replace />
           )
         }
+      />
+      <Route
+        path="/coach"
+        element={session ? <Coach /> : <Navigate to="/login" replace />}
       />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
