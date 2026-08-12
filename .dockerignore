@@ -1,0 +1,13 @@
+# Never ship host installs into the image — pnpm's node_modules is a symlink
+# farm into the local store and would clobber the in-image install.
+node_modules
+**/node_modules
+dist
+**/dist
+.turbo
+**/.turbo
+.git
+.env
+**/.env
+*.local
+.DS_Store

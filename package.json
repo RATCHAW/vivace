@@ -1,0 +1,17 @@
+{
+  "name": "strava-login-app",
+  "private": true,
+  "license": "CC-BY-NC-SA-4.0",
+  "packageManager": "pnpm@10.17.0",
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "typecheck": "turbo run typecheck",
+    "auth:migrate": "pnpm --filter @repo/api run auth:migrate",
+    "db:up": "docker compose up -d db"
+  },
+  "devDependencies": {
+    "turbo": "^2.5.0"
+  }
+}
