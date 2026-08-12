@@ -4,6 +4,9 @@
 /* Inter with the optical-size axis: large sizes automatically pick up the
    "Inter Display" cut, the closest open substitute for Aeonik Pro. */
 @import "@fontsource-variable/inter/opsz.css";
+/* The replay's technical micro-labels (CHAPTER, SPLITS, DISTANCE · 2026) are
+   set in mono so their tracking reads as instrumentation rather than copy. */
+@import "@fontsource-variable/jetbrains-mono";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -19,6 +22,9 @@
        substitute. Swap --font-heading here if Aeonik Pro is ever licensed. */
     --font-sans: 'Inter Variable', Inter, system-ui, sans-serif;
     --font-heading: var(--font-sans);
+    /* Not in DESIGN.md — it names no mono face. Introduced by the Vivace app
+       design for instrument labels only; never for copy. */
+    --font-mono: 'JetBrains Mono Variable', ui-monospace, SFMono-Regular, monospace;
 
     --color-sidebar-ring: var(--sidebar-ring);
     --color-sidebar-border: var(--sidebar-border);
@@ -120,6 +126,22 @@
 
     --text-caption: 0.8125rem;
     --text-caption--line-height: 1.4;
+
+    /* Instrument labels. Outside DESIGN.md's ramp — the Vivace app design uses
+       wide-tracked mono for the technical eyebrows above a number (DISTANCE,
+       SPLITS, 02 · ROUTE) and for SOON stamps. Pair with `font-mono`. */
+    --text-mono-label: 0.6875rem;
+    --text-mono-label--line-height: 1.2;
+    --text-mono-label--letter-spacing: 0.14em;
+
+    --text-mono-badge: 0.625rem;
+    --text-mono-badge--line-height: 1.2;
+    --text-mono-badge--letter-spacing: 0.1em;
+
+    /* {colors.stone} — metadata and subtle captions. A third text level below
+       `--muted-foreground`, and the only one legible on both canvases, which is
+       why it sits here rather than in the light/dark token blocks. */
+    --color-stone: #8d969e;
 
     /* Accent palette. DESIGN.md: these live inside product illustrations and
        iconography ONLY — never as button surfaces. */

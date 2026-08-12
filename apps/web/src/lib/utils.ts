@@ -20,8 +20,11 @@ const twMerge = extendTailwindMerge({
         "body-md",
         "body-sm",
         "caption",
+        "mono-label",
+        "mono-badge",
       ],
       color: [
+        "stone",
         "brand",
         "brand-foreground",
         "brand-bright",

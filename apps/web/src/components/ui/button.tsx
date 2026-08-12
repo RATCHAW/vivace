@@ -16,6 +16,11 @@ const buttonVariants = cva(
         // button-outline-light / button-outline-dark — a full-strength 1px rule
         outline:
           "border-foreground bg-background text-foreground hover:bg-muted aria-expanded:bg-muted",
+        // The same pill drawn on {colors.hairline-dark} instead. For the ring of
+        // secondary controls around a piece of content — player transport, back
+        // arrows, Share — where a full-strength rule would outshout the content.
+        subtle:
+          "border-border bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground aria-expanded:bg-muted",
         // button-soft — surface-soft ground
         secondary:
           "bg-secondary text-secondary-foreground hover:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_5%)] aria-expanded:bg-secondary",

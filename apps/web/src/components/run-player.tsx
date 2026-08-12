@@ -1,0 +1,169 @@
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Player, type PlayerRef } from "@remotion/player";
+import { toast } from "sonner";
+import {
+  DownloadIcon,
+  MaximizeIcon,
+  MinimizeIcon,
+  PauseIcon,
+  PlayIcon,
+  Share2Icon,
+} from "lucide-react";
+import type { Run, RunStreams } from "@/api";
+import { MonoLabel, SoonBadge } from "@/components/mono";
+import { Button } from "@/components/ui/button";
+import { Slider } from "@/components/ui/slider";
+import { cn } from "@/lib/utils";
+import { RunVideo } from "@/remotion/run-video/RunVideo";
+import {
+  chapterAtProgress,
+  DURATION_IN_FRAMES,
+  formatClock,
+  FPS,
+  VIDEO_HEIGHT,
+  VIDEO_WIDTH,
+} from "@/remotion/run-video/data";
+
+/** The replay with its own transport. Remotion's built-in controls are a video
+ *  chrome; this one speaks the film's language instead — a chapter name under
+ *  the scrubber, and a theatre toggle that gives the 9:16 the whole row.
+ *
+ *  Mount one per activity (`key` on the id): `RunMap` builds its Mapbox
+ *  instance once per mount, and the transport below subscribes to one player. */
+export function RunPlayer({
+  activity,
+  streams,
+  mapboxToken,
+  expanded,
+  onToggleExpanded,
+}: {
+  activity: Run;
+  streams: RunStreams;
+  mapboxToken: string;
+  expanded: boolean;
+  onToggleExpanded: () => void;
+}) {
+  const player = useRef<PlayerRef>(null);
+  const [frame, setFrame] = useState(0);
+  const [playing, setPlaying] = useState(false);
+
+  // The player owns playback; this component only mirrors it, so the transport
+  // stays right even when playback is driven from somewhere else (a seek that
+  // pauses, the loop wrapping round, autoplay being refused).
+  useEffect(() => {
+    const current = player.current;
+    if (!current) return;
+
+    // `autoPlay` starts the film during mount, and the "play" that goes with it
+    // is emitted before there is anything here to hear it — so playback state is
+    // read from the player on every frame rather than accumulated from events.
+    // "pause" still has to be listened for: a paused player emits no frames.
+    const onFrame = (e: { detail: { frame: number } }) => {
+      setFrame(e.detail.frame);
+      setPlaying(current.isPlaying());
+    };
+    const onPause = () => setPlaying(false);
+
+    current.addEventListener("frameupdate", onFrame);
+    current.addEventListener("pause", onPause);
+    setPlaying(current.isPlaying());
+
+    return () => {
+      current.removeEventListener("frameupdate", onFrame);
+      current.removeEventListener("pause", onPause);
+    };
+  }, []);
+
+  const share = useCallback(async () => {
+    const url = `${window.location.origin}/runs?run=${activity.id}`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: activity.name, url });
+        return;
+      }
+      await navigator.clipboard.writeText(url);
+      toast.success("Link copied", { description: "Anyone signed in can open this run." });
+    } catch (error) {
+      // A dismissed share sheet rejects too — only surface real failures.
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      toast.error("Could not share this run");
+    }
+  }, [activity.id, activity.name]);
+
+  const progress = frame / Math.max(1, DURATION_IN_FRAMES - 1);
+  const chapter = chapterAtProgress(progress);
+
+  return (
+    // Theatre mode centres the film and keeps the transport to its width — a
+    // scrubber three times wider than the thing it scrubs reads as a mistake.
+    <div className={cn("flex flex-col gap-4", expanded && "mx-auto max-w-[460px]")}>
+      <div className="aspect-9/16 w-full overflow-hidden rounded-lg border bg-black">
+        <Player
+          ref={player}
+          component={RunVideo}
+          inputProps={{ activity, streams, mapboxToken }}
+          durationInFrames={DURATION_IN_FRAMES}
+          fps={FPS}
+          compositionWidth={VIDEO_WIDTH}
+          compositionHeight={VIDEO_HEIGHT}
+          loop
+          autoPlay
+          acknowledgeRemotionLicense
+          style={{ width: "100%", height: "100%" }}
+        />
+      </div>
+
+      <div className="flex items-center gap-3.5">
+        <Button
+          size="icon"
+          aria-label={playing ? "Pause replay" : "Play replay"}
+          onClick={() => player.current?.toggle()}
+        >
+          {playing ? <PauseIcon /> : <PlayIcon />}
+        </Button>
+
+        <MonoLabel className="tabular-nums whitespace-nowrap">
+          {formatClock(frame / FPS)} / {formatClock(DURATION_IN_FRAMES / FPS)}
+        </MonoLabel>
+
+        <Slider
+          aria-label="Seek"
+          className="min-w-0 flex-1"
+          min={0}
+          max={DURATION_IN_FRAMES - 1}
+          value={frame}
+          onValueChange={(value) => {
+            const next = Array.isArray(value) ? value[0] : value;
+            setFrame(next);
+            player.current?.seekTo(next);
+          }}
+        />
+
+        <Button
+          size="icon"
+          variant="subtle"
+          aria-label={expanded ? "Leave theatre mode" : "Enter theatre mode"}
+          aria-pressed={expanded}
+          onClick={onToggleExpanded}
+        >
+          {expanded ? <MinimizeIcon /> : <MaximizeIcon />}
+        </Button>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <MonoLabel className="mr-auto whitespace-nowrap">{chapter.label}</MonoLabel>
+        <Button size="sm" variant="subtle" onClick={share}>
+          <Share2Icon />
+          Share
+        </Button>
+        {/* Rendering an MP4 needs @remotion/renderer on the server; the button
+            is here because the flow is designed, not because it works. */}
+        <Button size="sm" variant="secondary" disabled>
+          <DownloadIcon />
+          Download MP4
+          <SoonBadge />
+        </Button>
+      </div>
+    </div>
+  );
+}
