@@ -1,0 +1,222 @@
+@import "tailwindcss";
+@import "shadcn/tailwind.css";
+/* Inter with the optical-size axis: large sizes automatically pick up the
+   "Inter Display" cut, the closest open substitute for Aeonik Pro. */
+@import "@fontsource-variable/inter/opsz.css";
+/* The replay's technical micro-labels (AUG 5 2026, PACE, 02 · ROUTE) are set in
+   mono so their tracking reads as instrumentation rather than copy. */
+@import "@fontsource-variable/jetbrains-mono";
+
+/* ---------------------------------------------------------------------------
+ * The same shadcn token layer as apps/web/src/styles.css, bound to
+ * apps/web/DESIGN.md — keep the two in step when a token changes.
+ *
+ * One difference, and it is deliberate: the app switches canvas by theme
+ * (`.dark` on <html>), the landing page switches canvas *by band*. DESIGN.md's
+ * two-mode rhythm — black storytelling bands slamming against white catalogue
+ * bands — is the composition here, so `:root` is the dark canvas and a white
+ * band re-declares the light token set with `.band-light`. There is no theme
+ * toggle on a marketing page, so there is no `.dark` scope to collide with.
+ * ------------------------------------------------------------------------ */
+
+@theme inline {
+    /* Aeonik Pro is proprietary; DESIGN.md names Inter Display as a credible
+       substitute. Swap --font-heading here if Aeonik Pro is ever licensed. */
+    --font-sans: 'Inter Variable', Inter, system-ui, sans-serif;
+    --font-heading: var(--font-sans);
+    --font-mono: 'JetBrains Mono Variable', ui-monospace, SFMono-Regular, monospace;
+
+    --color-ring: var(--ring);
+    --color-input: var(--input);
+    --color-border: var(--border);
+    --color-destructive: var(--destructive);
+    --color-accent-foreground: var(--accent-foreground);
+    --color-accent: var(--accent);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-muted: var(--muted);
+    --color-secondary-foreground: var(--secondary-foreground);
+    --color-secondary: var(--secondary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-primary: var(--primary);
+    --color-popover-foreground: var(--popover-foreground);
+    --color-popover: var(--popover);
+    --color-card-foreground: var(--card-foreground);
+    --color-card: var(--card);
+    --color-foreground: var(--foreground);
+    --color-background: var(--background);
+
+    /* The cobalt-violet brand stamp. Deliberately NOT --primary: DESIGN.md
+       reserves it for featured surfaces and the wordmark, at most one per
+       viewport. --primary is the white/black CTA pill. */
+    --color-brand: var(--brand);
+    --color-brand-foreground: var(--brand-foreground);
+    --color-brand-bright: var(--brand-bright);
+    --color-brand-deep: var(--brand-deep);
+
+    /* {colors.divider-soft} — the sub-hairline under the footer, one step
+       quieter than {colors.hairline-dark}. Used once. */
+    --color-divider-soft: var(--divider-soft);
+
+    /* rounded.* — DESIGN.md's explicit scale, not the computed shadcn ramp. */
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 20px;
+    --radius-xl: 28px;
+    --radius-2xl: 36px;
+    --radius-3xl: 44px;
+    --radius-4xl: 52px;
+}
+
+/* typography.* — DESIGN.md's type ramp as first-class utilities.
+   Display sizes clamp across the responsive ladder documented in DESIGN.md
+   (136 -> 80 -> 64 -> 48). */
+@theme {
+    --text-display-xxl: clamp(3rem, 9vw, 8.5rem);
+    --text-display-xxl--line-height: 1;
+    --text-display-xxl--letter-spacing: -0.02em;
+    --text-display-xxl--font-weight: 500;
+
+    --text-display-xl: clamp(2.5rem, 6vw, 5rem);
+    --text-display-xl--line-height: 1;
+    --text-display-xl--letter-spacing: -0.01em;
+    --text-display-xl--font-weight: 500;
+
+    --text-display-lg: 3rem;
+    --text-display-lg--line-height: 1.21;
+    --text-display-lg--letter-spacing: -0.01em;
+    --text-display-lg--font-weight: 500;
+
+    --text-display-md: 2.5rem;
+    --text-display-md--line-height: 1.2;
+    --text-display-md--letter-spacing: -0.01em;
+    --text-display-md--font-weight: 500;
+
+    --text-heading-lg: 2rem;
+    --text-heading-lg--line-height: 1.19;
+    --text-heading-lg--letter-spacing: -0.01em;
+    --text-heading-lg--font-weight: 500;
+
+    --text-heading-md: 1.5rem;
+    --text-heading-md--line-height: 1.33;
+    --text-heading-md--font-weight: 500;
+
+    --text-heading-sm: 1.25rem;
+    --text-heading-sm--line-height: 1.4;
+    --text-heading-sm--font-weight: 500;
+
+    --text-body-lg: 1.125rem;
+    --text-body-lg--line-height: 1.56;
+    --text-body-lg--letter-spacing: -0.005em;
+
+    --text-body-md: 1rem;
+    --text-body-md--line-height: 1.5;
+    --text-body-md--letter-spacing: 0.015em;
+
+    --text-body-sm: 0.875rem;
+    --text-body-sm--line-height: 1.43;
+
+    --text-caption: 0.8125rem;
+    --text-caption--line-height: 1.4;
+
+    /* Instrument labels. Outside DESIGN.md's ramp — wide-tracked mono for the
+       technical eyebrow above a number (DISTANCE, 02 · ROUTE) and SOON stamps.
+       Pair with `font-mono`. */
+    --text-mono-label: 0.6875rem;
+    --text-mono-label--line-height: 1.2;
+    --text-mono-label--letter-spacing: 0.14em;
+
+    --text-mono-badge: 0.625rem;
+    --text-mono-badge--line-height: 1.2;
+    --text-mono-badge--letter-spacing: 0.1em;
+
+    /* {colors.stone} — metadata and subtle captions. The only third-level text
+       colour legible on both canvases, which is why it sits here rather than in
+       the band token blocks. */
+    --color-stone: #8d969e;
+
+    /* Strava's OAuth brand colour. Outside the DESIGN.md palette by necessity —
+       it belongs to Strava, not to us. Used on the provider mark only, never as
+       a button surface (DESIGN.md: accents are not button surfaces). */
+    --color-strava: #fc4c02;
+}
+
+/* The dark canvas — DESIGN.md "canvas-dark" storytelling band, and the
+   landing page's default. The surface ladder has exactly two dark steps
+   (canvas-dark -> surface-elevated). Do not add a third. */
+:root {
+    --background: #000000;                      /* canvas-dark */
+    --foreground: #ffffff;                      /* on-dark */
+    --card: #16181a;                            /* surface-elevated */
+    --card-foreground: #ffffff;                 /* on-dark */
+    --popover: #16181a;                         /* surface-elevated */
+    --popover-foreground: #ffffff;              /* on-dark */
+    --primary: #ffffff;                         /* button-primary: white pill */
+    --primary-foreground: #000000;              /* canvas-dark */
+    --secondary: #16181a;                       /* surface-elevated */
+    --secondary-foreground: #ffffff;            /* on-dark */
+    --muted: #16181a;                           /* surface-elevated */
+    --muted-foreground: rgba(255,255,255,0.72); /* on-dark-mute */
+    --accent: #16181a;                          /* surface-elevated */
+    --accent-foreground: #ffffff;               /* on-dark */
+    --destructive: #e23b4a;                     /* accent-danger */
+    --border: rgba(255,255,255,0.12);           /* hairline-dark */
+    --input: rgba(255,255,255,0.12);            /* hairline-dark */
+    --ring: #4f55f1;                            /* primary-bright */
+    --brand: #494fdf;                           /* primary */
+    --brand-foreground: #ffffff;                /* on-primary */
+    --brand-bright: #4f55f1;                    /* primary-bright */
+    --brand-deep: #3a40c4;                      /* primary-deep */
+    --radius: 20px;                             /* rounded.lg — card radius */
+    /* {colors.divider-soft} — the sub-hairline used once, under the footer. */
+    --divider-soft: rgba(255,255,255,0.06);
+}
+
+/* The light band — DESIGN.md "canvas-light" catalogue mode. Sections slam
+   against each other in full-bleed bands rather than fading between them, so
+   this is a scope, not a media query. */
+.band-light {
+    --background: #ffffff;              /* canvas-light */
+    --foreground: #191c1f;              /* ink */
+    --card: #ffffff;                    /* surface-card */
+    --card-foreground: #191c1f;         /* ink */
+    --popover: #ffffff;                 /* canvas-light */
+    --popover-foreground: #191c1f;      /* ink */
+    --primary: #000000;                 /* button-dark: dark CTA on light */
+    --primary-foreground: #ffffff;      /* on-dark */
+    --secondary: #f4f4f4;               /* button-soft / surface-soft */
+    --secondary-foreground: #191c1f;    /* ink */
+    --muted: #f4f4f4;                   /* surface-soft */
+    --muted-foreground: #505a63;        /* mute */
+    --accent: #f4f4f4;                  /* surface-soft */
+    --accent-foreground: #191c1f;       /* ink */
+    --border: #e2e2e7;                  /* hairline-light */
+    --input: #e2e2e7;                   /* hairline-light */
+    --ring: #494fdf;                    /* primary — transient focus only */
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+    }
+  html {
+    @apply font-sans;
+    font-optical-sizing: auto;
+    scroll-behavior: smooth;
+    }
+  body {
+    @apply bg-background text-body-md text-foreground antialiased;
+    }
+  /* The header is 64px and sticky; anchors have to clear it. */
+  :target {
+    scroll-margin-top: 4rem;
+    }
+  ::selection {
+    background: var(--brand-bright);
+    color: #ffffff;
+    }
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+      }
+    }
+}
