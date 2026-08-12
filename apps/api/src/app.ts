@@ -1,15 +1,22 @@
 import { OpenAPIHono, createRoute, z } from "@hono/zod-openapi";
 import { swaggerUI } from "@hono/swagger-ui";
+import type { Context } from "hono";
+import { bodyLimit } from "hono/body-limit";
 import { cors } from "hono/cors";
 import { streamSSE } from "hono/streaming";
 import { auth } from "./auth.js";
+import { logger } from "./logger.js";
+import { identify, requestLogger, type AppEnv } from "./request-logger.js";
 import {
   AthleteSchema,
+  ClientLogAcceptedSchema,
+  ClientLogBatchSchema,
   ErrorSchema,
   HealthSchema,
   RunRenderStateSchema,
   RunSchema,
   RunStreamsSchema,
+  type ClientLogLevel,
 } from "./schemas.js";
 import {
   fetchAthlete,
@@ -52,10 +59,45 @@ export const openAPIConfig = {
     { name: "Meta", description: "Liveness and documentation" },
     { name: "Athlete", description: "The signed-in athlete's Strava profile" },
     { name: "Runs", description: "The signed-in athlete's runs and their streams" },
+    { name: "Telemetry", description: "Browser events and errors, forwarded to Loki" },
   ],
 };
 
-export const app = new OpenAPIHono();
+export const app = new OpenAPIHono<AppEnv>({
+  // Without a hook, a request that fails schema validation gets Zod's own
+  // error body and no log line. Both are fixed here, for every route at once.
+  defaultHook: (result, c) => {
+    if (result.success) return;
+    c.get("log").warn(
+      {
+        event: "request.invalid",
+        route: c.req.routePath,
+        issues: result.error.issues.map((issue) => ({
+          path: issue.path.join("."),
+          message: issue.message,
+        })),
+      },
+      "Request failed validation",
+    );
+    return c.json({ error: "Invalid request" }, 400);
+  },
+});
+
+// First in the chain so every request — including the mounted better-auth
+// routes and anything that throws — produces exactly one `http_request` line.
+app.use("*", requestLogger);
+
+app.onError((err, c) => {
+  // The request logger already emitted the summary line; this one carries the
+  // stack, which is the thing you actually want in Grafana when a 500 shows up.
+  // Falls back to the bare logger: this is the last line of defence, so it must
+  // not itself depend on the middleware having run.
+  (c.get("log") ?? logger).error(
+    { event: "unhandled_error", route: c.req.routePath, err },
+    err.message,
+  );
+  return c.json({ error: "Internal server error" }, 500);
+});
 
 app.use(
   "/api/*",
@@ -75,6 +117,65 @@ app.openAPIRegistry.registerComponent("securitySchemes", "sessionCookie", {
   name: "better-auth.session_token",
   description: "Set by better-auth after the Strava OAuth callback.",
 });
+
+/**
+ * The session behind the request, or null when there isn't one.
+ *
+ * Also stamps the caller onto the request context, which is what puts `userId`
+ * on the `http_request` line and on every later line the handler logs.
+ */
+async function currentUser(c: Context<AppEnv>) {
+  const session = await auth.api.getSession({ headers: c.req.raw.headers });
+  if (!session) {
+    c.get("log").info(
+      { event: "auth.unauthenticated", route: c.req.routePath },
+      "Request without a session",
+    );
+    return null;
+  }
+  identify(c, session.user.id);
+  return session;
+}
+
+/**
+ * The stored Strava token for a user, refreshed by better-auth when expired.
+ * A refresh that fails is an expired grant, not a server fault — the caller
+ * turns null into a 401 telling the athlete to sign in again.
+ */
+async function stravaAccessToken(
+  c: Context<AppEnv>,
+  userId: string,
+): Promise<string | null> {
+  try {
+    const { accessToken } = await auth.api.getAccessToken({
+      body: { providerId: "strava", userId },
+    });
+    if (!accessToken) {
+      c.get("log").warn({ event: "auth.strava_token_missing" }, "No Strava token");
+      return null;
+    }
+    return accessToken;
+  } catch (err) {
+    c.get("log").error(
+      { event: "auth.strava_token_refresh_failed", err },
+      "Could not refresh the Strava token",
+    );
+    return null;
+  }
+}
+
+/** One place to record an upstream Strava failure before it becomes a 4xx/5xx. */
+function logStravaFailure(c: Context<AppEnv>, err: unknown, action: string): void {
+  if (err instanceof StravaApiError) {
+    const missingScope = err.status === 401 || err.status === 403;
+    c.get("log").warn(
+      { event: "strava.request_failed", action, status: err.status, missingScope },
+      `Strava rejected ${action}`,
+    );
+    return;
+  }
+  c.get("log").error({ event: "strava.request_failed", action, err }, `${action} failed`);
+}
 
 const healthRoute = createRoute({
   method: "get",
@@ -119,17 +220,16 @@ const athleteRoute = createRoute({
 });
 
 app.openapi(athleteRoute, async (c) => {
-  const session = await auth.api.getSession({ headers: c.req.raw.headers });
+  const session = await currentUser(c);
   if (!session) return c.json({ error: "Not signed in" }, 401);
 
-  const { accessToken } = await auth.api.getAccessToken({
-    body: { providerId: "strava", userId: session.user.id },
-  });
+  const accessToken = await stravaAccessToken(c, session.user.id);
   if (!accessToken) return c.json({ error: "No Strava access token" }, 401);
 
   try {
     return c.json(await fetchAthlete(accessToken), 200);
   } catch (err) {
+    logStravaFailure(c, err, "fetch athlete");
     if (err instanceof StravaApiError) return c.json({ error: err.message }, 502);
     throw err;
   }
@@ -172,17 +272,18 @@ const runsRoute = createRoute({
 });
 
 app.openapi(runsRoute, async (c) => {
-  const session = await auth.api.getSession({ headers: c.req.raw.headers });
+  const session = await currentUser(c);
   if (!session) return c.json({ error: "Not signed in" }, 401);
 
-  const { accessToken } = await auth.api.getAccessToken({
-    body: { providerId: "strava", userId: session.user.id },
-  });
+  const accessToken = await stravaAccessToken(c, session.user.id);
   if (!accessToken) return c.json({ error: "No Strava access token" }, 401);
 
   try {
-    return c.json(await fetchRuns(accessToken), 200);
+    const runs = await fetchRuns(accessToken);
+    c.get("log").info({ event: "runs.listed", count: runs.length }, "Listed runs");
+    return c.json(runs, 200);
   } catch (err) {
+    logStravaFailure(c, err, "list runs");
     if (err instanceof StravaApiError) {
       if (err.status === 401 || err.status === 403) {
         return c.json({ error: MISSING_SCOPE_ERROR }, 403);
@@ -237,18 +338,17 @@ const runStreamsRoute = createRoute({
 });
 
 app.openapi(runStreamsRoute, async (c) => {
-  const session = await auth.api.getSession({ headers: c.req.raw.headers });
+  const session = await currentUser(c);
   if (!session) return c.json({ error: "Not signed in" }, 401);
 
-  const { accessToken } = await auth.api.getAccessToken({
-    body: { providerId: "strava", userId: session.user.id },
-  });
+  const accessToken = await stravaAccessToken(c, session.user.id);
   if (!accessToken) return c.json({ error: "No Strava access token" }, 401);
 
   const { id } = c.req.valid("param");
   try {
     return c.json(await fetchRunStreams(accessToken, Number(id)), 200);
   } catch (err) {
+    logStravaFailure(c, err, "fetch run streams");
     if (err instanceof StravaApiError) {
       if (err.status === 401 || err.status === 403) {
         return c.json({ error: MISSING_SCOPE_ERROR }, 403);
@@ -301,7 +401,7 @@ const getRunRenderRoute = createRoute({
 });
 
 app.openapi(getRunRenderRoute, async (c) => {
-  const session = await auth.api.getSession({ headers: c.req.raw.headers });
+  const session = await currentUser(c);
   if (!session) return c.json({ error: "Not signed in" }, 401);
 
   const { id } = c.req.valid("param");
@@ -349,11 +449,15 @@ const startRunRenderRoute = createRoute({
 });
 
 app.openapi(startRunRenderRoute, async (c) => {
-  const session = await auth.api.getSession({ headers: c.req.raw.headers });
+  const session = await currentUser(c);
   if (!session) return c.json({ error: "Not signed in" }, 401);
 
+  const log = c.get("log");
   const config = getRenderConfig();
-  if (!config) return c.json({ error: RENDER_NOT_CONFIGURED }, 503);
+  if (!config) {
+    log.warn({ event: "render.not_configured" }, "Remotion Lambda is not configured");
+    return c.json({ error: RENDER_NOT_CONFIGURED }, 503);
+  }
 
   const { id } = c.req.valid("param");
   const activityId = Number(id);
@@ -361,12 +465,14 @@ app.openapi(startRunRenderRoute, async (c) => {
   // Don't double-render: an in-flight or finished render is simply returned.
   const existing = await getRunRender(session.user.id, activityId);
   if (existing && existing.status !== "error") {
+    log.info(
+      { event: "render.reused", activityId, status: existing.status },
+      "Returned the existing render",
+    );
     return c.json({ render: toRunRender(existing) }, 200);
   }
 
-  const { accessToken } = await auth.api.getAccessToken({
-    body: { providerId: "strava", userId: session.user.id },
-  });
+  const accessToken = await stravaAccessToken(c, session.user.id);
   if (!accessToken) return c.json({ error: "No Strava access token" }, 401);
 
   try {
@@ -381,9 +487,14 @@ app.openapi(startRunRenderRoute, async (c) => {
       renderId,
       bucketName,
     });
+    log.info(
+      { event: "render.started", activityId, renderId, bucketName, retry: Boolean(existing) },
+      "Started a Lambda render",
+    );
     return c.json({ render: toRunRender(row) }, 200);
   } catch (err) {
     if (err instanceof StravaApiError) {
+      logStravaFailure(c, err, "fetch the run to render");
       if (err.status === 401 || err.status === 403) {
         return c.json({ error: MISSING_SCOPE_ERROR }, 403);
       }
@@ -391,6 +502,7 @@ app.openapi(startRunRenderRoute, async (c) => {
     }
     // Lambda refused the render (bad serve URL, missing AWS permissions, …).
     const message = err instanceof Error ? err.message : "Failed to start the render";
+    log.error({ event: "render.start_failed", activityId, err }, message);
     return c.json({ error: message }, 502);
   }
 });
@@ -428,11 +540,15 @@ const runRenderProgressRoute = createRoute({
 const PROGRESS_POLL_MS = 1500;
 
 app.openapi(runRenderProgressRoute, async (c) => {
-  const session = await auth.api.getSession({ headers: c.req.raw.headers });
+  const session = await currentUser(c);
   if (!session) return c.json({ error: "Not signed in" }, 401);
 
+  const log = c.get("log");
   const config = getRenderConfig();
-  if (!config) return c.json({ error: RENDER_NOT_CONFIGURED }, 503);
+  if (!config) {
+    log.warn({ event: "render.not_configured" }, "Remotion Lambda is not configured");
+    return c.json({ error: RENDER_NOT_CONFIGURED }, 503);
+  }
 
   const { id } = c.req.valid("param");
   const activityId = Number(id);
@@ -461,13 +577,90 @@ app.openapi(runRenderProgressRoute, async (c) => {
         const progress = await fetchLambdaProgress(config, row);
         const updated = await updateRunRender(userId, activityId, progress);
         await stream.writeSSE({ data: JSON.stringify(toRunRender(updated)) });
-        if (updated.status !== "rendering") return;
-      } catch {
-        // A flaky poll is not a failed render — try again next tick.
+        if (updated.status !== "rendering") {
+          const finished = {
+            event: "render.finished",
+            activityId,
+            renderId: updated.renderId,
+            status: updated.status,
+            durationMs: updated.updatedAt.getTime() - updated.createdAt.getTime(),
+            error: updated.error,
+          };
+          if (updated.status === "error") log.error(finished, "Render failed on Lambda");
+          else log.info(finished, "Render finished");
+          return;
+        }
+      } catch (err) {
+        // A flaky poll is not a failed render — try again next tick. Logged
+        // because a render that never finishes usually starts here.
+        log.warn({ event: "render.progress_poll_failed", activityId, err }, "Poll failed");
       }
       await stream.sleep(PROGRESS_POLL_MS);
     }
   });
+});
+
+const clientLogsRoute = createRoute({
+  method: "post",
+  path: "/api/logs",
+  operationId: "postClientLogs",
+  tags: ["Telemetry"],
+  summary: "Forward a batch of browser events",
+  description:
+    "Re-logs events the browser recorded — user actions, failed requests, " +
+    "uncaught errors — through the server logger, so client and server lines " +
+    "share one stream in Loki. Deliberately open to signed-out callers: a " +
+    "crash on the sign-in page is exactly what this is for. The session, when " +
+    "there is one, only adds attribution.",
+  request: {
+    body: {
+      required: true,
+      content: { "application/json": { schema: ClientLogBatchSchema } },
+    },
+  },
+  responses: {
+    202: {
+      description: "The batch was accepted for logging.",
+      content: { "application/json": { schema: ClientLogAcceptedSchema } },
+    },
+  },
+});
+
+// Nothing legitimate comes close to 32 KB; the endpoint is unauthenticated, so
+// the ceiling is enforced before the body is parsed.
+app.use(
+  clientLogsRoute.path,
+  bodyLimit({
+    maxSize: 32 * 1024,
+    onError: (c) => c.json({ error: "Log batch too large" }, 413),
+  }),
+);
+
+app.openapi(clientLogsRoute, async (c) => {
+  const { events } = c.req.valid("json");
+
+  const session = await auth.api
+    .getSession({ headers: c.req.raw.headers })
+    .catch(() => null);
+  if (session) identify(c, session.user.id);
+
+  const log = c.get("log");
+  for (const event of events) {
+    const level: ClientLogLevel = event.level;
+    log[level](
+      {
+        event: event.event,
+        // The one field that separates a browser line from a server line.
+        source: "web",
+        path: event.path,
+        clientTs: event.ts,
+        ...(event.context ? { context: event.context } : {}),
+      },
+      event.message ?? event.event,
+    );
+  }
+
+  return c.json({ accepted: events.length }, 202);
 });
 
 app.doc31(OPENAPI_DOCUMENT_PATH, openAPIConfig);

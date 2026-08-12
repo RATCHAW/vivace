@@ -6,7 +6,8 @@
 // configured and its errors are normalised before the first request goes out.
 
 import { client } from "./generated/client.gen";
-import type { ApiError, RunRender } from "./generated/types.gen";
+import { postClientLogs } from "./generated/sdk.gen";
+import type { ApiError, ClientLogEvent, RunRender } from "./generated/types.gen";
 
 client.setConfig({
   // Same-origin: Vite proxies /api to the Hono server in dev, nginx in Docker.
@@ -82,11 +83,45 @@ export function subscribeRunRenderProgress(
   return () => source.close();
 }
 
+/**
+ * Ships a batch of browser events to POST /api/logs, where the server re-logs
+ * them into Loki. Called by `@/lib/logger` — track things through `trackEvent`
+ * / `trackError` there, not through this.
+ *
+ * The normal path is the generated `postClientLogs` operation. `beacon` is for
+ * the last flush before the page goes away, where a pending fetch is killed
+ * mid-flight: `navigator.sendBeacon` is the only transport a browser promises
+ * to finish, and it takes a URL and a body, not a client.
+ *
+ * Failures are swallowed on purpose. Telemetry that breaks the app, or that
+ * retries into a loop when the log endpoint is the thing that's down, is worse
+ * than a missing log line.
+ */
+export function sendClientLogs(
+  events: ClientLogEvent[],
+  { beacon = false }: { beacon?: boolean } = {},
+): void {
+  if (events.length === 0) return;
+  const body = { events };
+
+  if (beacon && typeof navigator !== "undefined" && navigator.sendBeacon) {
+    navigator.sendBeacon(
+      "/api/logs",
+      new Blob([JSON.stringify(body)], { type: "application/json" }),
+    );
+    return;
+  }
+
+  void postClientLogs({ body }).catch(() => {});
+}
+
 export { client };
 export * from "./generated/@tanstack/react-query.gen";
 export type {
   Athlete,
   ApiError,
+  ClientLogContext,
+  ClientLogEvent,
   Run,
   RunRender,
   RunRenderState,

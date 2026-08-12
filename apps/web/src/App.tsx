@@ -1,7 +1,8 @@
-import { lazy, Suspense } from "react";
-import { Navigate, Route, Routes } from "react-router-dom";
+import { lazy, Suspense, useEffect } from "react";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { Loader2Icon } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
+import { trackEvent } from "@/lib/logger";
 import { Login } from "@/pages/Login";
 import { Home } from "@/pages/Home";
 import { Coach } from "@/pages/Coach";
@@ -20,8 +21,25 @@ function FullPageSpinner() {
   );
 }
 
+/**
+ * One `ui.page_view` per navigation. The router never reloads the document, so
+ * this is the only place a "which screens do people use" panel can come from.
+ */
+function usePageViews(signedIn: boolean, ready: boolean): void {
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    // Until the session resolves every path renders the spinner, and half of
+    // them are about to redirect — that's not a page view.
+    if (!ready) return;
+    trackEvent("ui.page_view", { path: pathname, signedIn });
+  }, [pathname, signedIn, ready]);
+}
+
 export function App() {
   const { data: session, isPending } = authClient.useSession();
+
+  usePageViews(Boolean(session), !isPending);
 
   if (isPending) {
     return <FullPageSpinner />;

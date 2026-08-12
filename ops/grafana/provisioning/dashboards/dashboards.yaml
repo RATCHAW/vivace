@@ -1,0 +1,15 @@
+# Loads every dashboard JSON in ops/grafana/dashboards. They are files in the
+# repo, not Grafana state — edit in the UI to explore, then export the JSON
+# back into that folder to keep the change.
+apiVersion: 1
+
+providers:
+  - name: vivace
+    orgId: 1
+    type: file
+    disableDeletion: false
+    allowUiUpdates: true
+    updateIntervalSeconds: 30
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: false

@@ -3,8 +3,8 @@
 import { type DefaultError, queryOptions, type UseMutationOptions } from '@tanstack/react-query';
 
 import { client } from '../client.gen';
-import { getHealth, getRunRender, getRuns, getRunStreams, getStravaAthlete, type Options, startRunRender } from '../sdk.gen';
-import type { GetHealthData, GetHealthResponse, GetRunRenderData, GetRunRenderError, GetRunRenderResponse, GetRunsData, GetRunsError, GetRunsResponse, GetRunStreamsData, GetRunStreamsError, GetRunStreamsResponse, GetStravaAthleteData, GetStravaAthleteError, GetStravaAthleteResponse, StartRunRenderData, StartRunRenderError, StartRunRenderResponse } from '../types.gen';
+import { getHealth, getRunRender, getRuns, getRunStreams, getStravaAthlete, type Options, postClientLogs, startRunRender } from '../sdk.gen';
+import type { GetHealthData, GetHealthResponse, GetRunRenderData, GetRunRenderError, GetRunRenderResponse, GetRunsData, GetRunsError, GetRunsResponse, GetRunStreamsData, GetRunStreamsError, GetRunStreamsResponse, GetStravaAthleteData, GetStravaAthleteError, GetStravaAthleteResponse, PostClientLogsData, PostClientLogsResponse, StartRunRenderData, StartRunRenderError, StartRunRenderResponse } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
@@ -146,6 +146,25 @@ export const startRunRenderMutation = (options?: Partial<Options<StartRunRenderD
     const mutationOptions: UseMutationOptions<StartRunRenderResponse, StartRunRenderError, Options<StartRunRenderData>> = {
         mutationFn: async (fnOptions) => {
             const { data } = await startRunRender({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+/**
+ * Forward a batch of browser events
+ *
+ * Re-logs events the browser recorded — user actions, failed requests, uncaught errors — through the server logger, so client and server lines share one stream in Loki. Deliberately open to signed-out callers: a crash on the sign-in page is exactly what this is for. The session, when there is one, only adds attribution.
+ */
+export const postClientLogsMutation = (options?: Partial<Options<PostClientLogsData>>): UseMutationOptions<PostClientLogsResponse, DefaultError, Options<PostClientLogsData>> => {
+    const mutationOptions: UseMutationOptions<PostClientLogsResponse, DefaultError, Options<PostClientLogsData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await postClientLogs({
                 ...options,
                 ...fnOptions,
                 throwOnError: true

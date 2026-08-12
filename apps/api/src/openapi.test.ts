@@ -26,6 +26,7 @@ describe("openapi", () => {
       "/api/runs/{id}/streams",
       "/api/runs/{id}/render",
       "/api/runs/{id}/render/progress",
+      "/api/logs",
     ]);
     expect(document.components.schemas).toHaveProperty("Athlete");
     expect(document.paths["/api/me/strava"].get.operationId).toBe(

@@ -1,0 +1,54 @@
+# Single-binary Loki, filesystem storage — enough for one machine and the
+# volume of logs this app produces. The API pushes to it directly (pino-loki),
+# so there is no Promtail/Alloy agent to run.
+#
+# Grafana Cloud replaces this file entirely: point LOKI_URL at the hosted push
+# URL and set LOKI_USERNAME / LOKI_PASSWORD instead of running this service.
+auth_enabled: false
+
+server:
+  http_listen_port: 3100
+  grpc_listen_port: 9096
+  # Loki's own logs are not the ones we came for.
+  log_level: warn
+
+common:
+  instance_addr: 127.0.0.1
+  path_prefix: /loki
+  storage:
+    filesystem:
+      chunks_directory: /loki/chunks
+      rules_directory: /loki/rules
+  replication_factor: 1
+  ring:
+    kvstore:
+      store: inmemory
+
+schema_config:
+  configs:
+    # v13 + TSDB is the current schema; structured metadata needs it.
+    - from: 2024-01-01
+      store: tsdb
+      object_store: filesystem
+      schema: v13
+      index:
+        prefix: index_
+        period: 24h
+
+limits_config:
+  # A dev machine that has been asleep replays old lines on wake — accept them
+  # instead of dropping the first minutes after every restart.
+  reject_old_samples: false
+  retention_period: 720h # 30 days
+  # Guard rails, not tuning: this is one small service.
+  ingestion_rate_mb: 8
+  ingestion_burst_size_mb: 16
+
+compactor:
+  working_directory: /loki/compactor
+  delete_request_store: filesystem
+  # Without this, retention_period is advisory and the volume grows forever.
+  retention_enabled: true
+
+analytics:
+  reporting_enabled: false

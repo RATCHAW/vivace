@@ -23,6 +23,10 @@
     {
       "name": "Runs",
       "description": "The signed-in athlete's runs and their streams"
+    },
+    {
+      "name": "Telemetry",
+      "description": "Browser events and errors, forwarded to Loki"
     }
   ],
   "components": {
@@ -341,6 +345,97 @@
           "created_at",
           "updated_at"
         ]
+      },
+      "ClientLogAccepted": {
+        "type": "object",
+        "properties": {
+          "accepted": {
+            "type": "integer",
+            "example": 3
+          }
+        },
+        "required": [
+          "accepted"
+        ]
+      },
+      "ClientLogBatch": {
+        "type": "object",
+        "properties": {
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ClientLogEvent"
+            },
+            "minItems": 1,
+            "maxItems": 50
+          }
+        },
+        "required": [
+          "events"
+        ]
+      },
+      "ClientLogEvent": {
+        "type": "object",
+        "properties": {
+          "level": {
+            "type": "string",
+            "enum": [
+              "debug",
+              "info",
+              "warn",
+              "error"
+            ],
+            "example": "info"
+          },
+          "event": {
+            "type": "string",
+            "maxLength": 48,
+            "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$",
+            "example": "ui.render_clicked"
+          },
+          "message": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "path": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "context": {
+            "$ref": "#/components/schemas/ClientLogContext"
+          },
+          "ts": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "level",
+          "event"
+        ]
+      },
+      "ClientLogContext": {
+        "type": "object",
+        "additionalProperties": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "example": {
+          "activityId": 987654321,
+          "status": 502
+        }
       }
     },
     "parameters": {}
@@ -721,6 +816,38 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/logs": {
+      "post": {
+        "operationId": "postClientLogs",
+        "tags": [
+          "Telemetry"
+        ],
+        "summary": "Forward a batch of browser events",
+        "description": "Re-logs events the browser recorded — user actions, failed requests, uncaught errors — through the server logger, so client and server lines share one stream in Loki. Deliberately open to signed-out callers: a crash on the sign-in page is exactly what this is for. The session, when there is one, only adds attribution.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClientLogBatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "The batch was accepted for logging.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClientLogAccepted"
                 }
               }
             }

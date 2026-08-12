@@ -11,6 +11,7 @@ import {
 } from "@/api";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { trackEvent } from "@/lib/logger";
 import {
   Progress,
   ProgressLabel,
@@ -31,6 +32,9 @@ export function RenderControls({ run }: { run: Run }) {
 
   const start = useMutation({
     ...startRunRenderMutation(),
+    // The generated mutation carries no key; this is what names the operation
+    // when the failure reaches the MutationCache logger in @/lib/query-client.
+    mutationKey: ["startRunRender"],
     onSuccess: (state) =>
       queryClient.setQueryData(getRunRenderQueryKey({ path }), state),
   });
@@ -73,6 +77,7 @@ export function RenderControls({ run }: { run: Run }) {
     return (
       <Button
         className="mt-4 w-full"
+        onClick={() => trackEvent("ui.video_downloaded", { activityId: run.id })}
         render={<a href={render.output_url} download />}
       >
         <DownloadIcon />
@@ -94,7 +99,13 @@ export function RenderControls({ run }: { run: Run }) {
       <Button
         className="w-full"
         disabled={data === undefined || start.isPending}
-        onClick={() => start.mutate({ path })}
+        onClick={() => {
+          trackEvent("ui.render_clicked", {
+            activityId: run.id,
+            retry: render?.status === "error",
+          });
+          start.mutate({ path });
+        }}
       >
         {start.isPending ? <Loader2Icon className="animate-spin" /> : <FilmIcon />}
         {render?.status === "error" ? "Retry render" : "Render video"}

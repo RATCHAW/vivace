@@ -75,6 +75,27 @@ export type RunRender = {
     updated_at: string;
 } | null;
 
+export type ClientLogAccepted = {
+    accepted: number;
+};
+
+export type ClientLogBatch = {
+    events: Array<ClientLogEvent>;
+};
+
+export type ClientLogEvent = {
+    level: 'debug' | 'info' | 'warn' | 'error';
+    event: string;
+    message?: string;
+    path?: string;
+    context?: ClientLogContext;
+    ts?: string;
+};
+
+export type ClientLogContext = {
+    [key: string]: string | number | boolean | null;
+};
+
 export type GetHealthData = {
     body?: never;
     path?: never;
@@ -284,3 +305,19 @@ export type StreamRunRenderProgressResponses = {
 };
 
 export type StreamRunRenderProgressResponse = StreamRunRenderProgressResponses[keyof StreamRunRenderProgressResponses];
+
+export type PostClientLogsData = {
+    body: ClientLogBatch;
+    path?: never;
+    query?: never;
+    url: '/api/logs';
+};
+
+export type PostClientLogsResponses = {
+    /**
+     * The batch was accepted for logging.
+     */
+    202: ClientLogAccepted;
+};
+
+export type PostClientLogsResponse = PostClientLogsResponses[keyof PostClientLogsResponses];
