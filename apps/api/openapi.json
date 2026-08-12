@@ -23,6 +23,10 @@
     {
       "name": "Runs",
       "description": "The signed-in athlete's runs and their streams"
+    },
+    {
+      "name": "Coach",
+      "description": "Conversations with the AI running coach"
     }
   ],
   "components": {
@@ -340,6 +344,117 @@
           "error",
           "created_at",
           "updated_at"
+        ]
+      },
+      "CoachThread": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "8f2c1e34-9a1b-4f6d-8f0e-3b6a1c9d2e77"
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "Half marathon in October"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "created_at",
+          "updated_at"
+        ]
+      },
+      "CoachThreadDetail": {
+        "type": "object",
+        "properties": {
+          "thread": {
+            "$ref": "#/components/schemas/CoachThread"
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CoachMessage"
+            }
+          }
+        },
+        "required": [
+          "thread",
+          "messages"
+        ]
+      },
+      "CoachMessage": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "system",
+              "user",
+              "assistant"
+            ]
+          },
+          "parts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "example": "text"
+                }
+              },
+              "required": [
+                "type"
+              ],
+              "additionalProperties": {}
+            }
+          }
+        },
+        "required": [
+          "id",
+          "role",
+          "parts"
+        ]
+      },
+      "CoachChatRequest": {
+        "type": "object",
+        "properties": {
+          "thread_id": {
+            "type": "string",
+            "example": "8f2c1e34-9a1b-4f6d-8f0e-3b6a1c9d2e77"
+          },
+          "trigger": {
+            "type": "string",
+            "enum": [
+              "submit-message",
+              "regenerate-message"
+            ],
+            "default": "submit-message"
+          },
+          "message": {
+            "$ref": "#/components/schemas/CoachMessage"
+          },
+          "message_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "thread_id"
         ]
       }
     },
@@ -717,6 +832,264 @@
           },
           "503": {
             "description": "Remotion Lambda is not configured on this server.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/coach/threads": {
+      "get": {
+        "operationId": "listCoachThreads",
+        "tags": [
+          "Coach"
+        ],
+        "summary": "List the athlete's coach conversations",
+        "description": "Most recently used first. A thread with no messages has a null title.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The athlete's conversations.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CoachThread"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createCoachThread",
+        "tags": [
+          "Coach"
+        ],
+        "summary": "Start a new coach conversation",
+        "description": "Returns an empty thread. Its title is filled in from the first message the athlete sends to it.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "The new conversation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CoachThread"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/coach/threads/{id}": {
+      "get": {
+        "operationId": "getCoachThread",
+        "tags": [
+          "Coach"
+        ],
+        "summary": "Read one conversation",
+        "description": "The thread and its full transcript, oldest message first.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "8f2c1e34-9a1b-4f6d-8f0e-3b6a1c9d2e77"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The conversation and its messages.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CoachThreadDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such conversation for this athlete.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteCoachThread",
+        "tags": [
+          "Coach"
+        ],
+        "summary": "Delete one conversation",
+        "description": "Removes the thread and every message in it.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "8f2c1e34-9a1b-4f6d-8f0e-3b6a1c9d2e77"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted."
+          },
+          "401": {
+            "description": "No valid session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such conversation for this athlete.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/coach/chat": {
+      "post": {
+        "operationId": "coachChat",
+        "tags": [
+          "Coach"
+        ],
+        "summary": "Send a message and stream the coach's reply",
+        "description": "Loads the thread's transcript, appends the incoming message, and streams the model's answer as an AI SDK UI message stream — text, reasoning and tool calls as they happen. Both the athlete's message and the finished reply are persisted, so the browser never has to send the history back. Consumed by `useChat` from @ai-sdk/react, not by the generated client.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CoachChatRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "A UI message stream of the coach's reply.",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request named no message to answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such conversation for this athlete.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "No model API key is configured on this server.",
             "content": {
               "application/json": {
                 "schema": {

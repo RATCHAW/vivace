@@ -5,8 +5,9 @@
 // Import from `@/api`, not from the generated files directly, so the client is
 // configured and its errors are normalised before the first request goes out.
 
+import type { UIMessage } from "ai";
 import { client } from "./generated/client.gen";
-import type { ApiError, RunRender } from "./generated/types.gen";
+import type { ApiError, CoachMessage, RunRender } from "./generated/types.gen";
 
 client.setConfig({
   // Same-origin: Vite proxies /api to the Hono server in dev, nginx in Docker.
@@ -82,11 +83,31 @@ export function subscribeRunRenderProgress(
   return () => source.close();
 }
 
+/** Where `useChat` posts, mirroring the `coachChat` operation in the document. */
+export const COACH_CHAT_PATH = "/api/coach/chat";
+
+/**
+ * A stored transcript, back in the shape `useChat` wants.
+ *
+ * The second hand-written call in this app, and for the same reason as the one
+ * above: a `UIMessage` part is a union that grows with every model capability,
+ * so the OpenAPI schema describes it as "an object with a `type`" rather than
+ * re-deriving the AI SDK's types in Zod. The API only ever stores parts the SDK
+ * itself produced, so this cast is narrowing back to the truth — and it lives
+ * here, once, instead of at every call site.
+ */
+export function toUIMessages(messages: CoachMessage[]): UIMessage[] {
+  return messages as unknown as UIMessage[];
+}
+
 export { client };
 export * from "./generated/@tanstack/react-query.gen";
 export type {
   Athlete,
   ApiError,
+  CoachMessage,
+  CoachThread,
+  CoachThreadDetail,
   Run,
   RunRender,
   RunRenderState,
