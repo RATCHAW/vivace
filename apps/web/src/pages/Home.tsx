@@ -1,6 +1,32 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import type { StravaAthlete } from "@repo/shared";
-import { authClient } from "../lib/auth-client";
+import { authClient } from "@/lib/auth-client";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { ModeToggle } from "@/components/mode-toggle";
+
+function Fact({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="grid gap-0.5">
+      <dt className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+        {label}
+      </dt>
+      <dd className="font-medium">{children}</dd>
+    </div>
+  );
+}
 
 export function Home() {
   const { data: session } = authClient.useSession();
@@ -17,66 +43,88 @@ export function Home() {
   }, []);
 
   return (
-    <main className="page">
-      <div className="card">
-        <header className="profile-header">
-          {session?.user.image && (
-            <img className="avatar" src={session.user.image} alt="" />
-          )}
-          <div>
-            <h1>{session?.user.name}</h1>
-            <p className="muted">Signed in with Strava</p>
+    <main className="flex min-h-svh items-center justify-center bg-muted/40 p-6">
+      <Card className="w-full max-w-sm">
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <Avatar size="lg">
+              <AvatarImage src={session?.user.image ?? undefined} alt="" />
+              <AvatarFallback>
+                {session?.user.name?.charAt(0).toUpperCase() ?? "?"}
+              </AvatarFallback>
+            </Avatar>
+            <div className="grid gap-0.5">
+              <CardTitle className="text-lg">{session?.user.name}</CardTitle>
+              <CardDescription>Signed in with Strava</CardDescription>
+            </div>
           </div>
-        </header>
+          <CardAction>
+            <ModeToggle />
+          </CardAction>
+        </CardHeader>
 
-        {error && <p className="error">{error}</p>}
-        {!athlete && !error && <p>Loading your Strava profile…</p>}
+        <CardContent>
+          {error && (
+            <Alert variant="destructive">
+              <AlertTitle>Could not load your profile</AlertTitle>
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
 
-        {athlete && (
-          <dl className="facts">
-            <div>
-              <dt>Athlete ID</dt>
-              <dd>{athlete.id}</dd>
+          {!athlete && !error && (
+            <div className="grid gap-4" aria-label="Loading your Strava profile">
+              {Array.from({ length: 4 }, (_, i) => (
+                <div key={i} className="grid gap-1.5">
+                  <Skeleton className="h-3 w-20" />
+                  <Skeleton className="h-4 w-36" />
+                </div>
+              ))}
             </div>
-            {athlete.username && (
-              <div>
-                <dt>Username</dt>
-                <dd>{athlete.username}</dd>
-              </div>
-            )}
-            {(athlete.city || athlete.country) && (
-              <div>
-                <dt>Location</dt>
-                <dd>{[athlete.city, athlete.state, athlete.country].filter(Boolean).join(", ")}</dd>
-              </div>
-            )}
-            {athlete.sex && (
-              <div>
-                <dt>Sex</dt>
-                <dd>{athlete.sex}</dd>
-              </div>
-            )}
-            {athlete.weight != null && athlete.weight > 0 && (
-              <div>
-                <dt>Weight</dt>
-                <dd>{athlete.weight} kg</dd>
-              </div>
-            )}
-            <div>
-              <dt>Subscription</dt>
-              <dd>{athlete.summit || athlete.premium ? "Strava subscriber" : "Free plan"}</dd>
-            </div>
-            <div>
-              <dt>Member since</dt>
-              <dd>{new Date(athlete.created_at).toLocaleDateString()}</dd>
-            </div>
-          </dl>
-        )}
+          )}
 
-        <button className="signout-button" onClick={() => authClient.signOut()}>
-          Sign out
-        </button>
-      </div>
+          {athlete && (
+            <dl className="grid gap-3">
+              <Fact label="Athlete ID">{athlete.id}</Fact>
+              {athlete.username && (
+                <Fact label="Username">{athlete.username}</Fact>
+              )}
+              {(athlete.city || athlete.country) && (
+                <Fact label="Location">
+                  {[athlete.city, athlete.state, athlete.country]
+                    .filter(Boolean)
+                    .join(", ")}
+                </Fact>
+              )}
+              {athlete.sex && <Fact label="Sex">{athlete.sex}</Fact>}
+              {athlete.weight != null && athlete.weight > 0 && (
+                <Fact label="Weight">{athlete.weight} kg</Fact>
+              )}
+              <Fact label="Subscription">
+                {athlete.summit || athlete.premium ? (
+                  <Badge className="bg-strava text-strava-foreground">
+                    Strava subscriber
+                  </Badge>
+                ) : (
+                  <Badge variant="secondary">Free plan</Badge>
+                )}
+              </Fact>
+              <Fact label="Member since">
+                {new Date(athlete.created_at).toLocaleDateString()}
+              </Fact>
+            </dl>
+          )}
+        </CardContent>
+
+        <CardFooter>
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={() => authClient.signOut()}
+          >
+            Sign out
+          </Button>
+        </CardFooter>
+      </Card>
     </main>
   );
 }

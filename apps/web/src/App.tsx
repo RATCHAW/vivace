@@ -1,13 +1,19 @@
 import { Navigate, Route, Routes } from "react-router-dom";
-import { authClient } from "./lib/auth-client";
-import { Login } from "./pages/Login";
-import { Home } from "./pages/Home";
+import { Loader2Icon } from "lucide-react";
+import { authClient } from "@/lib/auth-client";
+import { Login } from "@/pages/Login";
+import { Home } from "@/pages/Home";
 
 export function App() {
   const { data: session, isPending } = authClient.useSession();
 
   if (isPending) {
-    return <main className="page">Loading…</main>;
+    return (
+      <main className="flex min-h-svh items-center justify-center bg-muted/40 p-6">
+        <Loader2Icon className="size-6 animate-spin text-muted-foreground" />
+        <span className="sr-only">Loading…</span>
+      </main>
+    );
   }
 
   return (
