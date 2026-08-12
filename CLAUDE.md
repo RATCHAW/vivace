@@ -1,7 +1,39 @@
 # Repo conventions
 
 Turborepo + pnpm workspaces. `apps/api` (Hono), `apps/web` (Vite + React),
-`packages/shared` (types used by both). See [README](./README.md) for setup.
+`packages/strava-api` (generated Strava SDK). See [README](./README.md) for setup.
+
+## API contract — generated, never hand-written
+
+Three artifacts are produced by codegen and **committed**. Never edit them by hand;
+run `pnpm generate` (root) after changing a route or schema.
+
+| Artifact | Generated from | Consumed by |
+| --- | --- | --- |
+| `packages/strava-api/src/generated/` | `packages/strava-api/openapi/strava-swagger.json` | `apps/api` |
+| `apps/api/openapi.json` | the Zod schemas + `createRoute()` calls in `apps/api/src` | `apps/web` codegen, Swagger UI |
+| `apps/web/src/api/generated/` | `apps/api/openapi.json` | `apps/web` |
+
+Consequences:
+
+- **Adding or changing an endpoint is a three-step edit.** Schema in
+  `apps/api/src/schemas.ts` → route in `apps/api/src/app.ts` → `pnpm generate`.
+  A test fails if `openapi.json` drifts from the routes, so skipping the last step
+  is caught, not shipped.
+- **`z` comes from `@hono/zod-openapi`, not `zod`.** It's Zod extended with
+  `.openapi()`; plain `zod` schemas won't carry metadata into the document.
+  `.openapi("Name")` registers a named component — give it a name that isn't a JS
+  global (`ApiError`, not `Error`, or the generated client shadows it).
+- **Never talk to Strava with bare `fetch`.** Use the generated SDK:
+  `getLoggedInAthlete({ client: createStravaClient(token) })`. All 32 endpoints are
+  already typed. Strava's spec omits some live fields (`username`, `bio`), so widen
+  the generated type where needed — see `apps/api/src/strava.ts`.
+- **Never fetch our own API by hand from the browser.** Use the generated
+  TanStack Query options: `useQuery(getStravaAthleteOptions())`. Import from
+  `@/api` (the barrel that configures the client and normalises errors into
+  `ApiRequestError`), never from `@/api/generated`.
+- New queries need no provider work — `QueryClientProvider` is already in
+  `src/main.tsx` with the client from `src/lib/query-client.ts`.
 
 ## UI — always shadcn/ui
 

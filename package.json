@@ -8,6 +8,8 @@
     "build": "turbo run build",
     "test": "turbo run test",
     "typecheck": "turbo run typecheck",
+    "generate": "pnpm --filter @repo/strava-api generate && pnpm --filter @repo/api openapi:emit && pnpm --filter @repo/web generate",
+    "spec:pull": "pnpm --filter @repo/strava-api spec:pull",
     "auth:migrate": "pnpm --filter @repo/api run auth:migrate",
     "db:up": "docker compose up -d db"
   },
