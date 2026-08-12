@@ -1,7 +1,8 @@
 # Repo conventions
 
 Turborepo + pnpm workspaces. `apps/api` (Hono), `apps/web` (Vite + React),
-`packages/strava-api` (generated Strava SDK). See [README](./README.md) for setup.
+`apps/landing` (Next.js marketing page), `packages/strava-api` (generated Strava
+SDK). See [README](./README.md) for setup.
 
 ## API contract — generated, never hand-written
 
@@ -92,6 +93,28 @@ Rules:
   a component's props don't match a Radix-era tutorial.
 - Icons: `lucide-react`. Dark mode: class-based via `next-themes`, provider in
   `src/main.tsx`.
+
+## apps/landing — the marketing page, on its own
+
+A separate Next.js App Router app. It is deliberately not part of `apps/web`: no
+session, no generated API client, no router. It links to the app, it never calls it.
+
+- **Nothing from `apps/web` is importable.** The two apps share a design language,
+  not a module graph. `button.tsx`, `input.tsx`, `icons.tsx` and `wordmark.tsx` are
+  copied in, and `apps/landing/src/styles.css` mirrors `apps/web/src/styles.css` —
+  a token change belongs in **both** files.
+- **Server Components by default.** Only `replay-phone.tsx` is `"use client"`,
+  because it runs a `requestAnimationFrame` loop. Keep it that way: the page has to
+  stay prerenderable.
+- **The canvas switches by band, not by theme.** There is no `.dark` class and no
+  theme toggle here. `:root` is `canvas-dark`; a white catalogue band opts into the
+  light token set with `.band-light` (see the two `<section>`s that use it).
+  Consequence: `dark:` variants never fire — style with tokens only.
+- **Links out go through `src/lib/site.ts`.** `NEXT_PUBLIC_APP_URL` is inlined at
+  build time, so it is a Docker build arg, not a runtime env var.
+- Hero-replay maths lives in `src/lib/replay.ts` as pure functions of `t` and is
+  unit-tested. Keep it pure — the server and the first client frame must agree, or
+  React logs a hydration mismatch.
 
 ## Checks
 

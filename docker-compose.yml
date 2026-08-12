@@ -44,5 +44,16 @@ services:
     depends_on:
       - api
 
+  landing:
+    profiles: ["app"]
+    build:
+      context: .
+      dockerfile: apps/landing/Dockerfile
+      args:
+        # Baked into the bundle at build time — where "Connect Strava" goes
+        NEXT_PUBLIC_APP_URL: http://localhost:8080
+    ports:
+      - "3001:3001"
+
 volumes:
   db-data:
