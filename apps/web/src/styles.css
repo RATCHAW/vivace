@@ -1,13 +1,25 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
-@import "@fontsource-variable/geist";
+/* Inter with the optical-size axis: large sizes automatically pick up the
+   "Inter Display" cut, the closest open substitute for Aeonik Pro. */
+@import "@fontsource-variable/inter/opsz.css";
 
 @custom-variant dark (&:is(.dark *));
 
+/* ---------------------------------------------------------------------------
+ * Tokens below are the shadcn token layer bound to DESIGN.md.
+ * Light mode  = DESIGN.md "canvas-light" (catalogue) mode.
+ * Dark mode   = DESIGN.md "canvas-dark"  (storytelling) mode.
+ * Every literal here traces back to a `colors.*` entry in DESIGN.md.
+ * ------------------------------------------------------------------------ */
+
 @theme inline {
+    /* Aeonik Pro is proprietary; DESIGN.md names Inter Display as a credible
+       substitute. Swap --font-heading here if Aeonik Pro is ever licensed. */
+    --font-sans: 'Inter Variable', Inter, system-ui, sans-serif;
     --font-heading: var(--font-sans);
-    --font-sans: 'Geist Variable', sans-serif;
+
     --color-sidebar-ring: var(--sidebar-ring);
     --color-sidebar-border: var(--sidebar-border);
     --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -39,89 +51,177 @@
     --color-card: var(--card);
     --color-foreground: var(--foreground);
     --color-background: var(--background);
-    --radius-sm: calc(var(--radius) * 0.6);
-    --radius-md: calc(var(--radius) * 0.8);
-    --radius-lg: var(--radius);
-    --radius-xl: calc(var(--radius) * 1.4);
-    --radius-2xl: calc(var(--radius) * 1.8);
-    --radius-3xl: calc(var(--radius) * 2.2);
-    --radius-4xl: calc(var(--radius) * 2.6);
+
+    /* The cobalt-violet brand stamp. Deliberately NOT --primary: DESIGN.md
+       reserves it for featured surfaces and the wordmark, at most one per
+       viewport. --primary is the white/black CTA pill. */
+    --color-brand: var(--brand);
+    --color-brand-foreground: var(--brand-foreground);
+    --color-brand-bright: var(--brand-bright);
+    --color-brand-deep: var(--brand-deep);
+
+    /* rounded.* — DESIGN.md's explicit scale, not the computed shadcn ramp. */
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 20px;
+    --radius-xl: 28px;
+    --radius-2xl: 36px;
+    --radius-3xl: 44px;
+    --radius-4xl: 52px;
 }
 
+/* typography.* — DESIGN.md's type ramp as first-class utilities.
+   Display sizes clamp across the responsive ladder documented in DESIGN.md
+   (136 -> 80 -> 64 -> 48). */
+@theme {
+    --text-display-xxl: clamp(3rem, 9vw, 8.5rem);
+    --text-display-xxl--line-height: 1;
+    --text-display-xxl--letter-spacing: -0.02em;
+    --text-display-xxl--font-weight: 500;
+
+    --text-display-xl: clamp(2.5rem, 6vw, 5rem);
+    --text-display-xl--line-height: 1;
+    --text-display-xl--letter-spacing: -0.01em;
+    --text-display-xl--font-weight: 500;
+
+    --text-display-lg: 3rem;
+    --text-display-lg--line-height: 1.21;
+    --text-display-lg--letter-spacing: -0.01em;
+    --text-display-lg--font-weight: 500;
+
+    --text-display-md: 2.5rem;
+    --text-display-md--line-height: 1.2;
+    --text-display-md--letter-spacing: -0.01em;
+    --text-display-md--font-weight: 500;
+
+    --text-heading-lg: 2rem;
+    --text-heading-lg--line-height: 1.19;
+    --text-heading-lg--letter-spacing: -0.01em;
+    --text-heading-lg--font-weight: 500;
+
+    --text-heading-md: 1.5rem;
+    --text-heading-md--line-height: 1.33;
+    --text-heading-md--font-weight: 500;
+
+    --text-heading-sm: 1.25rem;
+    --text-heading-sm--line-height: 1.4;
+    --text-heading-sm--font-weight: 500;
+
+    --text-body-lg: 1.125rem;
+    --text-body-lg--line-height: 1.56;
+    --text-body-lg--letter-spacing: -0.005em;
+
+    --text-body-md: 1rem;
+    --text-body-md--line-height: 1.5;
+    --text-body-md--letter-spacing: 0.015em;
+
+    --text-body-sm: 0.875rem;
+    --text-body-sm--line-height: 1.43;
+
+    --text-caption: 0.8125rem;
+    --text-caption--line-height: 1.4;
+
+    /* Accent palette. DESIGN.md: these live inside product illustrations and
+       iconography ONLY — never as button surfaces. */
+    --color-accent-teal: #00a87e;
+    --color-accent-blue-link: #376cd5;
+    --color-accent-light-blue: #007bc2;
+    --color-accent-light-green: #428619;
+    --color-accent-green-text: #006400;
+    --color-accent-yellow: #b09000;
+    --color-accent-warning: #ec7e00;
+    --color-accent-pink: #e61e49;
+    --color-accent-danger: #e23b4a;
+    --color-accent-deep-red: #8b0000;
+    --color-accent-brown: #936d62;
+}
+
+/* Light mode — DESIGN.md "canvas-light" catalogue band. */
 :root {
-    --background: oklch(1 0 0);
-    --foreground: oklch(0.145 0 0);
-    --card: oklch(1 0 0);
-    --card-foreground: oklch(0.145 0 0);
-    --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.145 0 0);
-    --primary: oklch(0.205 0 0);
-    --primary-foreground: oklch(0.985 0 0);
-    --secondary: oklch(0.97 0 0);
-    --secondary-foreground: oklch(0.205 0 0);
-    --muted: oklch(0.97 0 0);
-    --muted-foreground: oklch(0.556 0 0);
-    --accent: oklch(0.97 0 0);
-    --accent-foreground: oklch(0.205 0 0);
-    --destructive: oklch(0.577 0.245 27.325);
-    --border: oklch(0.922 0 0);
-    --input: oklch(0.922 0 0);
-    --ring: oklch(0.708 0 0);
-    --chart-1: oklch(0.87 0 0);
-    --chart-2: oklch(0.556 0 0);
-    --chart-3: oklch(0.439 0 0);
-    --chart-4: oklch(0.371 0 0);
-    --chart-5: oklch(0.269 0 0);
-    --radius: 0.625rem;
-    --sidebar: oklch(0.985 0 0);
-    --sidebar-foreground: oklch(0.145 0 0);
-    --sidebar-primary: oklch(0.205 0 0);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.97 0 0);
-    --sidebar-accent-foreground: oklch(0.205 0 0);
-    --sidebar-border: oklch(0.922 0 0);
-    --sidebar-ring: oklch(0.708 0 0);
+    --background: #ffffff;              /* canvas-light */
+    --foreground: #191c1f;              /* ink */
+    --card: #ffffff;                    /* surface-card */
+    --card-foreground: #191c1f;         /* ink */
+    --popover: #ffffff;                 /* canvas-light */
+    --popover-foreground: #191c1f;      /* ink */
+    --primary: #000000;                 /* button-dark: dark CTA on light */
+    --primary-foreground: #ffffff;      /* on-dark */
+    --secondary: #f4f4f4;               /* button-soft / surface-soft */
+    --secondary-foreground: #191c1f;    /* ink */
+    --muted: #f4f4f4;                   /* surface-soft */
+    --muted-foreground: #505a63;        /* mute */
+    --accent: #f4f4f4;                  /* surface-soft */
+    --accent-foreground: #191c1f;       /* ink */
+    --destructive: #e23b4a;             /* accent-danger */
+    --border: #e2e2e7;                  /* hairline-light */
+    --input: #e2e2e7;                   /* hairline-light */
+    --ring: #494fdf;                    /* primary — transient focus only */
+    --brand: #494fdf;                   /* primary */
+    --brand-foreground: #ffffff;        /* on-primary */
+    --brand-bright: #4f55f1;            /* primary-bright */
+    --brand-deep: #3a40c4;              /* primary-deep */
+    --chart-1: #00a87e;                 /* accent-teal */
+    --chart-2: #007bc2;                 /* accent-light-blue */
+    --chart-3: #e61e49;                 /* accent-pink */
+    --chart-4: #428619;                 /* accent-light-green */
+    --chart-5: #ec7e00;                 /* accent-warning */
+    --radius: 20px;                     /* rounded.lg — the card radius */
+    --sidebar: #f4f4f4;
+    --sidebar-foreground: #191c1f;
+    --sidebar-primary: #000000;
+    --sidebar-primary-foreground: #ffffff;
+    --sidebar-accent: #ffffff;
+    --sidebar-accent-foreground: #191c1f;
+    --sidebar-border: #e2e2e7;
+    --sidebar-ring: #494fdf;
 }
 
+/* Dark mode — DESIGN.md "canvas-dark" storytelling band.
+   The canvas is true #000000; the surface ladder has exactly two dark steps
+   (canvas-dark -> surface-elevated). Do not add a third. */
 .dark {
-    --background: oklch(0.145 0 0);
-    --foreground: oklch(0.985 0 0);
-    --card: oklch(0.205 0 0);
-    --card-foreground: oklch(0.985 0 0);
-    --popover: oklch(0.205 0 0);
-    --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.922 0 0);
-    --primary-foreground: oklch(0.205 0 0);
-    --secondary: oklch(0.269 0 0);
-    --secondary-foreground: oklch(0.985 0 0);
-    --muted: oklch(0.269 0 0);
-    --muted-foreground: oklch(0.708 0 0);
-    --accent: oklch(0.269 0 0);
-    --accent-foreground: oklch(0.985 0 0);
-    --destructive: oklch(0.704 0.191 22.216);
-    --border: oklch(1 0 0 / 10%);
-    --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.556 0 0);
-    --chart-1: oklch(0.87 0 0);
-    --chart-2: oklch(0.556 0 0);
-    --chart-3: oklch(0.439 0 0);
-    --chart-4: oklch(0.371 0 0);
-    --chart-5: oklch(0.269 0 0);
-    --sidebar: oklch(0.205 0 0);
-    --sidebar-foreground: oklch(0.985 0 0);
-    --sidebar-primary: oklch(0.488 0.243 264.376);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.269 0 0);
-    --sidebar-accent-foreground: oklch(0.985 0 0);
-    --sidebar-border: oklch(1 0 0 / 10%);
-    --sidebar-ring: oklch(0.556 0 0);
+    --background: #000000;                    /* canvas-dark */
+    --foreground: #ffffff;                    /* on-dark */
+    --card: #16181a;                          /* surface-elevated */
+    --card-foreground: #ffffff;               /* on-dark */
+    --popover: #16181a;                       /* surface-elevated */
+    --popover-foreground: #ffffff;            /* on-dark */
+    --primary: #ffffff;                       /* button-primary: white pill */
+    --primary-foreground: #000000;            /* canvas-dark */
+    --secondary: #16181a;                     /* surface-elevated */
+    --secondary-foreground: #ffffff;          /* on-dark */
+    --muted: #16181a;                         /* surface-elevated */
+    --muted-foreground: rgba(255,255,255,0.72); /* on-dark-mute */
+    --accent: #16181a;                        /* surface-elevated */
+    --accent-foreground: #ffffff;             /* on-dark */
+    --destructive: #e23b4a;                   /* accent-danger */
+    --border: rgba(255,255,255,0.12);         /* hairline-dark */
+    --input: rgba(255,255,255,0.12);          /* hairline-dark */
+    --ring: #4f55f1;                          /* primary-bright */
+    --brand: #494fdf;                         /* primary */
+    --brand-foreground: #ffffff;              /* on-primary */
+    --brand-bright: #4f55f1;                  /* primary-bright */
+    --brand-deep: #3a40c4;                    /* primary-deep */
+    --chart-1: #00a87e;
+    --chart-2: #007bc2;
+    --chart-3: #e61e49;
+    --chart-4: #428619;
+    --chart-5: #ec7e00;
+    --sidebar: #0a0a0a;
+    --sidebar-foreground: #ffffff;
+    --sidebar-primary: #ffffff;
+    --sidebar-primary-foreground: #000000;
+    --sidebar-accent: #16181a;
+    --sidebar-accent-foreground: #ffffff;
+    --sidebar-border: rgba(255,255,255,0.12);
+    --sidebar-ring: #4f55f1;
 }
 
-/* Brand colours that sit outside the shadcn token set. */
+/* Strava's OAuth brand colour. Outside the DESIGN.md palette by necessity —
+   it belongs to Strava, not to us. Used on the provider mark only, never as a
+   button surface (DESIGN.md: accents are not button surfaces). */
 @theme {
     --color-strava: #fc4c02;
-    --color-strava-hover: #e34402;
-    --color-strava-foreground: #ffffff;
 }
 
 @layer base {
@@ -129,9 +229,10 @@
     @apply border-border outline-ring/50;
     }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-body-md text-foreground;
     }
   html {
     @apply font-sans;
+    font-optical-sizing: auto;
     }
 }

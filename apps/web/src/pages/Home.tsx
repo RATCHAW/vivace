@@ -17,13 +17,14 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { ModeToggle } from "@/components/mode-toggle";
 
+// DESIGN.md: hairline rules carry the row rhythm — no shadows, no zebra fills.
 function Fact({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="grid gap-0.5">
-      <dt className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-        {label}
-      </dt>
-      <dd className="font-medium">{children}</dd>
+    <div className="flex items-center justify-between gap-4 py-3">
+      <dt className="text-caption shrink-0 text-muted-foreground">{label}</dt>
+      <dd className="text-body-sm min-w-0 text-right font-semibold break-words">
+        {children}
+      </dd>
     </div>
   );
 }
@@ -43,18 +44,19 @@ export function Home() {
   }, []);
 
   return (
-    <main className="flex min-h-svh items-center justify-center bg-muted/40 p-6">
-      <Card className="w-full max-w-sm">
+    <main className="flex min-h-svh items-center justify-center px-6 py-22">
+      {/* {component.feature-card-dark} / {component.feature-card-light} */}
+      <Card className="w-full max-w-md">
         <CardHeader>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-4">
             <Avatar size="lg">
               <AvatarImage src={session?.user.image ?? undefined} alt="" />
               <AvatarFallback>
                 {session?.user.name?.charAt(0).toUpperCase() ?? "?"}
               </AvatarFallback>
             </Avatar>
-            <div className="grid gap-0.5">
-              <CardTitle className="text-lg">{session?.user.name}</CardTitle>
+            <div className="grid gap-1">
+              <CardTitle>{session?.user.name}</CardTitle>
               <CardDescription>Signed in with Strava</CardDescription>
             </div>
           </div>
@@ -72,18 +74,21 @@ export function Home() {
           )}
 
           {!athlete && !error && (
-            <div className="grid gap-4" aria-label="Loading your Strava profile">
-              {Array.from({ length: 4 }, (_, i) => (
-                <div key={i} className="grid gap-1.5">
-                  <Skeleton className="h-3 w-20" />
-                  <Skeleton className="h-4 w-36" />
+            <div
+              className="divide-y divide-border"
+              aria-label="Loading your Strava profile"
+            >
+              {Array.from({ length: 5 }, (_, i) => (
+                <div key={i} className="flex justify-between gap-4 py-3">
+                  <Skeleton className="h-3.5 w-20" />
+                  <Skeleton className="h-3.5 w-32" />
                 </div>
               ))}
             </div>
           )}
 
           {athlete && (
-            <dl className="grid gap-3">
+            <dl className="divide-y divide-border">
               <Fact label="Athlete ID">{athlete.id}</Fact>
               {athlete.username && (
                 <Fact label="Username">{athlete.username}</Fact>
@@ -101,10 +106,12 @@ export function Home() {
               )}
               <Fact label="Subscription">
                 {athlete.summit || athlete.premium ? (
-                  <Badge className="bg-strava text-strava-foreground">
+                  // {component.badge-feature} — the single cobalt stamp
+                  <Badge className="bg-brand text-brand-foreground">
                     Strava subscriber
                   </Badge>
                 ) : (
+                  // {component.badge-tag}
                   <Badge variant="secondary">Free plan</Badge>
                 )}
               </Fact>
@@ -116,11 +123,7 @@ export function Home() {
         </CardContent>
 
         <CardFooter>
-          <Button
-            variant="outline"
-            className="w-full"
-            onClick={() => authClient.signOut()}
-          >
+          <Button variant="outline" className="w-full" onClick={() => authClient.signOut()}>
             Sign out
           </Button>
         </CardFooter>

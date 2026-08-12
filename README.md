@@ -63,8 +63,13 @@ to one origin.
 **shadcn/ui is the default for anything UI.** Reach for a registry component before
 hand-rolling markup or writing bespoke CSS.
 
+- [`apps/web/DESIGN.md`](apps/web/DESIGN.md) is the visual source of truth. Its
+  tokens are bound to the shadcn token layer in `apps/web/src/styles.css`, where
+  every literal is commented with the DESIGN.md token it implements. Buttons are
+  pills at ≥48px, cards use a 20px radius, elevation is hairlines rather than
+  shadows, and the cobalt brand colour (`bg-brand`) stays scarce.
 - Config lives in [`apps/web/components.json`](apps/web/components.json) —
-  style `base-nova` ([Base UI](https://base-ui.com) primitives, Lucide icons, Geist).
+  style `base-nova` ([Base UI](https://base-ui.com) primitives, Lucide icons, Inter).
 - Components are vendored into `apps/web/src/components/ui/` and are **yours to edit**;
   they are normal source files, not a locked dependency.
 - Design tokens (colours, radii, dark mode) live in `apps/web/src/styles.css`.

@@ -13,6 +13,39 @@ shadcn/ui is the default for anything user-facing. Before writing markup or CSS:
    `apps/web/src/components/ui/` when the registry has no match.
 3. Hand-rolled markup with bespoke CSS is the last resort.
 
+## Design system — apps/web/DESIGN.md
+
+[`apps/web/DESIGN.md`](./apps/web/DESIGN.md) is the visual source of truth. It is
+bound to the shadcn token layer in `apps/web/src/styles.css` — every literal
+there carries a comment naming the DESIGN.md token it implements. Change tokens
+in `styles.css`, not in components.
+
+The mapping:
+
+| DESIGN.md | Where it lives |
+| --- | --- |
+| `colors.canvas-light` mode | `:root` (light theme) |
+| `colors.canvas-dark` mode | `.dark` (dark theme) |
+| `colors.primary` (cobalt) | `--brand` → `bg-brand`, **not** `--primary` |
+| `button-primary` / `button-dark` | `--primary` (white on dark, black on light) |
+| `typography.*` | `text-display-xl`, `text-heading-md`, `text-body-md`, `text-caption`, … |
+| `rounded.*` | `rounded-sm` 8px · `rounded-md` 12px · `rounded-lg` 20px · `rounded-xl` 28px · `rounded-full` |
+| `spacing.*` | Tailwind's 4px scale (`py-3.5` = 14px, `p-8` = 32px, `py-22` = 88px) |
+
+Non-obvious consequences:
+
+- **Cobalt is not `--primary`.** DESIGN.md reserves `colors.primary` for the
+  featured card and the wordmark — at most one per viewport. The loud CTA is the
+  white/black pill, which *is* `--primary`. Use `bg-brand` for the cobalt stamp.
+- **Every button is a pill at ≥48px.** Don't reach for a smaller custom height.
+- **No drop shadows anywhere.** Elevation is canvas + surface-luminance +
+  hairlines. If you're adding `shadow-*`, you're off-system.
+- **Accent colours are illustration-only** — never a button surface.
+- **New `--text-*` or `--color-*` tokens must be registered in
+  `src/lib/utils.ts`.** tailwind-merge otherwise reads `text-body-md` as a
+  *colour* and silently drops `text-primary-foreground` when both land in one
+  `cn()` call.
+
 Rules:
 
 - **Style with tokens, not literals.** `bg-card`, `text-muted-foreground`,
