@@ -23,7 +23,7 @@ export const auth = betterAuth({
           // Strava expects client_id/client_secret in the POST body, not Basic auth
           authentication: "post",
           // Strava scopes are comma-separated, so keep them in a single entry
-          scopes: ["read"],
+          scopes: ["read,activity:read"],
           getUserInfo: async (tokens) => {
             const res = await fetch(`${STRAVA_API_BASE}/athlete`, {
               headers: { Authorization: `Bearer ${tokens.accessToken}` },

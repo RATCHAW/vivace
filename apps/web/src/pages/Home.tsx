@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
+import { Link } from "react-router-dom";
 import type { StravaAthlete } from "@repo/shared";
 import { authClient } from "@/lib/auth-client";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -122,7 +123,11 @@ export function Home() {
           )}
         </CardContent>
 
-        <CardFooter>
+        <CardFooter className="flex-col gap-3">
+          {/* {component.button-primary} — the loudest pixel on the card */}
+          <Button className="w-full" render={<Link to="/runs" />}>
+            Watch your runs
+          </Button>
           <Button variant="outline" className="w-full" onClick={() => authClient.signOut()}>
             Sign out
           </Button>
