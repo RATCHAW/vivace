@@ -1,7 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
 import { authClient } from "@/lib/auth-client";
 import { Wordmark } from "@/components/wordmark";
-import { SoonBadge } from "@/components/mono";
 import { ModeToggle } from "@/components/mode-toggle";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -9,7 +8,7 @@ import { Button } from "@/components/ui/button";
 const NAV = [
   { to: "/", label: "Overview" },
   { to: "/runs", label: "Activities" },
-  { to: "/coach", label: "Coach", soon: true },
+  { to: "/coach", label: "Coach" },
 ] as const;
 
 /** The signed-in chrome: wordmark, the three surfaces, and who you are.
@@ -36,7 +35,6 @@ export function AppHeader() {
             render={<Link to={item.to} />}
           >
             {item.label}
-            {"soon" in item && item.soon && <SoonBadge />}
           </Button>
         ))}
       </nav>

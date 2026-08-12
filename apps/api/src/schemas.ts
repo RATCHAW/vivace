@@ -145,3 +145,71 @@ export const RunRenderStateSchema = z
   .openapi("RunRenderState");
 
 export type RunRenderState = z.infer<typeof RunRenderStateSchema>;
+
+/** One coach conversation. `title` is null until the first message names it. */
+export const CoachThreadSchema = z
+  .object({
+    id: z.string().openapi({ example: "8f2c1e34-9a1b-4f6d-8f0e-3b6a1c9d2e77" }),
+    title: z.string().nullable().openapi({ example: "Half marathon in October" }),
+    created_at: z.iso.datetime(),
+    updated_at: z.iso.datetime(),
+  })
+  .openapi("CoachThread");
+
+export type CoachThread = z.infer<typeof CoachThreadSchema>;
+
+/**
+ * One stored message, in the AI SDK's `UIMessage` shape.
+ *
+ * `parts` is deliberately loose: a part is a discriminated union that grows
+ * with every model capability (text, reasoning, file, tool-*, …) and pinning it
+ * here would mean re-deriving the SDK's types in Zod and re-deriving them again
+ * on every SDK release. The browser casts this back to `UIMessage` in one
+ * documented place — see `coachMessages()` in apps/web/src/api.
+ */
+export const CoachMessageSchema = z
+  .object({
+    id: z.string(),
+    role: z.enum(["system", "user", "assistant"]),
+    parts: z.array(
+      z.looseObject({ type: z.string().openapi({ example: "text" }) }),
+    ),
+  })
+  .openapi("CoachMessage");
+
+export type CoachMessage = z.infer<typeof CoachMessageSchema>;
+
+/** A thread and everything said in it, oldest message first. */
+export const CoachThreadDetailSchema = z
+  .object({
+    thread: CoachThreadSchema,
+    messages: z.array(CoachMessageSchema),
+  })
+  .openapi("CoachThreadDetail");
+
+export type CoachThreadDetail = z.infer<typeof CoachThreadDetailSchema>;
+
+/**
+ * One turn of the chat.
+ *
+ * Only the message just typed travels — the rest of the transcript is already
+ * on the server, which is what `useChat`'s `prepareSendMessagesRequest` is
+ * configured to do in apps/web. `regenerate-message` carries no new message;
+ * it names the assistant reply to throw away and answer again.
+ */
+export const CoachChatRequestSchema = z
+  .object({
+    thread_id: z.string().openapi({
+      example: "8f2c1e34-9a1b-4f6d-8f0e-3b6a1c9d2e77",
+    }),
+    trigger: z
+      .enum(["submit-message", "regenerate-message"])
+      .default("submit-message"),
+    /** Required when `trigger` is `submit-message`. */
+    message: CoachMessageSchema.optional(),
+    /** The message to regenerate from, when `trigger` is `regenerate-message`. */
+    message_id: z.string().optional(),
+  })
+  .openapi("CoachChatRequest");
+
+export type CoachChatRequest = z.infer<typeof CoachChatRequestSchema>;

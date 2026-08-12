@@ -28,6 +28,9 @@ services:
       WEB_ORIGIN: http://localhost:8080
       STRAVA_CLIENT_ID: ${STRAVA_CLIENT_ID:-}
       STRAVA_CLIENT_SECRET: ${STRAVA_CLIENT_SECRET:-}
+      # Unset just means the coach answers 503; the rest of the app is fine.
+      GOOGLE_GENERATIVE_AI_API_KEY: ${GOOGLE_GENERATIVE_AI_API_KEY:-}
+      COACH_MODEL: ${COACH_MODEL:-}
     ports:
       - "3000:3000"
     depends_on:

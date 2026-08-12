@@ -4,11 +4,15 @@ import { Loader2Icon } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import { Login } from "@/pages/Login";
 import { Home } from "@/pages/Home";
-import { Coach } from "@/pages/Coach";
 
 // Remotion + Mapbox are heavy — only load them when the runs page is visited.
 const Runs = lazy(() =>
   import("@/pages/Runs").then((m) => ({ default: m.Runs })),
+);
+
+// So are the AI SDK and the markdown renderer behind the coach.
+const Coach = lazy(() =>
+  import("@/pages/Coach").then((m) => ({ default: m.Coach })),
 );
 
 function FullPageSpinner() {
@@ -51,7 +55,15 @@ export function App() {
       />
       <Route
         path="/coach"
-        element={session ? <Coach /> : <Navigate to="/login" replace />}
+        element={
+          session ? (
+            <Suspense fallback={<FullPageSpinner />}>
+              <Coach />
+            </Suspense>
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        }
       />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
