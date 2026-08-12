@@ -20,4 +20,15 @@ describe("api", () => {
     const res = await app.request("/api/me/strava");
     expect(res.status).toBe(401);
   });
+
+  it("rejects the render endpoints without a session", async () => {
+    for (const [method, path] of [
+      ["GET", "/api/runs/123/render"],
+      ["POST", "/api/runs/123/render"],
+      ["GET", "/api/runs/123/render/progress"],
+    ] as const) {
+      const res = await app.request(path, { method });
+      expect(res.status, `${method} ${path}`).toBe(401);
+    }
+  });
 });

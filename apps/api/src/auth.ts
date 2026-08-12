@@ -1,11 +1,11 @@
 import "dotenv/config";
 import { betterAuth } from "better-auth";
 import { genericOAuth, openAPI } from "better-auth/plugins";
-import pg from "pg";
 import { createStravaClient, getLoggedInAthlete } from "@repo/strava-api";
+import { pool } from "./db.js";
 
 export const auth = betterAuth({
-  database: new pg.Pool({ connectionString: process.env.DATABASE_URL }),
+  database: pool,
   baseURL: process.env.BETTER_AUTH_URL ?? "http://localhost:3000",
   secret: process.env.BETTER_AUTH_SECRET,
   trustedOrigins: [process.env.WEB_ORIGIN ?? "http://localhost:5173"],

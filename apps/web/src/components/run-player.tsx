@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Player, type PlayerRef } from "@remotion/player";
 import { toast } from "sonner";
 import {
-  DownloadIcon,
   MaximizeIcon,
   MinimizeIcon,
   PauseIcon,
@@ -10,10 +9,9 @@ import {
   Share2Icon,
 } from "lucide-react";
 import type { Run, RunStreams } from "@/api";
-import { MonoLabel, SoonBadge } from "@/components/mono";
+import { MonoLabel } from "@/components/mono";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
-import { cn } from "@/lib/utils";
 import { RunVideo } from "@/remotion/run-video/RunVideo";
 import {
   chapterAtProgress,
@@ -94,9 +92,8 @@ export function RunPlayer({
   const chapter = chapterAtProgress(progress);
 
   return (
-    // Theatre mode centres the film and keeps the transport to its width — a
-    // scrubber three times wider than the thing it scrubs reads as a mistake.
-    <div className={cn("flex flex-col gap-4", expanded && "mx-auto max-w-[460px]")}>
+    // Fills whatever width it is given; the page owns the theatre-mode measure.
+    <div className="flex flex-col gap-4">
       <div className="aspect-9/16 w-full overflow-hidden rounded-lg border bg-black">
         <Player
           ref={player}
@@ -150,18 +147,14 @@ export function RunPlayer({
         </Button>
       </div>
 
+      {/* The design's second action here was "Download MP4"; that is now a real
+          Lambda render, and it lives in <RenderControls> under the player
+          because it has three states and a progress bar to show. */}
       <div className="flex items-center gap-2">
         <MonoLabel className="mr-auto whitespace-nowrap">{chapter.label}</MonoLabel>
         <Button size="sm" variant="subtle" onClick={share}>
           <Share2Icon />
           Share
-        </Button>
-        {/* Rendering an MP4 needs @remotion/renderer on the server; the button
-            is here because the flow is designed, not because it works. */}
-        <Button size="sm" variant="secondary" disabled>
-          <DownloadIcon />
-          Download MP4
-          <SoonBadge />
         </Button>
       </div>
     </div>

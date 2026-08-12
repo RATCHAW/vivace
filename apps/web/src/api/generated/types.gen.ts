@@ -61,6 +61,20 @@ export type NumberStream = {
     data: Array<number>;
 };
 
+export type RunRenderState = {
+    render: RunRender;
+};
+
+export type RunRender = {
+    activity_id: number;
+    status: 'rendering' | 'done' | 'error';
+    progress: number;
+    output_url: string | null;
+    error: string | null;
+    created_at: string;
+    updated_at: string;
+} | null;
+
 export type GetHealthData = {
     body?: never;
     path?: never;
@@ -173,3 +187,100 @@ export type GetRunStreamsResponses = {
 };
 
 export type GetRunStreamsResponse = GetRunStreamsResponses[keyof GetRunStreamsResponses];
+
+export type GetRunRenderData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/runs/{id}/render';
+};
+
+export type GetRunRenderErrors = {
+    /**
+     * No valid session.
+     */
+    401: ApiError;
+};
+
+export type GetRunRenderError = GetRunRenderErrors[keyof GetRunRenderErrors];
+
+export type GetRunRenderResponses = {
+    /**
+     * The stored render, or null if none exists.
+     */
+    200: RunRenderState;
+};
+
+export type GetRunRenderResponse = GetRunRenderResponses[keyof GetRunRenderResponses];
+
+export type StartRunRenderData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/runs/{id}/render';
+};
+
+export type StartRunRenderErrors = {
+    /**
+     * No valid session.
+     */
+    401: ApiError;
+    /**
+     * The stored Strava token lacks the activity:read scope; sign out and back in.
+     */
+    403: ApiError;
+    /**
+     * Strava or Lambda failed the upstream request.
+     */
+    502: ApiError;
+    /**
+     * Remotion Lambda is not configured on this server.
+     */
+    503: ApiError;
+};
+
+export type StartRunRenderError = StartRunRenderErrors[keyof StartRunRenderErrors];
+
+export type StartRunRenderResponses = {
+    /**
+     * The render that is now in flight (or already finished).
+     */
+    200: RunRenderState;
+};
+
+export type StartRunRenderResponse = StartRunRenderResponses[keyof StartRunRenderResponses];
+
+export type StreamRunRenderProgressData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/runs/{id}/render/progress';
+};
+
+export type StreamRunRenderProgressErrors = {
+    /**
+     * No valid session.
+     */
+    401: ApiError;
+    /**
+     * Remotion Lambda is not configured on this server.
+     */
+    503: ApiError;
+};
+
+export type StreamRunRenderProgressError = StreamRunRenderProgressErrors[keyof StreamRunRenderProgressErrors];
+
+export type StreamRunRenderProgressResponses = {
+    /**
+     * An event stream of RunRender JSON messages.
+     */
+    200: string;
+};
+
+export type StreamRunRenderProgressResponse = StreamRunRenderProgressResponses[keyof StreamRunRenderProgressResponses];

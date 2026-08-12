@@ -12,11 +12,13 @@ import {
 import { RunMap } from "./RunMap";
 import { RouteFallback } from "./RouteFallback";
 
-export interface RunVideoProps {
+// A type alias, not an interface — Remotion's <Composition> needs props
+// assignable to Record<string, unknown>, which interfaces never are.
+export type RunVideoProps = {
   activity: Run;
   streams: RunStreams;
   mapboxToken: string;
-}
+};
 
 /** The effort chapter's sparkline draws on over this slice of the timeline,
  *  starting once the chapter has faded up. */

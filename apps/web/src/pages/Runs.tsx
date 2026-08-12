@@ -11,6 +11,8 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+// The theme toggle that used to sit here now lives in AppHeader.
+import { RenderControls } from "@/components/render-controls";
 import { cn } from "@/lib/utils";
 import { formatClock, formatPace } from "@/remotion/run-video/data";
 
@@ -170,34 +172,43 @@ export function Runs() {
             aria-label="Run replay"
             className={cn(!expanded && "lg:sticky lg:top-10")}
           >
-            {!selected || (!streams && !streamsError) ? (
-              <div className="mx-auto flex aspect-9/16 w-full max-w-[460px] items-center justify-center rounded-lg border bg-black">
-                <Loader2Icon className="text-muted-foreground size-6 animate-spin" />
-                <span className="sr-only">Loading run replay…</span>
-              </div>
-            ) : streamsError ? (
-              <Alert variant="destructive">
-                <AlertTitle>Could not load this run</AlertTitle>
-                <AlertDescription>{streamsError.error}</AlertDescription>
-              </Alert>
-            ) : (
-              <RunPlayer
-                key={selected.id}
-                activity={selected}
-                streams={streams ?? {}}
-                mapboxToken={MAPBOX_TOKEN}
-                expanded={expanded}
-                onToggleExpanded={() => setExpanded((open) => !open)}
-              />
-            )}
+            {/* Theatre mode hides the list and centres the film; everything
+                stacked under it — transport, render panel, footnote — keeps to
+                the same width, or the column reads as three loose things. */}
+            <div className={cn(expanded && "mx-auto max-w-[460px]")}>
+              {!selected || (!streams && !streamsError) ? (
+                <div className="flex aspect-9/16 w-full items-center justify-center rounded-lg border bg-black">
+                  <Loader2Icon className="text-muted-foreground size-6 animate-spin" />
+                  <span className="sr-only">Loading run replay…</span>
+                </div>
+              ) : streamsError ? (
+                <Alert variant="destructive">
+                  <AlertTitle>Could not load this run</AlertTitle>
+                  <AlertDescription>{streamsError.error}</AlertDescription>
+                </Alert>
+              ) : (
+                <RunPlayer
+                  key={selected.id}
+                  activity={selected}
+                  streams={streams ?? {}}
+                  mapboxToken={MAPBOX_TOKEN}
+                  expanded={expanded}
+                  onToggleExpanded={() => setExpanded((open) => !open)}
+                />
+              )}
 
-            {!MAPBOX_TOKEN && (
-              <p className="text-caption text-stone mt-4">
-                No Mapbox token configured — the replay draws the route on a plain
-                canvas. Set <code>VITE_MAPBOX_TOKEN</code> in{" "}
-                <code>apps/web/.env</code> to get the full map.
-              </p>
-            )}
+              {/* Rendering happens on Lambda from the API's copy of the run, so
+                  it stands even when the browser could not load the streams. */}
+              {selected && <RenderControls key={selected.id} run={selected} />}
+
+              {!MAPBOX_TOKEN && (
+                <p className="text-caption text-stone mt-4">
+                  No Mapbox token configured — the replay draws the route on a
+                  plain canvas. Set <code>VITE_MAPBOX_TOKEN</code> in{" "}
+                  <code>apps/web/.env</code> to get the full map.
+                </p>
+              )}
+            </div>
           </section>
         </div>
       </main>
