@@ -8,10 +8,10 @@ RUN corepack enable
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json ./
 COPY apps/api/package.json apps/api/package.json
 COPY apps/web/package.json apps/web/package.json
-COPY packages/shared/package.json packages/shared/package.json
+COPY packages/strava-api/package.json packages/strava-api/package.json
 RUN pnpm install --frozen-lockfile --filter @repo/web...
 
-COPY packages/shared packages/shared
+COPY packages/strava-api packages/strava-api
 COPY apps/web apps/web
 RUN pnpm --filter @repo/web build
 

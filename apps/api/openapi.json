@@ -1,0 +1,241 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Strava Login App API",
+    "version": "0.0.0",
+    "description": "Sign in with Strava, then read your profile. Requests are authenticated with the better-auth session cookie, so 'Try it out' works from a browser that is already signed in. The auth endpoints themselves (/api/auth/*) are documented separately at /api/auth/reference."
+  },
+  "servers": [
+    {
+      "url": "/",
+      "description": "Same origin"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Meta",
+      "description": "Liveness and documentation"
+    },
+    {
+      "name": "Athlete",
+      "description": "The signed-in athlete's Strava profile"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "sessionCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "better-auth.session_token",
+        "description": "Set by better-auth after the Strava OAuth callback."
+      }
+    },
+    "schemas": {
+      "Health": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok"
+            ]
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "Athlete": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "example": 1234567
+          },
+          "username": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "marianne_t"
+          },
+          "firstname": {
+            "type": "string",
+            "example": "Marianne"
+          },
+          "lastname": {
+            "type": "string",
+            "example": "Teutenberg"
+          },
+          "bio": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "city": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "San Francisco"
+          },
+          "state": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "CA"
+          },
+          "country": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "US"
+          },
+          "sex": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "M",
+              "F",
+              null
+            ]
+          },
+          "premium": {
+            "type": "boolean"
+          },
+          "summit": {
+            "type": "boolean"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2017-11-14T02:30:05Z"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "profile": {
+            "type": "string"
+          },
+          "profile_medium": {
+            "type": "string"
+          },
+          "weight": {
+            "type": [
+              "number",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "username",
+          "firstname",
+          "lastname",
+          "bio",
+          "city",
+          "state",
+          "country",
+          "sex",
+          "premium",
+          "summit",
+          "created_at",
+          "updated_at",
+          "profile",
+          "profile_medium",
+          "weight"
+        ]
+      },
+      "ApiError": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "example": "Not signed in"
+          }
+        },
+        "required": [
+          "error"
+        ]
+      }
+    },
+    "parameters": {}
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "operationId": "getHealth",
+        "tags": [
+          "Meta"
+        ],
+        "summary": "Liveness probe",
+        "responses": {
+          "200": {
+            "description": "The API is up.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/me/strava": {
+      "get": {
+        "operationId": "getStravaAthlete",
+        "tags": [
+          "Athlete"
+        ],
+        "summary": "Get the signed-in athlete",
+        "description": "Reads the session, takes the stored Strava access token (refreshing it when expired), and proxies GET /athlete from the Strava API.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The athlete's Strava profile.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Athlete"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Strava rejected or failed the upstream request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "webhooks": {}
+}

@@ -6,7 +6,10 @@
     "strict": true,
     "skipLibCheck": true,
     "noEmit": true,
+    // @repo/strava-api's generated fetch client is written against web APIs
+    // (URLSearchParams iteration, Request/Response), so DOM libs come along.
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "types": ["node"]
   },
-  "include": ["src"]
+  "include": ["src", "scripts"]
 }

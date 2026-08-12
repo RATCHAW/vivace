@@ -1,5 +1,6 @@
-import { useEffect, useState, type ReactNode } from "react";
-import type { StravaAthlete } from "@repo/shared";
+import { type ReactNode } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { getStravaAthleteOptions } from "@/api";
 import { authClient } from "@/lib/auth-client";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -31,17 +32,8 @@ function Fact({ label, children }: { label: string; children: ReactNode }) {
 
 export function Home() {
   const { data: session } = authClient.useSession();
-  const [athlete, setAthlete] = useState<StravaAthlete | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    fetch("/api/me/strava", { credentials: "include" })
-      .then(async (res) => {
-        if (!res.ok) throw new Error(`Failed to load profile (${res.status})`);
-        setAthlete(await res.json());
-      })
-      .catch((err: Error) => setError(err.message));
-  }, []);
+  // Fully typed off the API's OpenAPI document — see apps/web/src/api.
+  const { data: athlete, error } = useQuery(getStravaAthleteOptions());
 
   return (
     <main className="flex min-h-svh items-center justify-center px-6 py-22">
@@ -69,7 +61,7 @@ export function Home() {
           {error && (
             <Alert variant="destructive">
               <AlertTitle>Could not load your profile</AlertTitle>
-              <AlertDescription>{error}</AlertDescription>
+              <AlertDescription>{error.error}</AlertDescription>
             </Alert>
           )}
 
