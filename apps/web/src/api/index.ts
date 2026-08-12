@@ -53,4 +53,4 @@ client.interceptors.error.use(
 
 export { client };
 export * from "./generated/@tanstack/react-query.gen";
-export type { Athlete, ApiError } from "./generated/types.gen";
+export type { Athlete, ApiError, Run, RunStreams } from "./generated/types.gen";

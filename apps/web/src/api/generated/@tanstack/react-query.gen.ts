@@ -3,8 +3,8 @@
 import { type DefaultError, queryOptions } from '@tanstack/react-query';
 
 import { client } from '../client.gen';
-import { getHealth, getStravaAthlete, type Options } from '../sdk.gen';
-import type { GetHealthData, GetHealthResponse, GetStravaAthleteData, GetStravaAthleteError, GetStravaAthleteResponse } from '../types.gen';
+import { getHealth, getRuns, getRunStreams, getStravaAthlete, type Options } from '../sdk.gen';
+import type { GetHealthData, GetHealthResponse, GetRunsData, GetRunsError, GetRunsResponse, GetRunStreamsData, GetRunStreamsError, GetRunStreamsResponse, GetStravaAthleteData, GetStravaAthleteError, GetStravaAthleteResponse } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
@@ -75,4 +75,44 @@ export const getStravaAthleteOptions = (options?: Options<GetStravaAthleteData>)
         return data;
     },
     queryKey: getStravaAthleteQueryKey(options)
+});
+
+export const getRunsQueryKey = (options?: Options<GetRunsData>) => createQueryKey('getRuns', options);
+
+/**
+ * List the signed-in athlete's runs
+ *
+ * Proxies GET /athlete/activities from the Strava API and keeps only run-type activities (Run, TrailRun, VirtualRun).
+ */
+export const getRunsOptions = (options?: Options<GetRunsData>) => queryOptions<GetRunsResponse, GetRunsError, GetRunsResponse, ReturnType<typeof getRunsQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getRuns({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getRunsQueryKey(options)
+});
+
+export const getRunStreamsQueryKey = (options: Options<GetRunStreamsData>) => createQueryKey('getRunStreams', options);
+
+/**
+ * Get one run's GPS and sensor streams
+ *
+ * Proxies GET /activities/{id}/streams from the Strava API. Activities without streams (e.g. manual entries) yield an empty object.
+ */
+export const getRunStreamsOptions = (options: Options<GetRunStreamsData>) => queryOptions<GetRunStreamsResponse, GetRunStreamsError, GetRunStreamsResponse, ReturnType<typeof getRunStreamsQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getRunStreams({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getRunStreamsQueryKey(options)
 });

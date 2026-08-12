@@ -31,6 +31,36 @@ export type ApiError = {
     error: string;
 };
 
+export type Run = {
+    id: number;
+    name: string;
+    distance: number;
+    moving_time: number;
+    total_elevation_gain: number;
+    sport_type: string;
+    start_date_local: string;
+    average_speed: number;
+    average_heartrate: number | null;
+};
+
+export type RunStreams = {
+    latlng?: {
+        data: Array<[
+            number,
+            number
+        ]>;
+    };
+    time?: NumberStream;
+    distance?: NumberStream;
+    altitude?: NumberStream;
+    heartrate?: NumberStream;
+    velocity_smooth?: NumberStream;
+};
+
+export type NumberStream = {
+    data: Array<number>;
+};
+
 export type GetHealthData = {
     body?: never;
     path?: never;
@@ -75,3 +105,71 @@ export type GetStravaAthleteResponses = {
 };
 
 export type GetStravaAthleteResponse = GetStravaAthleteResponses[keyof GetStravaAthleteResponses];
+
+export type GetRunsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/me/runs';
+};
+
+export type GetRunsErrors = {
+    /**
+     * No valid session.
+     */
+    401: ApiError;
+    /**
+     * The stored Strava token lacks the activity:read scope; sign out and back in.
+     */
+    403: ApiError;
+    /**
+     * Strava rejected or failed the upstream request.
+     */
+    502: ApiError;
+};
+
+export type GetRunsError = GetRunsErrors[keyof GetRunsErrors];
+
+export type GetRunsResponses = {
+    /**
+     * The athlete's runs, most recent first.
+     */
+    200: Array<Run>;
+};
+
+export type GetRunsResponse = GetRunsResponses[keyof GetRunsResponses];
+
+export type GetRunStreamsData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/runs/{id}/streams';
+};
+
+export type GetRunStreamsErrors = {
+    /**
+     * No valid session.
+     */
+    401: ApiError;
+    /**
+     * The stored Strava token lacks the activity:read scope; sign out and back in.
+     */
+    403: ApiError;
+    /**
+     * Strava rejected or failed the upstream request.
+     */
+    502: ApiError;
+};
+
+export type GetRunStreamsError = GetRunStreamsErrors[keyof GetRunStreamsErrors];
+
+export type GetRunStreamsResponses = {
+    /**
+     * The run's streams, keyed by type.
+     */
+    200: RunStreams;
+};
+
+export type GetRunStreamsResponse = GetRunStreamsResponses[keyof GetRunStreamsResponses];

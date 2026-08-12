@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { GetHealthData, GetHealthResponses, GetStravaAthleteData, GetStravaAthleteErrors, GetStravaAthleteResponses } from './types.gen';
+import type { GetHealthData, GetHealthResponses, GetRunsData, GetRunsErrors, GetRunsResponses, GetRunStreamsData, GetRunStreamsErrors, GetRunStreamsResponses, GetStravaAthleteData, GetStravaAthleteErrors, GetStravaAthleteResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -35,5 +35,35 @@ export const getStravaAthlete = <ThrowOnError extends boolean = false>(options?:
             type: 'apiKey'
         }],
     url: '/api/me/strava',
+    ...options
+});
+
+/**
+ * List the signed-in athlete's runs
+ *
+ * Proxies GET /athlete/activities from the Strava API and keeps only run-type activities (Run, TrailRun, VirtualRun).
+ */
+export const getRuns = <ThrowOnError extends boolean = false>(options?: Options<GetRunsData, ThrowOnError>): RequestResult<GetRunsResponses, GetRunsErrors, ThrowOnError> => (options?.client ?? client).get<GetRunsResponses, GetRunsErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'better-auth.session_token',
+            type: 'apiKey'
+        }],
+    url: '/api/me/runs',
+    ...options
+});
+
+/**
+ * Get one run's GPS and sensor streams
+ *
+ * Proxies GET /activities/{id}/streams from the Strava API. Activities without streams (e.g. manual entries) yield an empty object.
+ */
+export const getRunStreams = <ThrowOnError extends boolean = false>(options: Options<GetRunStreamsData, ThrowOnError>): RequestResult<GetRunStreamsResponses, GetRunStreamsErrors, ThrowOnError> => (options.client ?? client).get<GetRunStreamsResponses, GetRunStreamsErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'better-auth.session_token',
+            type: 'apiKey'
+        }],
+    url: '/api/runs/{id}/streams',
     ...options
 });

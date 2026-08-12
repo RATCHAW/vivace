@@ -1,9 +1,13 @@
 import {
   createStravaClient,
+  getActivityStreams,
   getLoggedInAthlete,
+  getLoggedInAthleteActivities,
   type DetailedAthlete,
+  type StreamSet,
+  type SummaryActivity,
 } from "@repo/strava-api";
-import type { Athlete } from "./schemas.js";
+import type { Athlete, Run, RunStreams } from "./schemas.js";
 
 /**
  * Strava's published Swagger omits two fields the live API does return, so the
@@ -56,4 +60,85 @@ export async function fetchAthlete(accessToken: string): Promise<Athlete> {
   if (!data) throw new StravaApiError(response?.status ?? 502);
 
   return toAthlete(data as StravaAthleteResponse);
+}
+
+/**
+ * Strava's spec also omits heart-rate fields on activities — the live API
+ * returns them whenever the run was recorded with a monitor.
+ */
+type StravaActivityResponse = SummaryActivity & {
+  average_heartrate?: number;
+};
+
+/** Maps a Strava activity onto our own run contract. */
+function toRun(activity: StravaActivityResponse): Run {
+  return {
+    id: activity.id ?? 0,
+    name: activity.name ?? "Run",
+    distance: activity.distance ?? 0,
+    moving_time: activity.moving_time ?? 0,
+    total_elevation_gain: activity.total_elevation_gain ?? 0,
+    sport_type: activity.sport_type ?? "Run",
+    start_date_local: activity.start_date_local ?? new Date().toISOString(),
+    average_speed: activity.average_speed ?? 0,
+    average_heartrate: activity.average_heartrate ?? null,
+  };
+}
+
+/** `GET /athlete/activities` through the generated SDK, runs only. */
+export async function fetchRuns(accessToken: string): Promise<Run[]> {
+  const { data, response } = await getLoggedInAthleteActivities({
+    client: createStravaClient(accessToken),
+    query: { per_page: 100 },
+  });
+
+  if (!data) throw new StravaApiError(response?.status ?? 502);
+
+  // "Run", "TrailRun", "VirtualRun" — every run-flavoured sport type.
+  return data
+    .filter((a) => `${a.sport_type ?? a.type ?? ""}`.includes("Run"))
+    .map((a) => toRun(a as StravaActivityResponse));
+}
+
+const STREAM_KEYS = [
+  "latlng",
+  "time",
+  "distance",
+  "altitude",
+  "heartrate",
+  "velocity_smooth",
+] as const;
+
+/** Picks only the `data` arrays; the rest of `BaseStream` is sampling metadata. */
+function toRunStreams(set: StreamSet): RunStreams {
+  return {
+    latlng: set.latlng?.data ? { data: set.latlng.data } : undefined,
+    time: set.time?.data ? { data: set.time.data } : undefined,
+    distance: set.distance?.data ? { data: set.distance.data } : undefined,
+    altitude: set.altitude?.data ? { data: set.altitude.data } : undefined,
+    heartrate: set.heartrate?.data ? { data: set.heartrate.data } : undefined,
+    velocity_smooth: set.velocity_smooth?.data
+      ? { data: set.velocity_smooth.data }
+      : undefined,
+  };
+}
+
+/** `GET /activities/{id}/streams` through the generated SDK. */
+export async function fetchRunStreams(
+  accessToken: string,
+  id: number,
+): Promise<RunStreams> {
+  const { data, response } = await getActivityStreams({
+    client: createStravaClient(accessToken),
+    path: { id },
+    query: { keys: [...STREAM_KEYS], key_by_type: true },
+  });
+
+  if (!data) {
+    // Strava 404s on activities without any streams (e.g. manual entries).
+    if (response?.status === 404) return {};
+    throw new StravaApiError(response?.status ?? 502);
+  }
+
+  return toRunStreams(data);
 }

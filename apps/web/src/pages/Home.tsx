@@ -1,4 +1,5 @@
 import { type ReactNode } from "react";
+import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { getStravaAthleteOptions } from "@/api";
 import { authClient } from "@/lib/auth-client";
@@ -114,7 +115,11 @@ export function Home() {
           )}
         </CardContent>
 
-        <CardFooter>
+        <CardFooter className="flex-col gap-3">
+          {/* {component.button-primary} — the loudest pixel on the card */}
+          <Button className="w-full" render={<Link to="/runs" />}>
+            Watch your runs
+          </Button>
           <Button variant="outline" className="w-full" onClick={() => authClient.signOut()}>
             Sign out
           </Button>

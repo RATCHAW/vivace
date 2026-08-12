@@ -53,3 +53,64 @@ export const AthleteSchema = z
   .openapi("Athlete");
 
 export type Athlete = z.infer<typeof AthleteSchema>;
+
+/**
+ * One run in the athlete's activity list.
+ *
+ * Like `AthleteSchema`, a deliberate subset of Strava's `SummaryActivity` —
+ * exactly the fields the run list and the run video consume.
+ */
+export const RunSchema = z
+  .object({
+    id: z.number().int().openapi({ example: 987654321 }),
+    name: z.string().openapi({ example: "Morning Run" }),
+    /** Meters. */
+    distance: z.number().openapi({ example: 5021.4 }),
+    /** Seconds. */
+    moving_time: z.number().openapi({ example: 1724 }),
+    /** Meters. */
+    total_elevation_gain: z.number(),
+    sport_type: z.string().openapi({ example: "Run" }),
+    /** The athlete's wall clock at the start (ISO, Z-suffixed by Strava). */
+    start_date_local: z.iso.datetime().openapi({ example: "2026-08-09T07:12:00Z" }),
+    /** Meters per second. */
+    average_speed: z.number(),
+    /** Beats per minute, or null when recorded without a heart-rate monitor. */
+    average_heartrate: z.number().nullable(),
+  })
+  .openapi("Run");
+
+export type Run = z.infer<typeof RunSchema>;
+
+const NumberStreamSchema = z
+  .object({
+    data: z.array(z.number()),
+  })
+  .openapi("NumberStream");
+
+/**
+ * The streams the run video is built from. Every key is optional — treadmill
+ * runs have no latlng, most runs have no heartrate.
+ */
+export const RunStreamsSchema = z
+  .object({
+    latlng: z
+      .object({
+        /** [latitude, longitude] pairs. */
+        data: z.array(z.array(z.number()).min(2).max(2)),
+      })
+      .optional(),
+    /** Seconds since the start of the activity. */
+    time: NumberStreamSchema.optional(),
+    /** Cumulative meters. */
+    distance: NumberStreamSchema.optional(),
+    /** Meters above sea level. */
+    altitude: NumberStreamSchema.optional(),
+    /** Beats per minute. */
+    heartrate: NumberStreamSchema.optional(),
+    /** Smoothed meters per second. */
+    velocity_smooth: NumberStreamSchema.optional(),
+  })
+  .openapi("RunStreams");
+
+export type RunStreams = z.infer<typeof RunStreamsSchema>;

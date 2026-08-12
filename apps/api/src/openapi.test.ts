@@ -19,7 +19,12 @@ describe("openapi", () => {
 
     const document = await res.json();
     expect(document.openapi).toBe("3.1.0");
-    expect(Object.keys(document.paths)).toEqual(["/health", "/api/me/strava"]);
+    expect(Object.keys(document.paths)).toEqual([
+      "/health",
+      "/api/me/strava",
+      "/api/me/runs",
+      "/api/runs/{id}/streams",
+    ]);
     expect(document.components.schemas).toHaveProperty("Athlete");
     expect(document.paths["/api/me/strava"].get.operationId).toBe(
       "getStravaAthlete",
