@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
+  <!-- Vivace mark, "Continuous chevron · 1a", as the cobalt app stamp. -->
+  <rect width="24" height="24" rx="5.28" fill="#494fdf"/>
+  <g transform="translate(12 12) scale(.72) translate(-12 -12)">
+    <path d="M6.208 2.077 22 14.415 3.419 21.923 2 18.412 20.611 14.22 3.876 5.061Z" fill="#fff"/>
+  </g>
+</svg>

@@ -1,8 +1,9 @@
 import { cn } from "@/lib/utils";
+import { VivaceMark } from "@/components/vivace-mark";
 
 /**
  * The cobalt stamp and the name. DESIGN.md reserves `{colors.primary}` for the
- * wordmark and the featured card — at most one per viewport — so the dot here
+ * wordmark and the featured card — at most one per viewport — so the mark here
  * is usually the only cobalt on screen.
  */
 export function Wordmark({
@@ -14,11 +15,8 @@ export function Wordmark({
 }) {
   return (
     <span className={cn("flex items-center gap-2.5", className)}>
-      <span
-        className={cn(
-          "bg-brand rounded-full",
-          size === "lg" ? "size-3" : "size-2.5",
-        )}
+      <VivaceMark
+        className={cn("text-brand", size === "lg" ? "size-6" : "size-5")}
       />
       <span
         className={cn(

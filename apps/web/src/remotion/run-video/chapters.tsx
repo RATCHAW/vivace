@@ -1,6 +1,7 @@
 import { useMemo, type ReactNode } from "react";
 import { AbsoluteFill } from "remotion";
 import type { Run, RunStreams } from "@/api";
+import { VivaceMark } from "@/components/vivace-mark";
 import {
   buildSparkline,
   buildSplits,
@@ -549,15 +550,8 @@ export function SummaryChapter({
 
       {/* The one cobalt stamp per frame DESIGN.md allows — the wordmark. */}
       <div style={{ marginTop: 85, paddingTop: 53, borderTop: `1px solid ${RULE}` }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 21 }}>
-          <span
-            style={{
-              width: 21,
-              height: 21,
-              borderRadius: 9999,
-              backgroundColor: COBALT,
-            }}
-          />
+        <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
+          <VivaceMark style={{ width: 35, height: 35, color: COBALT }} />
           <span style={{ fontSize: 35, fontWeight: 600 }}>vivace</span>
         </div>
       </div>
