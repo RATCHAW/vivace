@@ -1,4 +1,4 @@
-import type { StravaActivity, StravaStreamSet } from "@repo/shared";
+import type { Run, RunStreams } from "@/api";
 
 // Story format: 9:16 at 30fps, 15 seconds.
 export const FPS = 30;
@@ -10,7 +10,7 @@ export const DRAW_START = 2 * FPS;
 export const DRAW_END = 13 * FPS;
 
 /** Strava streams deliver [latitude, longitude] pairs. */
-export type LatLng = [number, number];
+export type LatLng = number[];
 
 const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
 
@@ -46,7 +46,7 @@ export function formatPace(secondsPerKm: number | null): string {
 
 /** "SAT · AUG 9 · 7:12 AM" — start_date_local carries the local clock with a
  *  Z suffix, so format it in UTC to preserve the athlete's wall time. */
-export function formatStartDate(activity: StravaActivity): string {
+export function formatStartDate(activity: Run): string {
   const date = new Date(activity.start_date_local);
   if (Number.isNaN(date.getTime())) return "";
   const day = new Intl.DateTimeFormat("en-US", {
@@ -77,8 +77,8 @@ export interface LiveMetrics {
 /** What the overlay shows at a given route progress. Falls back to linearly
  *  scaled activity totals when the activity has no usable streams. */
 export function metricsAtProgress(
-  activity: StravaActivity,
-  streams: StravaStreamSet,
+  activity: Run,
+  streams: RunStreams,
   progress: number,
 ): LiveMetrics {
   const p = clamp01(progress);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { StravaActivity, StravaStreamSet } from "@repo/shared";
+import type { Run, RunStreams } from "@/api";
 import {
   formatClock,
   formatKm,
@@ -9,14 +9,17 @@ import {
   sampleIndex,
 } from "./data";
 
-const activity = {
+const activity: Run = {
+  id: 987654321,
+  name: "Morning Run",
   distance: 5000,
   moving_time: 1500,
-  elapsed_time: 1560,
   total_elevation_gain: 42,
+  sport_type: "Run",
+  start_date_local: "2026-08-09T07:12:00Z",
   average_speed: 5000 / 1500,
   average_heartrate: 152.4,
-} as StravaActivity;
+};
 
 describe("formatClock", () => {
   it("formats minutes and seconds", () => {
@@ -56,11 +59,11 @@ describe("sampleIndex", () => {
 });
 
 describe("metricsAtProgress", () => {
-  const streams: StravaStreamSet = {
-    time: { data: [0, 750, 1500], series_type: "distance", original_size: 3, resolution: "high" },
-    distance: { data: [0, 2500, 5000], series_type: "distance", original_size: 3, resolution: "high" },
-    velocity_smooth: { data: [0, 3.2, 3.4], series_type: "distance", original_size: 3, resolution: "high" },
-    heartrate: { data: [120, 150, 160], series_type: "distance", original_size: 3, resolution: "high" },
+  const streams: RunStreams = {
+    time: { data: [0, 750, 1500] },
+    distance: { data: [0, 2500, 5000] },
+    velocity_smooth: { data: [0, 3.2, 3.4] },
+    heartrate: { data: [120, 150, 160] },
   };
 
   it("reads live values from the streams", () => {

@@ -1,10 +1,8 @@
 import "dotenv/config";
 import { betterAuth } from "better-auth";
-import { genericOAuth } from "better-auth/plugins";
+import { genericOAuth, openAPI } from "better-auth/plugins";
 import pg from "pg";
-import type { StravaAthlete } from "@repo/shared";
-
-export const STRAVA_API_BASE = "https://www.strava.com/api/v3";
+import { createStravaClient, getLoggedInAthlete } from "@repo/strava-api";
 
 export const auth = betterAuth({
   database: new pg.Pool({ connectionString: process.env.DATABASE_URL }),
@@ -12,6 +10,8 @@ export const auth = betterAuth({
   secret: process.env.BETTER_AUTH_SECRET,
   trustedOrigins: [process.env.WEB_ORIGIN ?? "http://localhost:5173"],
   plugins: [
+    // Documents the /api/auth/* routes; Scalar reference at /api/auth/reference.
+    openAPI(),
     genericOAuth({
       config: [
         {
@@ -25,11 +25,11 @@ export const auth = betterAuth({
           // Strava scopes are comma-separated, so keep them in a single entry
           scopes: ["read,activity:read"],
           getUserInfo: async (tokens) => {
-            const res = await fetch(`${STRAVA_API_BASE}/athlete`, {
-              headers: { Authorization: `Bearer ${tokens.accessToken}` },
+            if (!tokens.accessToken) return null;
+            const { data: athlete } = await getLoggedInAthlete({
+              client: createStravaClient(tokens.accessToken),
             });
-            if (!res.ok) return null;
-            const athlete = (await res.json()) as StravaAthlete;
+            if (!athlete?.id) return null;
             const now = new Date();
             return {
               id: String(athlete.id),

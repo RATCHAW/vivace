@@ -1,8 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { Player } from "@remotion/player";
 import { ArrowLeftIcon, Loader2Icon } from "lucide-react";
-import type { StravaActivity, StravaStreamSet } from "@repo/shared";
+// Fully typed off the API's OpenAPI document — see apps/web/src/api.
+import { getRunsOptions, getRunStreamsOptions, type Run } from "@/api";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -24,68 +26,29 @@ import {
 // route canvas in the meantime.
 const MAPBOX_TOKEN: string = import.meta.env.VITE_MAPBOX_TOKEN ?? "";
 
-async function fetchJson<T>(url: string): Promise<T> {
-  const res = await fetch(url, { credentials: "include" });
-  if (!res.ok) {
-    const body = (await res.json().catch(() => null)) as { error?: string } | null;
-    throw new Error(body?.error ?? `Request failed (${res.status})`);
-  }
-  return res.json() as Promise<T>;
-}
-
 /** start_date_local carries the local clock with a Z suffix — format in UTC. */
-function runDate(activity: StravaActivity): string {
+function runDate(run: Run): string {
   return new Intl.DateTimeFormat("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
     timeZone: "UTC",
-  }).format(new Date(activity.start_date_local));
+  }).format(new Date(run.start_date_local));
 }
 
-function averagePaceSeconds(activity: StravaActivity): number | null {
-  return activity.average_speed > 0 ? 1000 / activity.average_speed : null;
+function averagePaceSeconds(run: Run): number | null {
+  return run.average_speed > 0 ? 1000 / run.average_speed : null;
 }
 
 export function Runs() {
-  const [runs, setRuns] = useState<StravaActivity[] | null>(null);
-  const [runsError, setRunsError] = useState<string | null>(null);
-  const [selected, setSelected] = useState<StravaActivity | null>(null);
-  const [streams, setStreams] = useState<StravaStreamSet | null>(null);
-  const [streamsError, setStreamsError] = useState<string | null>(null);
-  const streamsCache = useRef(new Map<number, StravaStreamSet>());
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const { data: runs, error: runsError } = useQuery(getRunsOptions());
+  const selected = runs?.find((run) => run.id === selectedId) ?? runs?.[0] ?? null;
 
-  useEffect(() => {
-    fetchJson<StravaActivity[]>("/api/me/runs")
-      .then((data) => {
-        setRuns(data);
-        setSelected((current) => current ?? data[0] ?? null);
-      })
-      .catch((err: Error) => setRunsError(err.message));
-  }, []);
-
-  useEffect(() => {
-    if (!selected) return;
-    const cached = streamsCache.current.get(selected.id);
-    if (cached) {
-      setStreams(cached);
-      return;
-    }
-    let cancelled = false;
-    setStreams(null);
-    setStreamsError(null);
-    fetchJson<StravaStreamSet>(`/api/runs/${selected.id}/streams`)
-      .then((data) => {
-        streamsCache.current.set(selected.id, data);
-        if (!cancelled) setStreams(data);
-      })
-      .catch((err: Error) => {
-        if (!cancelled) setStreamsError(err.message);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [selected]);
+  const { data: streams, error: streamsError } = useQuery({
+    ...getRunStreamsOptions({ path: { id: String(selected?.id ?? 0) } }),
+    enabled: selected != null,
+  });
 
   return (
     <main className="mx-auto w-full max-w-[1200px] px-6 py-10">
@@ -109,7 +72,7 @@ export function Runs() {
           {runsError && (
             <Alert variant="destructive">
               <AlertTitle>Could not load your runs</AlertTitle>
-              <AlertDescription>{runsError}</AlertDescription>
+              <AlertDescription>{runsError.error}</AlertDescription>
             </Alert>
           )}
 
@@ -142,7 +105,7 @@ export function Runs() {
                   <button
                     key={run.id}
                     type="button"
-                    onClick={() => setSelected(run)}
+                    onClick={() => setSelectedId(run.id)}
                     aria-pressed={selected?.id === run.id}
                     className={cn(
                       "flex w-full flex-col gap-1 rounded-md px-4 py-4 text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
@@ -173,7 +136,7 @@ export function Runs() {
               <div className="flex h-full items-center justify-center p-6">
                 <Alert variant="destructive">
                   <AlertTitle>Could not load this run</AlertTitle>
-                  <AlertDescription>{streamsError}</AlertDescription>
+                  <AlertDescription>{streamsError.error}</AlertDescription>
                 </Alert>
               </div>
             ) : (

@@ -5,7 +5,7 @@ import {
   useCurrentFrame,
   useVideoConfig,
 } from "remotion";
-import type { StravaActivity, StravaStreamSet } from "@repo/shared";
+import type { Run, RunStreams } from "@/api";
 import {
   DRAW_END,
   DRAW_START,
@@ -19,8 +19,8 @@ import { RunMap } from "./RunMap";
 import { RouteFallback } from "./RouteFallback";
 
 export interface RunVideoProps {
-  activity: StravaActivity;
-  streams: StravaStreamSet;
+  activity: Run;
+  streams: RunStreams;
   mapboxToken: string;
 }
 
