@@ -22,8 +22,17 @@ export const auth = betterAuth({
           tokenUrl: "https://www.strava.com/oauth/token",
           // Strava expects client_id/client_secret in the POST body, not Basic auth
           authentication: "post",
-          // Strava scopes are comma-separated, so keep them in a single entry
-          scopes: ["read,activity:read"],
+          // Strava scopes are comma-separated, so keep them in a single entry.
+          //
+          // `activity:read_all` rather than `activity:read`: a run marked "Only
+          // You" is still a run, and a coach that can't see it reports the
+          // wrong weekly volume and the wrong load ratio. `profile:read_all` is
+          // what puts gear on GET /athlete, which is where shoe mileage lives.
+          //
+          // Widening this list invalidates nothing, but an athlete who
+          // authorised the old set keeps the old token until they sign out and
+          // back in — every caller here degrades rather than failing.
+          scopes: ["read,activity:read_all,profile:read_all"],
           getUserInfo: async (tokens) => {
             if (!tokens.accessToken) return null;
             const { data: athlete } = await getLoggedInAthlete({

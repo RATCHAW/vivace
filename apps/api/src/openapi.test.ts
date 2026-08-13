@@ -28,7 +28,11 @@ describe("openapi", () => {
       "/api/runs/{id}/render/progress",
       "/api/coach/threads",
       "/api/coach/threads/{id}",
+      "/api/coach/briefing",
+      "/api/coach/context",
+      "/api/coach/plan",
       "/api/coach/chat",
+      "/api/strava/webhook",
       "/api/logs",
     ]);
     expect(document.components.schemas).toHaveProperty("Athlete");

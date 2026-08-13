@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, ServerSentEventsResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { CoachChatData, CoachChatErrors, CoachChatResponse, CoachChatResponses, CreateCoachThreadData, CreateCoachThreadErrors, CreateCoachThreadResponses, DeleteCoachThreadData, DeleteCoachThreadErrors, DeleteCoachThreadResponses, GetCoachThreadData, GetCoachThreadErrors, GetCoachThreadResponses, GetHealthData, GetHealthResponses, GetRunRenderData, GetRunRenderErrors, GetRunRenderResponses, GetRunsData, GetRunsErrors, GetRunsResponses, GetRunStreamsData, GetRunStreamsErrors, GetRunStreamsResponses, GetStravaAthleteData, GetStravaAthleteErrors, GetStravaAthleteResponses, ListCoachThreadsData, ListCoachThreadsErrors, ListCoachThreadsResponses, PostClientLogsData, PostClientLogsResponses, StartRunRenderData, StartRunRenderErrors, StartRunRenderResponses, StreamRunRenderProgressData, StreamRunRenderProgressErrors, StreamRunRenderProgressResponse, StreamRunRenderProgressResponses } from './types.gen';
+import type { AcceptCoachPlanData, AcceptCoachPlanErrors, AcceptCoachPlanResponses, CoachChatData, CoachChatErrors, CoachChatResponse, CoachChatResponses, CreateCoachThreadData, CreateCoachThreadErrors, CreateCoachThreadResponses, DeleteCoachThreadData, DeleteCoachThreadErrors, DeleteCoachThreadResponses, GetCoachBriefingData, GetCoachBriefingErrors, GetCoachBriefingResponses, GetCoachThreadData, GetCoachThreadErrors, GetCoachThreadResponses, GetHealthData, GetHealthResponses, GetRunRenderData, GetRunRenderErrors, GetRunRenderResponses, GetRunsData, GetRunsErrors, GetRunsResponses, GetRunStreamsData, GetRunStreamsErrors, GetRunStreamsResponses, GetStravaAthleteData, GetStravaAthleteErrors, GetStravaAthleteResponses, ListCoachThreadsData, ListCoachThreadsErrors, ListCoachThreadsResponses, PostClientLogsData, PostClientLogsResponses, ReceiveStravaWebhookData, ReceiveStravaWebhookResponses, StartRunRenderData, StartRunRenderErrors, StartRunRenderResponses, StreamRunRenderProgressData, StreamRunRenderProgressErrors, StreamRunRenderProgressResponse, StreamRunRenderProgressResponses, UpdateCoachContextData, UpdateCoachContextErrors, UpdateCoachContextResponses, ValidateStravaWebhookData, ValidateStravaWebhookErrors, ValidateStravaWebhookResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -178,6 +178,59 @@ export const getCoachThread = <ThrowOnError extends boolean = false>(options: Op
 });
 
 /**
+ * The coach's read on the athlete, before they ask anything
+ *
+ * Everything the Coach screen's rails show: the goal race the coach remembers, this week's accepted plan measured against what was actually run, the measured training signals (load ratio, easy-run intensity, aerobic decoupling, shoe mileage) and the queue of things worth asking about. Signals that cannot be computed from the athlete's data are omitted rather than returned empty.
+ */
+export const getCoachBriefing = <ThrowOnError extends boolean = false>(options?: Options<GetCoachBriefingData, ThrowOnError>): RequestResult<GetCoachBriefingResponses, GetCoachBriefingErrors, ThrowOnError> => (options?.client ?? client).get<GetCoachBriefingResponses, GetCoachBriefingErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'better-auth.session_token',
+            type: 'apiKey'
+        }],
+    url: '/api/coach/briefing',
+    ...options
+});
+
+/**
+ * Change what the coach remembers between threads
+ *
+ * Merges into the stored context. An omitted field is left alone; a field sent as null is cleared — that is the difference between changing the target time and dropping the race. The coach writes here too, through its setAthleteContext tool.
+ */
+export const updateCoachContext = <ThrowOnError extends boolean = false>(options: Options<UpdateCoachContextData, ThrowOnError>): RequestResult<UpdateCoachContextResponses, UpdateCoachContextErrors, ThrowOnError> => (options.client ?? client).put<UpdateCoachContextResponses, UpdateCoachContextErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'better-auth.session_token',
+            type: 'apiKey'
+        }],
+    url: '/api/coach/context',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Accept a week the coach proposed
+ *
+ * Stores the seven sessions as the athlete's week and returns them measured against what they have already run. Accepting again for the same week replaces it, which is what a revision is.
+ */
+export const acceptCoachPlan = <ThrowOnError extends boolean = false>(options: Options<AcceptCoachPlanData, ThrowOnError>): RequestResult<AcceptCoachPlanResponses, AcceptCoachPlanErrors, ThrowOnError> => (options.client ?? client).post<AcceptCoachPlanResponses, AcceptCoachPlanErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'better-auth.session_token',
+            type: 'apiKey'
+        }],
+    url: '/api/coach/plan',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
  * Send a message and stream the coach's reply
  *
  * Loads the thread's transcript, appends the incoming message, and streams the model's answer as an AI SDK UI message stream — text, reasoning and tool calls as they happen. Both the athlete's message and the finished reply are persisted, so the browser never has to send the history back. Consumed by `useChat` from @ai-sdk/react, not by the generated client.
@@ -193,6 +246,27 @@ export const coachChat = <ThrowOnError extends boolean = false>(options?: Option
     headers: {
         'Content-Type': 'application/json',
         ...options?.headers
+    }
+});
+
+/**
+ * Answer Strava's subscription challenge
+ *
+ * Strava calls this while `POST /push_subscriptions` is in flight and expects `{ "hub.challenge": … }` back within two seconds. The challenge is only echoed when `hub.verify_token` matches the server's STRAVA_WEBHOOK_VERIFY_TOKEN, so somebody else's subscription cannot point at this callback.
+ */
+export const validateStravaWebhook = <ThrowOnError extends boolean = false>(options: Options<ValidateStravaWebhookData, ThrowOnError>): RequestResult<ValidateStravaWebhookResponses, ValidateStravaWebhookErrors, ThrowOnError> => (options.client ?? client).get<ValidateStravaWebhookResponses, ValidateStravaWebhookErrors, ThrowOnError>({ url: '/api/strava/webhook', ...options });
+
+/**
+ * Receive a Strava activity or athlete event
+ *
+ * Acknowledged immediately and processed afterwards: Strava requires a 200 within two seconds and retries up to three times otherwise, which is far less time than reading an activity and writing a debrief takes. A new run becomes a post-run debrief in the athlete's "Post-run debriefs" thread; everything else is recorded and ignored.
+ */
+export const receiveStravaWebhook = <ThrowOnError extends boolean = false>(options: Options<ReceiveStravaWebhookData, ThrowOnError>): RequestResult<ReceiveStravaWebhookResponses, unknown, ThrowOnError> => (options.client ?? client).post<ReceiveStravaWebhookResponses, unknown, ThrowOnError>({
+    url: '/api/strava/webhook',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
     }
 });
 

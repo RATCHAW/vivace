@@ -29,6 +29,10 @@
       "description": "Conversations with the AI running coach"
     },
     {
+      "name": "Webhooks",
+      "description": "Strava push subscription callbacks — called by Strava, not the browser"
+    },
+    {
       "name": "Telemetry",
       "description": "Browser events and errors, forwarded to Loki"
     }
@@ -215,6 +219,22 @@
               "number",
               "null"
             ]
+          },
+          "max_heartrate": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "workout_type": {
+            "type": "string",
+            "enum": [
+              "default",
+              "race",
+              "long_run",
+              "workout"
+            ],
+            "example": "long_run"
           }
         },
         "required": [
@@ -226,7 +246,9 @@
           "sport_type",
           "start_date_local",
           "average_speed",
-          "average_heartrate"
+          "average_heartrate",
+          "max_heartrate",
+          "workout_type"
         ]
       },
       "RunStreams": {
@@ -441,12 +463,401 @@
               ],
               "additionalProperties": {}
             }
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/CoachMessageMetadata"
           }
         },
         "required": [
           "id",
           "role",
           "parts"
+        ]
+      },
+      "CoachMessageMetadata": {
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "run": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer"
+              },
+              "name": {
+                "type": "string"
+              },
+              "date": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "date"
+            ]
+          }
+        }
+      },
+      "CoachBriefing": {
+        "type": "object",
+        "properties": {
+          "context": {
+            "$ref": "#/components/schemas/CoachContext"
+          },
+          "plan": {
+            "$ref": "#/components/schemas/PlanProgress"
+          },
+          "signals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CoachSignal"
+            }
+          },
+          "queue": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CoachQueueItem"
+            }
+          }
+        },
+        "required": [
+          "context",
+          "plan",
+          "signals",
+          "queue"
+        ]
+      },
+      "CoachContext": {
+        "type": "object",
+        "properties": {
+          "race_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "Casablanca Half"
+          },
+          "race_date": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "example": "2026-10-18"
+          },
+          "race_distance_m": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "target_seconds": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "long_run_day": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 6
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "updated_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "race_name",
+          "race_date",
+          "race_distance_m",
+          "target_seconds",
+          "long_run_day",
+          "notes",
+          "updated_at"
+        ]
+      },
+      "PlanProgress": {
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "week_starting": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "example": "2026-10-18"
+          },
+          "label": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "planned_km": {
+            "type": "number"
+          },
+          "actual_km": {
+            "type": "number"
+          },
+          "remaining": {
+            "type": "integer"
+          },
+          "days": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "day": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 6
+                },
+                "type": {
+                  "type": "string"
+                },
+                "planned_km": {
+                  "type": "number"
+                },
+                "actual_km": {
+                  "type": "number"
+                },
+                "run_ids": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer"
+                  }
+                }
+              },
+              "required": [
+                "day",
+                "type",
+                "planned_km",
+                "actual_km",
+                "run_ids"
+              ]
+            }
+          }
+        },
+        "required": [
+          "week_starting",
+          "label",
+          "planned_km",
+          "actual_km",
+          "remaining",
+          "days"
+        ]
+      },
+      "CoachSignal": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "acwr"
+          },
+          "label": {
+            "type": "string",
+            "example": "ACWR · 7:28 day load"
+          },
+          "value": {
+            "type": "string",
+            "example": "1.31"
+          },
+          "note": {
+            "type": "string",
+            "example": "Above the 1.3 band"
+          },
+          "tone": {
+            "$ref": "#/components/schemas/CoachTone"
+          },
+          "question": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "value",
+          "note",
+          "tone",
+          "question"
+        ]
+      },
+      "CoachTone": {
+        "type": "string",
+        "enum": [
+          "neutral",
+          "warn",
+          "alert"
+        ]
+      },
+      "CoachQueueItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "debrief"
+          },
+          "title": {
+            "type": "string",
+            "example": "Debrief ready · Aug 5 evening run"
+          },
+          "when": {
+            "type": "string",
+            "example": "LAST RUN · 2 DAYS AGO"
+          },
+          "tone": {
+            "$ref": "#/components/schemas/CoachTone"
+          },
+          "question": {
+            "type": "string"
+          },
+          "run_id": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "thread_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "when",
+          "tone",
+          "question",
+          "run_id",
+          "thread_id"
+        ]
+      },
+      "CoachContextPatch": {
+        "type": "object",
+        "properties": {
+          "race_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "Casablanca Half"
+          },
+          "race_date": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "example": "2026-10-18"
+          },
+          "race_distance_m": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "target_seconds": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "long_run_day": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 6
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "CoachPlan": {
+        "type": "object",
+        "properties": {
+          "week_starting": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "example": "2026-10-18"
+          },
+          "label": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "Build 4 of 9"
+          },
+          "sessions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlannedSession"
+            },
+            "maxItems": 7
+          }
+        },
+        "required": [
+          "week_starting",
+          "label",
+          "sessions"
+        ]
+      },
+      "PlannedSession": {
+        "type": "object",
+        "properties": {
+          "day": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 6
+          },
+          "type": {
+            "type": "string",
+            "maxLength": 40,
+            "example": "8 × 400"
+          },
+          "km": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 200
+          },
+          "pace": {
+            "type": "string",
+            "maxLength": 40,
+            "example": "4:35 /km"
+          },
+          "key": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "day",
+          "type",
+          "km",
+          "pace",
+          "key"
         ]
       },
       "CoachChatRequest": {
@@ -469,10 +880,75 @@
           },
           "message_id": {
             "type": "string"
+          },
+          "range_weeks": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 52,
+            "default": 6
           }
         },
         "required": [
           "thread_id"
+        ]
+      },
+      "StravaEvent": {
+        "type": "object",
+        "properties": {
+          "object_type": {
+            "type": "string",
+            "enum": [
+              "activity",
+              "athlete"
+            ]
+          },
+          "object_id": {
+            "type": "number",
+            "example": 987654321
+          },
+          "aspect_type": {
+            "type": "string",
+            "enum": [
+              "create",
+              "update",
+              "delete"
+            ]
+          },
+          "updates": {
+            "type": "object",
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "boolean"
+                }
+              ]
+            },
+            "default": {},
+            "example": {
+              "title": "Morning Run"
+            }
+          },
+          "owner_id": {
+            "type": "number",
+            "example": 165387970
+          },
+          "subscription_id": {
+            "type": "number"
+          },
+          "event_time": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "object_type",
+          "object_id",
+          "aspect_type",
+          "owner_id",
+          "subscription_id",
+          "event_time"
         ]
       },
       "ClientLogAccepted": {
@@ -1143,6 +1619,177 @@
         }
       }
     },
+    "/api/coach/briefing": {
+      "get": {
+        "operationId": "getCoachBriefing",
+        "tags": [
+          "Coach"
+        ],
+        "summary": "The coach's read on the athlete, before they ask anything",
+        "description": "Everything the Coach screen's rails show: the goal race the coach remembers, this week's accepted plan measured against what was actually run, the measured training signals (load ratio, easy-run intensity, aerobic decoupling, shoe mileage) and the queue of things worth asking about. Signals that cannot be computed from the athlete's data are omitted rather than returned empty.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The athlete's briefing.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CoachBriefing"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The stored Strava token lacks the activity:read scope; sign out and back in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Strava rejected or failed the upstream request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/coach/context": {
+      "put": {
+        "operationId": "updateCoachContext",
+        "tags": [
+          "Coach"
+        ],
+        "summary": "Change what the coach remembers between threads",
+        "description": "Merges into the stored context. An omitted field is left alone; a field sent as null is cleared — that is the difference between changing the target time and dropping the race. The coach writes here too, through its setAthleteContext tool.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CoachContextPatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The context after the change.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CoachContext"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/coach/plan": {
+      "post": {
+        "operationId": "acceptCoachPlan",
+        "tags": [
+          "Coach"
+        ],
+        "summary": "Accept a week the coach proposed",
+        "description": "Stores the seven sessions as the athlete's week and returns them measured against what they have already run. Accepting again for the same week replaces it, which is what a revision is.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CoachPlan"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The accepted week, against what was actually run.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanProgress"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The stored Strava token lacks the activity:read scope; sign out and back in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Strava rejected or failed the upstream request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/coach/chat": {
       "post": {
         "operationId": "coachChat",
@@ -1212,6 +1859,115 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/strava/webhook": {
+      "get": {
+        "operationId": "validateStravaWebhook",
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "Answer Strava's subscription challenge",
+        "description": "Strava calls this while `POST /push_subscriptions` is in flight and expects `{ \"hub.challenge\": … }` back within two seconds. The challenge is only echoed when `hub.verify_token` matches the server's STRAVA_WEBHOOK_VERIFY_TOKEN, so somebody else's subscription cannot point at this callback.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "subscribe"
+            },
+            "required": true,
+            "name": "hub.mode",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "example": "15f7d1a91c1f40f8a748fd134752feb3"
+            },
+            "required": true,
+            "name": "hub.challenge",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "hub.verify_token",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The challenge, echoed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "hub.challenge": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "hub.challenge"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The verify token did not match, or none is configured.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "receiveStravaWebhook",
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "Receive a Strava activity or athlete event",
+        "description": "Acknowledged immediately and processed afterwards: Strava requires a 200 within two seconds and retries up to three times otherwise, which is far less time than reading an activity and writing a debrief takes. A new run becomes a post-run debrief in the athlete's \"Post-run debriefs\" thread; everything else is recorded and ignored.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StravaEvent"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Acknowledged. Always, whatever the event turns out to be.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "received": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  },
+                  "required": [
+                    "received"
+                  ]
                 }
               }
             }

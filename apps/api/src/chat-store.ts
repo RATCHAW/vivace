@@ -25,6 +25,7 @@ interface MessageRow {
   id: string;
   role: UIMessage["role"];
   parts: UIMessage["parts"];
+  metadata: UIMessage["metadata"];
 }
 
 // better-auth migrates its own tables via `pnpm auth:migrate`; these two are
@@ -69,6 +70,25 @@ function ensureTables(): Promise<unknown> {
     await pool.query(`
       CREATE INDEX IF NOT EXISTS "coach_message_thread_idx"
         ON "coach_message" ("thread_id", "seq")
+    `);
+    // Added after the table shipped — the run the athlete attached to a
+    // question with the composer's `@` picker. Existing rows keep a null.
+    await pool.query(`
+      ALTER TABLE "coach_message" ADD COLUMN IF NOT EXISTS "metadata" jsonb
+    `);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS "coach_debrief" (
+        "user_id" text NOT NULL,
+        "activity_id" bigint NOT NULL,
+        "thread_id" uuid NOT NULL
+          REFERENCES "coach_thread" ("id") ON DELETE CASCADE,
+        "message_id" text NOT NULL,
+        "created_at" timestamptz NOT NULL DEFAULT now(),
+        -- One debrief per run. The webhook is at-least-once delivery, and this
+        -- is the second guard behind claimEvent: a redelivery weeks later,
+        -- after the event table has been pruned, still cannot post twice.
+        PRIMARY KEY ("user_id", "activity_id")
+      )
     `);
   })();
   return tablesReady;
@@ -135,11 +155,18 @@ export async function deleteThread(
 export async function getMessages(threadId: string): Promise<UIMessage[]> {
   await ensureTables();
   const { rows } = await pool.query<MessageRow>(
-    `SELECT "id", "role", "parts" FROM "coach_message"
+    `SELECT "id", "role", "parts", "metadata" FROM "coach_message"
      WHERE "thread_id" = $1 ORDER BY "seq"`,
     [threadId],
   );
-  return rows.map((row) => ({ id: row.id, role: row.role, parts: row.parts }));
+  return rows.map((row) => ({
+    id: row.id,
+    role: row.role,
+    parts: row.parts,
+    // `undefined`, not `null`: the SDK's UIMessage treats metadata as optional,
+    // and a null would be handed to the model as a metadata object.
+    ...(row.metadata ? { metadata: row.metadata } : {}),
+  }));
 }
 
 /**
@@ -153,10 +180,17 @@ export async function saveMessage(
 ): Promise<void> {
   await ensureTables();
   await pool.query(
-    `INSERT INTO "coach_message" ("id", "thread_id", "role", "parts")
-     VALUES ($1, $2, $3, $4)
-     ON CONFLICT ("thread_id", "id") DO UPDATE SET "parts" = EXCLUDED."parts"`,
-    [message.id, threadId, message.role, JSON.stringify(message.parts)],
+    `INSERT INTO "coach_message" ("id", "thread_id", "role", "parts", "metadata")
+     VALUES ($1, $2, $3, $4, $5)
+     ON CONFLICT ("thread_id", "id") DO UPDATE
+       SET "parts" = EXCLUDED."parts", "metadata" = EXCLUDED."metadata"`,
+    [
+      message.id,
+      threadId,
+      message.role,
+      JSON.stringify(message.parts),
+      message.metadata ? JSON.stringify(message.metadata) : null,
+    ],
   );
   await pool.query(
     `UPDATE "coach_thread" SET "updated_at" = now() WHERE "id" = $1`,
@@ -206,6 +240,64 @@ export function titleFrom(message: UIMessage): string | null {
   return text.length > TITLE_MAX_LENGTH
     ? `${text.slice(0, TITLE_MAX_LENGTH).trimEnd()}…`
     : text;
+}
+
+/**
+ * The athlete's thread with this exact title, creating it if it isn't there.
+ *
+ * Used by the automatic debrief, which needs somewhere predictable to land:
+ * posting into whatever conversation happens to be open would interrupt a
+ * question about next week with a card about yesterday.
+ */
+export async function findOrCreateThread(
+  userId: string,
+  title: string,
+): Promise<CoachThread> {
+  await ensureTables();
+  const { rows } = await pool.query<ThreadRow>(
+    `SELECT * FROM "coach_thread"
+     WHERE "user_id" = $1 AND "title" = $2
+     ORDER BY "created_at" LIMIT 1`,
+    [userId, title],
+  );
+  if (rows[0]) return toThread(rows[0]);
+
+  const { rows: created } = await pool.query<ThreadRow>(
+    `INSERT INTO "coach_thread" ("id", "user_id", "title")
+     VALUES ($1, $2, $3) RETURNING *`,
+    [randomUUID(), userId, title],
+  );
+  return toThread(created[0]);
+}
+
+/** The debrief already posted for a run, or null. */
+export async function findDebrief(
+  userId: string,
+  activityId: number,
+): Promise<{ thread_id: string; message_id: string } | null> {
+  await ensureTables();
+  const { rows } = await pool.query<{ thread_id: string; message_id: string }>(
+    `SELECT "thread_id", "message_id" FROM "coach_debrief"
+     WHERE "user_id" = $1 AND "activity_id" = $2`,
+    [userId, activityId],
+  );
+  return rows[0] ?? null;
+}
+
+/** Records that a run has been debriefed, so it never is again. */
+export async function recordDebrief(
+  userId: string,
+  activityId: number,
+  threadId: string,
+  messageId: string,
+): Promise<void> {
+  await ensureTables();
+  await pool.query(
+    `INSERT INTO "coach_debrief" ("user_id", "activity_id", "thread_id", "message_id")
+     VALUES ($1, $2, $3, $4)
+     ON CONFLICT ("user_id", "activity_id") DO NOTHING`,
+    [userId, activityId, threadId, messageId],
+  );
 }
 
 /** Names a thread the first time the athlete says something in it. */
