@@ -162,6 +162,16 @@ progress bar streams live over SSE, and once done the button becomes
 (`run_render`), so an already-rendered run offers the download straight away —
 even after a reload or on another device.
 
+**Video options** sit between the player and that button, and change the film
+rather than the page. There is one today: *Run as your avatar* swaps the dot at
+the head of the route for the athlete's Strava picture — three times the size,
+with the camera widened to keep it in frame. The `<Player>` updates as the
+switch is thrown, and the same choice travels with the render request. Options
+are part of a render's identity, so a run already rendered with the other answer
+offers **Render again** (and the previous MP4) instead of passing the old file
+off as the new choice. An athlete who never set a Strava picture gets the dot,
+and the switch says so.
+
 One-time setup (all optional — without it the render button returns a 503 and
 the rest of the app is unaffected):
 
@@ -181,8 +191,10 @@ bundle is what Lambda renders, not your local code. After a Remotion version
 upgrade the function must be redeployed too; all `remotion`/`@remotion/*`
 packages are pinned to the same exact version for this reason.
 
-How it flows: `POST /api/runs/{id}/render` fetches the run + streams from
-Strava, calls `renderMediaOnLambda()`, and stores the render row.
+How it flows: `POST /api/runs/{id}/render` fetches the run + streams from Strava
+— plus the athlete, when the avatar option is on, so the picture baked into the
+video is read from Strava rather than named by the browser — calls
+`renderMediaOnLambda()`, and stores the render row with the options it used.
 `GET /api/runs/{id}/render/progress` (SSE) polls Lambda, persists each update,
 and streams it to the browser. `GET /api/runs/{id}/render` serves the stored
 state. The MP4 lands in the Remotion S3 bucket with a public download URL.

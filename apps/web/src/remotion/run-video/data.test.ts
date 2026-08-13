@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Run, RunStreams } from "@/api";
 import {
+  avatarSource,
   buildCameraTrack,
   CAMERA_TRACK_SAMPLES,
   cameraAtProgress,
@@ -97,6 +98,25 @@ describe("sampleIndex", () => {
   });
   it("is empty-safe", () => {
     expect(sampleIndex(0, 0.5)).toBe(0);
+  });
+});
+
+describe("avatarSource", () => {
+  it("takes an athlete's picture", () => {
+    const url = "https://dgalywyr863hv.cloudfront.net/pictures/athletes/1/large.jpg";
+    expect(avatarSource(url)).toBe(url);
+  });
+
+  it("refuses Strava's placeholder for an athlete with no picture", () => {
+    // Not a URL but a sprite name — an <img> pointed at it 404s against our own
+    // origin, which in a headless render is a frame with a hole in it.
+    expect(avatarSource("avatar/athlete/large.png")).toBe("");
+  });
+
+  it("treats a missing profile as no avatar", () => {
+    expect(avatarSource(undefined)).toBe("");
+    expect(avatarSource(null)).toBe("");
+    expect(avatarSource("")).toBe("");
   });
 });
 
