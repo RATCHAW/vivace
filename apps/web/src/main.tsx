@@ -7,10 +7,13 @@ import { App } from "./App";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { Toaster } from "@/components/ui/sonner";
 import { installClientLogging } from "@/lib/logger";
+import { initPostHog } from "@/lib/posthog";
 import { queryClient } from "@/lib/query-client";
 import "./styles.css";
 
-// Before the first render, so a crash on the way up is still reported.
+// Before the first render, so a crash on the way up is still reported — and so
+// the first pageview is captured rather than missed.
+initPostHog();
 installClientLogging();
 
 createRoot(document.getElementById("root")!).render(

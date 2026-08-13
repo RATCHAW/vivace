@@ -72,7 +72,45 @@ server-side with `source: "web"`:
   and the batch is capped, because the endpoint is deliberately unauthenticated
   (a crash on the sign-in page is exactly what it's for).
 - `apps/landing` has no logging: it is a static marketing page and never calls
-  the API. Keep it that way.
+  the API. Keep it that way — PostHog is the exception, and it talks to PostHog
+  directly rather than through us.
+
+## Analytics — PostHog, behind the same call sites
+
+PostHog is a *second sink* on the instrumentation that already exists, never a
+parallel one. `apps/api/src/posthog.ts` and `apps/web/src/lib/posthog.ts` own
+the SDKs; nothing else imports `posthog-js` or `posthog-node`.
+
+- **Record a user action once.** `trackEvent(...)` in the browser and
+  `track(c, ...)` in the API (`apps/api/src/analytics.ts`) each write a log line
+  *and* a PostHog event. Never add a `posthog.capture` next to a `trackEvent` —
+  that is exactly the drift these helpers exist to prevent.
+- **Diagnostics stay out of PostHog.** `auth.unauthenticated`,
+  `strava.request_failed`, `request.invalid`, a flaky poll — log those through
+  `c.get("log")` directly. They describe the server, not the athlete, and in
+  PostHog they are noise you pay to store.
+- **Everything is a no-op without a key.** `POSTHOG_KEY` / `VITE_POSTHOG_KEY` /
+  `NEXT_PUBLIC_POSTHOG_KEY` unset is the normal state of a fresh clone and of
+  every test run. No feature may depend on PostHog being reachable.
+- **A flag's fallback is the shipped behaviour.** `isFeatureEnabledFor(flag, id,
+  fallback)` and `useFeatureFlag(flag, fallback)` return it when PostHog is off,
+  unreachable, or has never heard of the flag. The server reads `getFlag()`, not
+  `isEnabled()` — the latter reports an unknown flag as *off*, which would
+  disable a feature the moment PostHog was switched on.
+- **Don't reach for `withTracing`** from `@posthog/ai` — it throws on an AI SDK
+  v7 model and demands an OpenTelemetry exporter. The coach sends
+  `captureAiGeneration` from `streamText`'s `onFinish`, where the SDK already
+  hands over tokens, latency and stop reason.
+- **Coach transcripts stay private by default** (`privacyMode`), so
+  `$ai_generation` carries the numbers and not the conversation. The opt-in is
+  `POSTHOG_LLM_CAPTURE_CONTENT=true`.
+- **Session replay is on.** Anything that identifies an athlete on screen gets
+  `ph-no-capture`, which blocks it in replay *and* autocapture.
+
+`apps/landing` is the one exception to "no instrumentation on the landing page":
+it has no logging (it never calls the API), but it does load PostHog, because
+the sign-up funnel starts there. One client component, `analytics.tsx`, and
+autocapture handles the CTA clicks — so the CTAs stay Server Components.
 
 ## UI — always shadcn/ui
 

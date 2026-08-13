@@ -12,6 +12,7 @@ import {
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { trackEvent } from "@/lib/logger";
+import { useFeatureFlag } from "@/lib/posthog";
 import {
   Progress,
   ProgressLabel,
@@ -24,8 +25,17 @@ import {
  * here is the persisted render state — reloading mid-render resumes the
  * progress bar, and an already-rendered run goes straight to download.
  */
+/**
+ * The PostHog flag that can switch rendering off without a deploy — the API
+ * checks the same one, and is what actually enforces it. Rendering is a Lambda
+ * invocation per click, so it is the one thing here worth a kill switch.
+ */
+const RENDER_FLAG = "video-render";
+
 export function RenderControls({ run }: { run: Run }) {
   const queryClient = useQueryClient();
+  // On unless PostHog says otherwise, so no key (or no flag) changes nothing.
+  const renderEnabled = useFeatureFlag(RENDER_FLAG, true);
   const path = { id: String(run.id) } as const;
   const { data, error: loadError } = useQuery(getRunRenderOptions({ path }));
   const render = data?.render ?? null;
@@ -87,6 +97,15 @@ export function RenderControls({ run }: { run: Run }) {
   }
 
   const failure = start.error?.error ?? (render?.status === "error" ? render.error : null);
+
+  // Already-rendered videos keep their download above; only new renders stop.
+  if (!renderEnabled) {
+    return (
+      <p className="text-caption text-muted-foreground mt-4 text-center">
+        Video rendering is paused right now. Check back shortly.
+      </p>
+    );
+  }
 
   return (
     <div className="mt-4 flex flex-col gap-3">

@@ -867,7 +867,7 @@
             }
           },
           "503": {
-            "description": "Remotion Lambda is not configured on this server.",
+            "description": "Remotion Lambda is not configured on this server, or rendering is switched off for this athlete by the `video-render` feature flag.",
             "content": {
               "application/json": {
                 "schema": {

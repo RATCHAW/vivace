@@ -13,9 +13,14 @@ COPY packages/strava-api/package.json packages/strava-api/package.json
 RUN pnpm install --frozen-lockfile --filter @repo/landing...
 
 COPY apps/landing apps/landing
-# NEXT_PUBLIC_* is baked into the bundle, so the app's origin is a build input
+# NEXT_PUBLIC_* is baked into the bundle, so the app's origin — and the PostHog
+# project it reports to — are build inputs, not runtime variables
 ARG NEXT_PUBLIC_APP_URL
 ENV NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL
+ARG NEXT_PUBLIC_POSTHOG_KEY
+ENV NEXT_PUBLIC_POSTHOG_KEY=$NEXT_PUBLIC_POSTHOG_KEY
+ARG NEXT_PUBLIC_POSTHOG_HOST
+ENV NEXT_PUBLIC_POSTHOG_HOST=$NEXT_PUBLIC_POSTHOG_HOST
 RUN pnpm --filter @repo/landing build
 
 FROM node:22-alpine
