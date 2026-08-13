@@ -14,7 +14,10 @@
 // Needs AWS credentials in the environment (REMOTION_AWS_ACCESS_KEY_ID and
 // REMOTION_AWS_SECRET_ACCESS_KEY) — set up per
 // https://www.remotion.dev/docs/lambda/setup. Prints the env vars the API
-// needs; run with: pnpm --filter @repo/video deploy
+// needs; run with: pnpm video:deploy
+//
+// (`pnpm --filter @repo/video deploy` runs pnpm's own `deploy` command, not this
+// script — hence the `run` in the root package.json.)
 import { execFileSync } from "node:child_process";
 import { existsSync, writeFileSync } from "node:fs";
 import process from "node:process";
