@@ -12,6 +12,7 @@ import {
   validateUIMessages,
   type UIMessage,
 } from "ai";
+import { DEFAULT_TEMPLATE_ID, getTemplate } from "@repo/video";
 import { auth } from "./auth.js";
 import { track, trackError } from "./analytics.js";
 import { logger } from "./logger.js";
@@ -42,6 +43,7 @@ import {
   RunSchema,
   RunStreamsSchema,
   StravaEventSchema,
+  VideoTemplateSchema,
   type ClientLogLevel,
   type StravaEvent,
 } from "./schemas.js";
@@ -52,7 +54,12 @@ import {
   fetchRunStreams,
   StravaApiError,
 } from "./strava.js";
-import { fetchLambdaProgress, getRenderConfig, startLambdaRender } from "./render.js";
+import {
+  fetchLambdaProgress,
+  renderPropsHash,
+  resolveRenderTarget,
+  startLambdaRender,
+} from "./render.js";
 import {
   getRunRender,
   saveStartedRender,
@@ -462,8 +469,16 @@ const RunIdParamsSchema = z.object({
 
 const RENDER_NOT_CONFIGURED =
   "Video rendering is not configured. Deploy Remotion Lambda " +
-  "(pnpm --filter @repo/web remotion:deploy) and set REMOTION_FUNCTION_NAME / " +
+  "(pnpm video:deploy) and set REMOTION_FUNCTION_NAME / " +
   "REMOTION_SERVE_URL in apps/api/.env.";
+
+/** Which template's render a GET is about. A run holds one per template, so
+ *  asking without saying which means the default cut. */
+const TemplateQuerySchema = z.object({
+  template: VideoTemplateSchema.default(DEFAULT_TEMPLATE_ID).openapi({
+    param: { name: "template", in: "query", required: false },
+  }),
+});
 
 /**
  * The PostHog flag that can switch rendering off — per athlete, or for
@@ -482,12 +497,12 @@ const getRunRenderRoute = createRoute({
   tags: ["Runs"],
   summary: "Get one run's stored render",
   description:
-    "Reads the persisted render state for this run and athlete. `render` is " +
-    "null when the run has never been rendered. While a render is in flight, " +
-    "live progress comes from the SSE endpoint, which also keeps this state " +
-    "up to date.",
+    "Reads the persisted render state for this run, athlete and template. " +
+    "`render` is null when this run has never been rendered with this " +
+    "template. While a render is in flight, live progress comes from the SSE " +
+    "endpoint, which also keeps this state up to date.",
   security: [{ sessionCookie: [] }],
-  request: { params: RunIdParamsSchema },
+  request: { params: RunIdParamsSchema, query: TemplateQuerySchema },
   responses: {
     200: {
       description: "The stored render, or null if none exists.",
@@ -505,7 +520,8 @@ app.openapi(getRunRenderRoute, async (c) => {
   if (!session) return c.json({ error: "Not signed in" }, 401);
 
   const { id } = c.req.valid("param");
-  const row = await getRunRender(session.user.id, Number(id));
+  const { template } = c.req.valid("query");
+  const row = await getRunRender(session.user.id, Number(id), template);
   return c.json({ render: row ? toRunRender(row) : null }, 200);
 });
 
@@ -517,11 +533,13 @@ const startRunRenderRoute = createRoute({
   summary: "Render this run's video on Remotion Lambda",
   description:
     "Fetches the run and its streams from Strava, starts a Remotion Lambda " +
-    "render of the story video, and persists the render state. The MP4 lands " +
-    "in the Remotion S3 bucket. Idempotent while a render is in flight or " +
-    "already done with the same options — those return the existing state; a " +
-    "failed render, or one whose options no longer match, is rendered again. " +
-    "The body is optional and defaults to the plain replay.",
+    "render of the chosen template, and persists the render state. The MP4 " +
+    "lands in the Remotion S3 bucket. Idempotent while a render is in flight " +
+    "or already done with the same options — those return the existing state; " +
+    "a failed render, or one whose options no longer match, is rendered again. " +
+    "Each template gets its own render, so switching template does not " +
+    "replace the video already made with the last one. The body is optional " +
+    "and defaults to the plain replay.",
   security: [{ sessionCookie: [] }],
   request: {
     params: RunIdParamsSchema,
@@ -561,9 +579,24 @@ app.openapi(startRunRenderRoute, async (c) => {
   if (!session) return c.json({ error: "Not signed in" }, 401);
 
   const log = c.get("log");
-  const config = getRenderConfig();
-  if (!config) {
-    log.warn({ event: "render.not_configured" }, "Remotion Lambda is not configured");
+
+  const { id } = c.req.valid("param");
+  const activityId = Number(id);
+  // The body is optional, so the validator — and with it the schema's defaults —
+  // is skipped entirely when a caller posts nothing.
+  const body: RunRenderOptions | undefined = c.req.valid("json");
+  const template = body?.template ?? DEFAULT_TEMPLATE_ID;
+  // A template that draws no runner has nothing to put a face on, so the option
+  // is dropped here rather than stored as an answer that changed nothing.
+  const showAvatar = (body?.show_avatar ?? false) && getTemplate(template).supportsAvatar;
+  const options = { showAvatar };
+
+  const target = resolveRenderTarget(template);
+  if (!target) {
+    log.warn(
+      { event: "render.not_configured", template },
+      "Remotion Lambda is not configured",
+    );
     return c.json({ error: RENDER_NOT_CONFIGURED }, 503);
   }
 
@@ -575,21 +608,15 @@ app.openapi(startRunRenderRoute, async (c) => {
     return c.json({ error: RENDER_DISABLED }, 503);
   }
 
-  const { id } = c.req.valid("param");
-  const activityId = Number(id);
-  // The body is optional, so the validator — and with it the schema's defaults —
-  // is skipped entirely when a caller posts nothing.
-  const options: RunRenderOptions | undefined = c.req.valid("json");
-  const showAvatar = options?.show_avatar ?? false;
-
   // Don't double-render: an in-flight or finished render is simply returned —
   // unless it was made with different options, which makes it a different video.
-  const existing = await getRunRender(session.user.id, activityId);
-  if (existing && existing.status !== "error" && existing.showAvatar === showAvatar) {
+  const propsHash = renderPropsHash(template, options);
+  const existing = await getRunRender(session.user.id, activityId, template);
+  if (existing && existing.status !== "error" && existing.propsHash === propsHash) {
     track(
       c,
       "render.reused",
-      { activityId, status: existing.status, showAvatar },
+      { activityId, template, status: existing.status, showAvatar },
       "Returned the existing render",
     );
     return c.json({ render: toRunRender(existing) }, 200);
@@ -607,7 +634,7 @@ app.openapi(startRunRenderRoute, async (c) => {
       showAvatar ? fetchAthlete(accessToken) : null,
     ]);
     const { renderId, bucketName } = await startLambdaRender(
-      config,
+      target,
       run,
       streams,
       athlete?.profile ?? "",
@@ -615,14 +642,26 @@ app.openapi(startRunRenderRoute, async (c) => {
     const row = await saveStartedRender({
       userId: session.user.id,
       activityId,
+      template,
       renderId,
       bucketName,
-      showAvatar,
+      region: target.region,
+      functionName: target.functionName,
+      serveUrl: target.serveUrl,
+      options,
+      propsHash,
     });
     track(
       c,
       "render.started",
-      { activityId, renderId, bucketName, showAvatar, retry: Boolean(existing) },
+      {
+        activityId,
+        template,
+        renderId,
+        bucketName,
+        showAvatar,
+        retry: Boolean(existing),
+      },
       "Started a Lambda render",
     );
     return c.json({ render: toRunRender(row) }, 200);
@@ -634,9 +673,16 @@ app.openapi(startRunRenderRoute, async (c) => {
       }
       return c.json({ error: err.message }, 502);
     }
-    // Lambda refused the render (bad serve URL, missing AWS permissions, …).
+    // Lambda refused the render (bad serve URL, missing AWS permissions, a
+    // composition the deployed bundle doesn't hold, …).
     const message = err instanceof Error ? err.message : "Failed to start the render";
-    trackError(c, "render.start_failed", err, { activityId }, message);
+    trackError(
+      c,
+      "render.start_failed",
+      err,
+      { activityId, template, serveUrl: target.serveUrl },
+      message,
+    );
     return c.json({ error: message }, 502);
   }
 });
@@ -648,13 +694,14 @@ const runRenderProgressRoute = createRoute({
   tags: ["Runs"],
   summary: "Stream a render's progress (SSE)",
   description:
-    "Server-sent events. While the run's render is in flight, polls Remotion " +
-    "Lambda every ~1.5s, persists the result, and emits the updated RunRender " +
-    "as a JSON message. The final message has status `done` or `error`, after " +
-    "which the stream closes; a lone `null` message means there is no render. " +
-    "Consumed with EventSource, not the generated client.",
+    "Server-sent events. While this run's render of the given template is in " +
+    "flight, polls Remotion Lambda every ~1.5s, persists the result, and emits " +
+    "the updated RunRender as a JSON message. The final message has status " +
+    "`done` or `error`, after which the stream closes; a lone `null` message " +
+    "means there is no render. Consumed with EventSource, not the generated " +
+    "client.",
   security: [{ sessionCookie: [] }],
-  request: { params: RunIdParamsSchema },
+  request: { params: RunIdParamsSchema, query: TemplateQuerySchema },
   responses: {
     200: {
       description: "An event stream of RunRender JSON messages.",
@@ -678,13 +725,17 @@ app.openapi(runRenderProgressRoute, async (c) => {
   if (!session) return c.json({ error: "Not signed in" }, 401);
 
   const log = c.get("log");
-  const config = getRenderConfig();
-  if (!config) {
-    log.warn({ event: "render.not_configured" }, "Remotion Lambda is not configured");
+  const { id } = c.req.valid("param");
+  const { template } = c.req.valid("query");
+  const target = resolveRenderTarget(template);
+  if (!target) {
+    log.warn(
+      { event: "render.not_configured", template },
+      "Remotion Lambda is not configured",
+    );
     return c.json({ error: RENDER_NOT_CONFIGURED }, 503);
   }
 
-  const { id } = c.req.valid("param");
   const activityId = Number(id);
   const userId = session.user.id;
 
@@ -695,7 +746,7 @@ app.openapi(runRenderProgressRoute, async (c) => {
     });
 
     while (!aborted) {
-      const row = await getRunRender(userId, activityId);
+      const row = await getRunRender(userId, activityId, template);
       if (!row) {
         // Nothing to watch — tell the client so it can close instead of
         // letting EventSource reconnect forever.
@@ -708,13 +759,21 @@ app.openapi(runRenderProgressRoute, async (c) => {
       }
 
       try {
-        const progress = await fetchLambdaProgress(config, row);
-        const updated = await updateRunRender(userId, activityId, progress);
+        // The row's own function is what the render was started on; the
+        // resolved target only covers rows written before it was recorded.
+        const progress = await fetchLambdaProgress({
+          region: row.region ?? target.region,
+          functionName: row.functionName ?? target.functionName,
+          renderId: row.renderId,
+          bucketName: row.bucketName,
+        });
+        const updated = await updateRunRender(userId, activityId, template, progress);
         await stream.writeSSE({ data: JSON.stringify(toRunRender(updated)) });
         if (updated.status !== "rendering") {
           const finished = {
             event: "render.finished",
             activityId,
+            template,
             renderId: updated.renderId,
             status: updated.status,
             durationMs: updated.updatedAt.getTime() - updated.createdAt.getTime(),
@@ -736,7 +795,10 @@ app.openapi(runRenderProgressRoute, async (c) => {
       } catch (err) {
         // A flaky poll is not a failed render — try again next tick. Logged
         // because a render that never finishes usually starts here.
-        log.warn({ event: "render.progress_poll_failed", activityId, err }, "Poll failed");
+        log.warn(
+          { event: "render.progress_poll_failed", activityId, template, err },
+          "Poll failed",
+        );
       }
       await stream.sleep(PROGRESS_POLL_MS);
     }

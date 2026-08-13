@@ -9,9 +9,11 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json ./
 COPY apps/api/package.json apps/api/package.json
 COPY apps/web/package.json apps/web/package.json
 COPY packages/strava-api/package.json packages/strava-api/package.json
+COPY packages/video/package.json packages/video/package.json
 RUN pnpm install --frozen-lockfile --filter @repo/web...
 
 COPY packages/strava-api packages/strava-api
+COPY packages/video packages/video
 COPY apps/web apps/web
 
 # Vite inlines VITE_* at build time, so the PostHog project is a build input

@@ -1,10 +1,14 @@
-import type { Run, RunStreams } from "@/api";
+import { getTemplate } from "../../registry";
+import type { VideoActivity, VideoStreams } from "../../types";
 
-// Story format: 9:16 at 30fps, 20 seconds.
-export const FPS = 30;
-export const VIDEO_WIDTH = 1080;
-export const VIDEO_HEIGHT = 1920;
-export const DURATION_IN_FRAMES = 20 * FPS;
+// Story format: 9:16 at 30fps, 20 seconds. The registry is the source — it is
+// what the <Composition>, the browser's <Player> and the Lambda render all read
+// — and these are the names the composition's own maths is written in.
+const TEMPLATE = getTemplate("run-video");
+export const FPS = TEMPLATE.fps;
+export const VIDEO_WIDTH = TEMPLATE.width;
+export const VIDEO_HEIGHT = TEMPLATE.height;
+export const DURATION_IN_FRAMES = TEMPLATE.durationInFrames;
 
 const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
 
@@ -70,7 +74,7 @@ export function formatPace(secondsPerKm: number | null): string {
 
 /** "SAT · AUG 9 · 7:12 AM" — start_date_local carries the local clock with a
  *  Z suffix, so format it in UTC to preserve the athlete's wall time. */
-export function formatStartDate(activity: Run): string {
+export function formatStartDate(activity: VideoActivity): string {
   const date = new Date(activity.start_date_local);
   if (Number.isNaN(date.getTime())) return "";
   const day = new Intl.DateTimeFormat("en-US", {
@@ -135,8 +139,8 @@ export interface LiveMetrics {
  *  are averaged over a half-second window so they read instead of flicker.
  *  Falls back to linearly scaled activity totals when there are no streams. */
 export function metricsAtProgress(
-  activity: Run,
-  streams: RunStreams,
+  activity: VideoActivity,
+  streams: VideoStreams,
   progress: number,
   fps: number = FPS,
 ): LiveMetrics {

@@ -5,6 +5,7 @@
 //
 // `z` must come from @hono/zod-openapi — it is Zod extended with `.openapi()`.
 import { z } from "@hono/zod-openapi";
+import { DEFAULT_TEMPLATE_ID, TEMPLATE_IDS } from "@repo/video";
 
 export const HealthSchema = z
   .object({
@@ -126,14 +127,28 @@ export const RunStreamsSchema = z
 export type RunStreams = z.infer<typeof RunStreamsSchema>;
 
 /**
+ * Which cut of the run to make.
+ *
+ * The values come from `@repo/video`'s registry, which is also what the browser
+ * builds its picker from and what the Lambda site bundle registers as
+ * compositions — so a template can't be requested that nothing can render.
+ */
+export const VideoTemplateSchema = z
+  .enum(TEMPLATE_IDS)
+  .openapi("VideoTemplate", { example: DEFAULT_TEMPLATE_ID });
+
+/**
  * What the athlete chose in the replay's options panel, sent when a render is
- * started. Part of a render's identity, not a display setting: the same run
- * with the avatar on is a different video, so the stored render carries these
- * back and the browser offers a re-render rather than the wrong MP4.
+ * started. Part of a render's identity, not a display setting: the same run as
+ * a different template, or with the avatar on, is a different video — so the
+ * stored render carries these back and the browser offers a re-render rather
+ * than the wrong MP4.
  */
 export const RunRenderOptionsSchema = z
   .object({
-    /** Draw the runner as the athlete's Strava picture instead of a dot. */
+    template: VideoTemplateSchema.default(DEFAULT_TEMPLATE_ID),
+    /** Draw the runner as the athlete's Strava picture instead of a dot.
+     *  Ignored by a template whose `supportsAvatar` is false. */
     show_avatar: z.boolean().default(false).openapi({ example: true }),
   })
   .openapi("RunRenderOptions");
@@ -143,11 +158,13 @@ export type RunRenderOptions = z.infer<typeof RunRenderOptionsSchema>;
 /**
  * One run's Lambda render — the persisted row in `run_render`, as served to
  * the browser. `output_url` is the public S3 URL of the MP4 once `status` is
- * `"done"`.
+ * `"done"`. A run holds one of these per template.
  */
 export const RunRenderSchema = z
   .object({
     activity_id: z.number().int().openapi({ example: 987654321 }),
+    /** Which cut this is. Rendering another template leaves this one alone. */
+    template: VideoTemplateSchema,
     status: z.enum(["rendering", "done", "error"]).openapi({ example: "rendering" }),
     /** The option this render was started with — see `RunRenderOptions`. */
     show_avatar: z.boolean(),

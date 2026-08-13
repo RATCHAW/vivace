@@ -325,6 +325,9 @@
             "type": "integer",
             "example": 987654321
           },
+          "template": {
+            "$ref": "#/components/schemas/VideoTemplate"
+          },
           "status": {
             "type": "string",
             "enum": [
@@ -367,6 +370,7 @@
         },
         "required": [
           "activity_id",
+          "template",
           "status",
           "show_avatar",
           "progress",
@@ -376,9 +380,19 @@
           "updated_at"
         ]
       },
+      "VideoTemplate": {
+        "type": "string",
+        "enum": [
+          "run-video"
+        ],
+        "example": "run-video"
+      },
       "RunRenderOptions": {
         "type": "object",
         "properties": {
+          "template": {
+            "$ref": "#/components/schemas/VideoTemplate"
+          },
           "show_avatar": {
             "type": "boolean",
             "default": false,
@@ -1250,7 +1264,7 @@
           "Runs"
         ],
         "summary": "Get one run's stored render",
-        "description": "Reads the persisted render state for this run and athlete. `render` is null when the run has never been rendered. While a render is in flight, live progress comes from the SSE endpoint, which also keeps this state up to date.",
+        "description": "Reads the persisted render state for this run, athlete and template. `render` is null when this run has never been rendered with this template. While a render is in flight, live progress comes from the SSE endpoint, which also keeps this state up to date.",
         "security": [
           {
             "sessionCookie": []
@@ -1266,6 +1280,14 @@
             "required": true,
             "name": "id",
             "in": "path"
+          },
+          {
+            "schema": {
+              "$ref": "#/components/schemas/VideoTemplate"
+            },
+            "required": false,
+            "name": "template",
+            "in": "query"
           }
         ],
         "responses": {
@@ -1297,7 +1319,7 @@
           "Runs"
         ],
         "summary": "Render this run's video on Remotion Lambda",
-        "description": "Fetches the run and its streams from Strava, starts a Remotion Lambda render of the story video, and persists the render state. The MP4 lands in the Remotion S3 bucket. Idempotent while a render is in flight or already done with the same options — those return the existing state; a failed render, or one whose options no longer match, is rendered again. The body is optional and defaults to the plain replay.",
+        "description": "Fetches the run and its streams from Strava, starts a Remotion Lambda render of the chosen template, and persists the render state. The MP4 lands in the Remotion S3 bucket. Idempotent while a render is in flight or already done with the same options — those return the existing state; a failed render, or one whose options no longer match, is rendered again. Each template gets its own render, so switching template does not replace the video already made with the last one. The body is optional and defaults to the plain replay.",
         "security": [
           {
             "sessionCookie": []
@@ -1385,7 +1407,7 @@
           "Runs"
         ],
         "summary": "Stream a render's progress (SSE)",
-        "description": "Server-sent events. While the run's render is in flight, polls Remotion Lambda every ~1.5s, persists the result, and emits the updated RunRender as a JSON message. The final message has status `done` or `error`, after which the stream closes; a lone `null` message means there is no render. Consumed with EventSource, not the generated client.",
+        "description": "Server-sent events. While this run's render of the given template is in flight, polls Remotion Lambda every ~1.5s, persists the result, and emits the updated RunRender as a JSON message. The final message has status `done` or `error`, after which the stream closes; a lone `null` message means there is no render. Consumed with EventSource, not the generated client.",
         "security": [
           {
             "sessionCookie": []
@@ -1401,6 +1423,14 @@
             "required": true,
             "name": "id",
             "in": "path"
+          },
+          {
+            "schema": {
+              "$ref": "#/components/schemas/VideoTemplate"
+            },
+            "required": false,
+            "name": "template",
+            "in": "query"
           }
         ],
         "responses": {

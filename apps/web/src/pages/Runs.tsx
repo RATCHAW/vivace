@@ -21,7 +21,14 @@ import { Skeleton } from "@/components/ui/skeleton";
 // The theme toggle that used to sit here now lives in AppHeader.
 import { RenderControls } from "@/components/render-controls";
 import { cn } from "@/lib/utils";
-import { avatarSource, formatClock, formatPace } from "@/remotion/run-video/data";
+import {
+  avatarSource,
+  DEFAULT_TEMPLATE_ID,
+  formatClock,
+  formatPace,
+  getTemplate,
+  type TemplateId,
+} from "@repo/video";
 
 // Empty until the Mapbox token is provided; the video falls back to a plain
 // route canvas in the meantime.
@@ -49,9 +56,12 @@ export function Runs() {
   // Overview's "Replay →" rows and the player's Share button both point here.
   const [params, setParams] = useSearchParams();
   const [expanded, setExpanded] = useState(false);
-  // A cut of the film, not a property of the run — it outlives selecting
-  // another one, and both the player and the render request read it.
+  // A cut of the film, not a property of the run — these outlive selecting
+  // another one, and both the player and the render request read them.
   const [showAvatar, setShowAvatar] = useState(false);
+  const [template, setTemplate] = useState<TemplateId>(DEFAULT_TEMPLATE_ID);
+  // A template that draws no runner has nothing for the avatar switch to do.
+  const avatarSupported = getTemplate(template).supportsAvatar;
 
   const { data: runs, error: runsError } = useQuery(getRunsOptions());
   const { data: athlete, error: athleteError } = useQuery(getStravaAthleteOptions());
@@ -200,11 +210,12 @@ export function Runs() {
                 </Alert>
               ) : (
                 <RunPlayer
-                  key={selected.id}
+                  key={`${selected.id}:${template}`}
+                  template={template}
                   activity={selected}
                   streams={streams ?? {}}
                   mapboxToken={MAPBOX_TOKEN}
-                  avatarUrl={showAvatar ? avatarUrl : ""}
+                  avatarUrl={showAvatar && avatarSupported ? avatarUrl : ""}
                   expanded={expanded}
                   onToggleExpanded={() => setExpanded((open) => !open)}
                 />
@@ -212,6 +223,12 @@ export function Runs() {
 
               {selected && (
                 <VideoOptions
+                  template={template}
+                  onTemplateChange={(next) => {
+                    setTemplate(next);
+                    trackEvent("ui.video_template_changed", { template: next });
+                  }}
+                  avatarSupported={avatarSupported}
                   avatarUrl={avatarUrl}
                   name={athlete?.firstname ?? ""}
                   pending={athlete === undefined && athleteError == null}
@@ -233,9 +250,10 @@ export function Runs() {
                   it stands even when the browser could not load the streams. */}
               {selected && (
                 <RenderControls
-                  key={selected.id}
+                  key={`${selected.id}:${template}`}
                   run={selected}
-                  showAvatar={showAvatar}
+                  template={template}
+                  showAvatar={showAvatar && avatarSupported}
                 />
               )}
 

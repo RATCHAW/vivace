@@ -11,6 +11,7 @@
     "generate": "pnpm --filter @repo/strava-api generate && pnpm --filter @repo/api openapi:emit && pnpm --filter @repo/web generate",
     "spec:pull": "pnpm --filter @repo/strava-api spec:pull",
     "auth:migrate": "pnpm --filter @repo/api run auth:migrate",
+    "video:deploy": "pnpm --filter @repo/video deploy",
     "db:up": "docker compose up -d db",
     "logs:up": "docker compose --profile observability up -d"
   },

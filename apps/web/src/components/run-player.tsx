@@ -10,27 +10,23 @@ import {
   Share2Icon,
   SparklesIcon,
 } from "lucide-react";
+import { formatClock, getTemplate, type TemplateId } from "@repo/video";
+import { VIDEO_COMPONENTS } from "@repo/video/compositions";
 import type { Run, RunStreams } from "@/api";
 import { trackEvent } from "@/lib/logger";
 import { MonoLabel } from "@/components/mono";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
-import { RunVideo } from "@/remotion/run-video/RunVideo";
-import {
-  DURATION_IN_FRAMES,
-  formatClock,
-  FPS,
-  VIDEO_HEIGHT,
-  VIDEO_WIDTH,
-} from "@/remotion/run-video/data";
 
 /** The replay with its own transport. Remotion's built-in controls are a video
  *  chrome; this one speaks the film's language instead — a mono clock, and a
  *  theatre toggle that gives the 9:16 the whole row.
  *
- *  Mount one per activity (`key` on the id): `RunMap` builds its Mapbox
- *  instance once per mount, and the transport below subscribes to one player. */
+ *  Mount one per activity *and template* (`key` on both): the composition is
+ *  swapped wholesale when either changes — `RunMap` builds its Mapbox instance
+ *  once per mount — and the transport below subscribes to one player. */
 export function RunPlayer({
+  template,
   activity,
   streams,
   mapboxToken,
@@ -38,6 +34,9 @@ export function RunPlayer({
   expanded,
   onToggleExpanded,
 }: {
+  /** Which cut of the run to play. The same id is sent with the render, so the
+   *  file that comes off Lambda is what was on screen. */
+  template: TemplateId;
   activity: Run;
   streams: RunStreams;
   mapboxToken: string;
@@ -47,6 +46,7 @@ export function RunPlayer({
   expanded: boolean;
   onToggleExpanded: () => void;
 }) {
+  const { durationInFrames, fps, width, height } = getTemplate(template);
   const player = useRef<PlayerRef>(null);
   const [frame, setFrame] = useState(0);
   const [playing, setPlaying] = useState(false);
@@ -100,12 +100,12 @@ export function RunPlayer({
       <div className="aspect-9/16 w-full overflow-hidden rounded-lg border bg-black">
         <Player
           ref={player}
-          component={RunVideo}
+          component={VIDEO_COMPONENTS[template]}
           inputProps={{ activity, streams, mapboxToken, avatarUrl }}
-          durationInFrames={DURATION_IN_FRAMES}
-          fps={FPS}
-          compositionWidth={VIDEO_WIDTH}
-          compositionHeight={VIDEO_HEIGHT}
+          durationInFrames={durationInFrames}
+          fps={fps}
+          compositionWidth={width}
+          compositionHeight={height}
           loop
           autoPlay
           acknowledgeRemotionLicense
@@ -123,14 +123,14 @@ export function RunPlayer({
         </Button>
 
         <MonoLabel className="tabular-nums whitespace-nowrap">
-          {formatClock(frame / FPS)} / {formatClock(DURATION_IN_FRAMES / FPS)}
+          {formatClock(frame / fps)} / {formatClock(durationInFrames / fps)}
         </MonoLabel>
 
         <Slider
           aria-label="Seek"
           className="min-w-0 flex-1"
           min={0}
-          max={DURATION_IN_FRAMES - 1}
+          max={durationInFrames - 1}
           value={frame}
           onValueChange={(value) => {
             const next = Array.isArray(value) ? value[0] : value;

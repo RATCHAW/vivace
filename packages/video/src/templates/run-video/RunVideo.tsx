@@ -1,5 +1,5 @@
 import { AbsoluteFill, Easing, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
-import type { Run, RunStreams } from "@/api";
+import type { VideoActivity, VideoStreams } from "../../types";
 import { avatarSource, DRAW_END, DRAW_START, fadeAt, metricsAtProgress } from "./data";
 import { RouteOverlay, StoryProgress, TYPE, Watermark } from "./overlay";
 import { RunMap } from "./RunMap";
@@ -8,8 +8,8 @@ import { RouteFallback } from "./RouteFallback";
 // A type alias, not an interface — Remotion's <Composition> needs props
 // assignable to Record<string, unknown>, which interfaces never are.
 export type RunVideoProps = {
-  activity: Run;
-  streams: RunStreams;
+  activity: VideoActivity;
+  streams: VideoStreams;
   mapboxToken: string;
   /** The athlete's Strava picture, riding the head of the trace in place of the
    *  dot. Empty — the default — keeps the dot. */

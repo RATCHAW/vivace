@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Run, RunStreams } from "@/api";
+import type { VideoActivity, VideoStreams } from "../../types";
 import {
   avatarSource,
   buildCameraTrack,
@@ -27,7 +27,7 @@ import {
   type LatLng,
 } from "./data";
 
-const activity: Run = {
+const activity: VideoActivity = {
   id: 987654321,
   name: "Morning Run",
   distance: 5000,
@@ -123,7 +123,7 @@ describe("avatarSource", () => {
 });
 
 describe("metricsAtProgress", () => {
-  const streams: RunStreams = {
+  const streams: VideoStreams = {
     time: { data: [0, 750, 1500] },
     distance: { data: [0, 2500, 5000] },
     velocity_smooth: { data: [0, 3.2, 3.4] },
@@ -187,7 +187,7 @@ describe("metricsAtProgress smoothing", () => {
   const withSpike = (steady: number, spike: number) =>
     Array.from({ length: sampleCount }, (_, i) => (i === spikeIndex ? spike : steady));
 
-  const streams: RunStreams = {
+  const streams: VideoStreams = {
     time: { data: Array.from({ length: sampleCount }, (_, i) => i) },
     distance: { data: Array.from({ length: sampleCount }, (_, i) => i * 3) },
     velocity_smooth: { data: withSpike(3, 0.6) },

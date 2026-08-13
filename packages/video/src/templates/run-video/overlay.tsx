@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { AbsoluteFill } from "remotion";
-import type { Run } from "@/api";
-import { VivaceMark } from "@/components/vivace-mark";
+import { VivaceMark } from "../../brand/vivace-mark";
+import type { VideoActivity } from "../../types";
 import {
   formatClock,
   formatKm,
@@ -137,7 +137,7 @@ export function RouteOverlay({
   live,
   opacity,
 }: {
-  activity: Run;
+  activity: VideoActivity;
   live: LiveMetrics;
   opacity: number;
 }) {

@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { formatClock, formatPace } from "@/remotion/run-video/data";
+import { formatClock, formatPace } from "@repo/video";
 
 /** The API asks Strava for one page of this size — see `fetchRuns` in
  *  apps/api/src/strava.ts. A year that fills the page may be under-counted, and
