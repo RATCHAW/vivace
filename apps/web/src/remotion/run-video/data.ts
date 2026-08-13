@@ -8,45 +8,9 @@ export const DURATION_IN_FRAMES = 20 * FPS;
 
 const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
 
-/* ---- Chapters ----------------------------------------------------------- *
- * The replay is a four-act film, not a single shot: a title card, the route
- * drawing under live metrics, the effort read (heart rate and splits), and the
- * shareable summary. Boundaries are fractions of the whole so the timeline can
- * be retimed in one place — the player's chapter bar reads the same table.    */
-
-export type ChapterId = "title" | "route" | "effort" | "summary";
-
-export interface Chapter {
-  id: ChapterId;
-  /** Shown under the player's scrubber, e.g. "02 · ROUTE". */
-  label: string;
-  /** Fractions of the whole video, 0–1. */
-  start: number;
-  end: number;
-}
-
-export const CHAPTERS: readonly Chapter[] = [
-  { id: "title", label: "01 · TITLE", start: 0, end: 0.1 },
-  { id: "route", label: "02 · ROUTE", start: 0.1, end: 0.66 },
-  { id: "effort", label: "03 · EFFORT", start: 0.66, end: 0.85 },
-  { id: "summary", label: "04 · SUMMARY", start: 0.85, end: 1 },
-];
-
-/** The chapter containing `progress` (0–1); the last one at and past the end. */
-export function chapterAtProgress(progress: number): Chapter {
-  const p = clamp01(progress);
-  return CHAPTERS.find((c) => p < c.end) ?? CHAPTERS[CHAPTERS.length - 1];
-}
-
-/** How far `progress` has moved through `chapter`, as 0–1. Drives the segmented
- *  chapter bar: chapters behind read 1, chapters ahead read 0. */
-export function chapterProgress(chapter: Chapter, progress: number): number {
-  return clamp01((clamp01(progress) - chapter.start) / (chapter.end - chapter.start));
-}
-
 /** A trapezoid envelope over the timeline: 0 before `from`, ramping to 1 by
- *  `hold`, held until `release`, back to 0 at `to`. Chapters overlap on these,
- *  so one is always dissolving into the next rather than cutting. */
+ *  `hold`, held until `release`, back to 0 at `to`. The overlay rides one of
+ *  these, so it dissolves in over the opening beat rather than cutting. */
 export function fadeAt(
   progress: number,
   from: number,
@@ -60,10 +24,11 @@ export function fadeAt(
   return 1 - (progress - release) / (to - release);
 }
 
-// The route draws inside the route chapter, finishing before the chapter ends so
-// the completed trace holds for a beat under the final live numbers.
-export const DRAW_START = Math.round(0.13 * DURATION_IN_FRAMES);
-export const DRAW_END = Math.round(0.63 * DURATION_IN_FRAMES);
+// The draw is the whole film. It opens holding on the start line for a beat and
+// finishes early, so the completed route holds under the final live numbers —
+// the frame a story is paused on.
+export const DRAW_START = Math.round(0.06 * DURATION_IN_FRAMES);
+export const DRAW_END = Math.round(0.92 * DURATION_IN_FRAMES);
 // A whole run is compressed into the draw, so one video frame steps over many
 // stream samples. Reading a single sample makes the instantaneous channels
 // (pace, heart rate) jump between neighbouring frames; averaging this much
@@ -206,167 +171,6 @@ export function metricsAtProgress(
     heartrate: heartrate ? Math.round(heartrate) : null,
     elevationGainMeters: activity.total_elevation_gain * p,
   };
-}
-
-/* ---- Effort ------------------------------------------------------------- *
- * What the effort chapter charts: one channel plotted as a sparkline, and the
- * run's splits as a bar per segment. Both are pure geometry over the streams —
- * the chapter component only positions and paints them.                       */
-
-export interface Sparkline {
-  /** An SVG path laid out in the `width` × `height` box asked for. */
-  d: string;
-  /** Its length, so the same path can draw on with a stroke dash offset. */
-  length: number;
-  min: number;
-  max: number;
-}
-
-/** Fraction of the plot height kept clear above and below the trace, so the
- *  peak of a run reads as a peak instead of grazing the ceiling. */
-const SPARKLINE_HEADROOM = 0.08;
-
-/** Downsample a stream to `samples` bucket means and lay it out as a polyline.
- *  Null when there is nothing plottable — a stream that is missing, too short,
- *  or entirely flat has no shape to show, and a dead-flat line reads as broken.  */
-export function buildSparkline(
-  data: readonly number[] | undefined,
-  width: number,
-  height: number,
-  samples = 56,
-): Sparkline | null {
-  const finite = data?.filter((v) => Number.isFinite(v)) ?? [];
-  if (finite.length < 2 || samples < 2) return null;
-
-  const buckets: number[] = [];
-  for (let i = 0; i < samples; i += 1) {
-    const from = Math.floor((i * finite.length) / samples);
-    const to = Math.max(from + 1, Math.floor(((i + 1) * finite.length) / samples));
-    let sum = 0;
-    for (let j = from; j < to; j += 1) sum += finite[j];
-    buckets.push(sum / (to - from));
-  }
-
-  const min = Math.min(...buckets);
-  const max = Math.max(...buckets);
-  if (max - min < 1e-9) return null;
-
-  const pad = (max - min) * SPARKLINE_HEADROOM;
-  const lo = min - pad;
-  const span = max - min + 2 * pad;
-
-  const points = buckets.map((v, i): [number, number] => [
-    (i / (samples - 1)) * width,
-    height - ((v - lo) / span) * height,
-  ]);
-
-  let length = 0;
-  for (let i = 1; i < points.length; i += 1) {
-    length += Math.hypot(points[i][0] - points[i - 1][0], points[i][1] - points[i - 1][1]);
-  }
-
-  return {
-    d: points
-      .map(([x, y], i) => `${i ? "L" : "M"}${x.toFixed(1)} ${y.toFixed(1)}`)
-      .join(" "),
-    length,
-    min,
-    max,
-  };
-}
-
-export interface Split {
-  /** Cumulative kilometres at the end of the segment — "1", "2", "5", "10". */
-  label: string;
-  paceSecondsPerKm: number | null;
-  /** 0–1 against the fastest split, which reads 1. Sizes the bar. */
-  weight: number;
-}
-
-/** Beyond this the rows stop being readable at 9:16, so a long run is grouped
- *  into wider segments rather than scrolled or truncated. */
-export const MAX_SPLIT_ROWS = 8;
-
-/** A trailing segment shorter than this fraction of a full one is absorbed into
- *  the one before it — a 60m "split" is noise, and its pace is wild. */
-const MIN_TRAILING_SPLIT = 0.25;
-
-/** Seconds elapsed at `metres` into the run. Interpolated off the distance and
- *  time streams; falls back to the run's average speed without them. */
-function elapsedAtDistance(activity: Run, streams: RunStreams, metres: number): number {
-  const distance = streams.distance?.data;
-  const time = streams.time?.data;
-  if (!distance || !time || distance.length < 2 || time.length < distance.length) {
-    return activity.distance > 0
-      ? (metres / activity.distance) * activity.moving_time
-      : 0;
-  }
-
-  // The distance stream is monotonic, so the first sample at or past the target
-  // brackets it with the one before.
-  let i = 0;
-  while (i < distance.length && distance[i] < metres) i += 1;
-  if (i === 0) return time[0];
-  if (i >= distance.length) return time[time.length - 1];
-
-  const span = distance[i] - distance[i - 1];
-  const f = span > 0 ? (metres - distance[i - 1]) / span : 0;
-  return time[i - 1] + (time[i] - time[i - 1]) * f;
-}
-
-/** The run cut into at most `maxRows` equal-distance segments, each with the
- *  pace actually run over it. Kilometre splits for anything up to `maxRows` km;
- *  longer runs step in whole kilometres so the labels stay round numbers. */
-export function buildSplits(
-  activity: Run,
-  streams: RunStreams,
-  maxRows: number = MAX_SPLIT_ROWS,
-): Split[] {
-  const totalKm = activity.distance / 1000;
-  // Under two kilometres there is no split to compare against another.
-  if (!Number.isFinite(totalKm) || totalKm < 2 || maxRows < 1) return [];
-
-  const stepKm = Math.max(1, Math.ceil(Math.floor(totalKm) / maxRows));
-
-  const ends: number[] = [];
-  for (let km = stepKm; km < totalKm; km += stepKm) ends.push(km);
-  const trailing = totalKm - (ends[ends.length - 1] ?? 0);
-  if (ends.length === 0 || trailing >= stepKm * MIN_TRAILING_SPLIT) {
-    ends.push(totalKm);
-  } else {
-    ends[ends.length - 1] = totalKm;
-  }
-  // Rounding the step up can leave one row over the budget; the overflow is
-  // always the trailing partial, so fold it into the segment before it.
-  if (ends.length > maxRows) ends.splice(ends.length - 2, 1);
-
-  const rows = ends.map((endKm, i) => {
-    const startKm = i === 0 ? 0 : ends[i - 1];
-    const seconds =
-      elapsedAtDistance(activity, streams, endKm * 1000) -
-      elapsedAtDistance(activity, streams, startKm * 1000);
-    const km = endKm - startKm;
-    const pace = km > 0 && seconds > 0 ? seconds / km : null;
-    const whole = Math.round(endKm);
-    return {
-      label: Math.abs(endKm - whole) < 0.05 ? String(whole) : endKm.toFixed(1),
-      paceSecondsPerKm: pace,
-      weight: 1,
-    };
-  });
-
-  const paces = rows
-    .map((r) => r.paceSecondsPerKm)
-    .filter((p): p is number => p != null);
-  const fastest = paces.length > 0 ? Math.min(...paces) : null;
-
-  return rows.map((row) => ({
-    ...row,
-    weight:
-      fastest != null && row.paceSecondsPerKm != null
-        ? fastest / row.paceSecondsPerKm
-        : 1,
-  }));
 }
 
 export interface RoutePadding {
