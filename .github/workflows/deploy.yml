@@ -90,6 +90,12 @@ jobs:
       - run: pnpm test
       - run: pnpm build
 
+      # webpack, not tsc, is what finds a bad import in the Lambda entry, so
+      # `pnpm build` above passes on a bundle that cannot be built. Without this
+      # the deploy job discovers it after joining the tailnet and calling AWS.
+      - if: steps.scope.outputs.video == 'true'
+        run: pnpm --filter @repo/video run bundle:check
+
   deploy:
     needs: check
     if: needs.check.outputs.api == 'true'
