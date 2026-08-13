@@ -1,0 +1,224 @@
+name: Deploy
+
+# The only thing that deploys the API. Coolify's own auto-deploy must be OFF
+# (Application -> General -> Auto Deploy, or PATCH is_auto_deploy_enabled=false),
+# so there is exactly one trigger, one log, and one answer to "what is running".
+#
+# A webhook cannot give us three things this does:
+#
+#   1. tests gate the deploy — a webhook ships whatever lands on main;
+#   2. ordering — the Remotion bundle and its env vars have to exist before the
+#      API container starts, because apps/api compiles against @repo/video;
+#   3. what was tested is what ships — `POST /deploy` builds the branch head at
+#      build time, so a second commit landing mid-build would deploy something
+#      CI never saw. Pinning `git_commit_sha` first removes that gap.
+#
+# apps/web and apps/landing are deliberately not here: they go to Vercel through
+# its own git integration, which has no env coupling to sequence and gives
+# preview deployments for free.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Commit, tag or branch to deploy (defaults to main's head)"
+        required: false
+
+# Serialised: two runs would race to pin the commit and set the environment.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      sha: ${{ steps.resolve.outputs.sha }}
+      video: ${{ steps.scope.outputs.video }}
+      api: ${{ steps.scope.outputs.api }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+          # The scope check diffs against the previous head, so shallow won't do
+          fetch-depth: 0
+
+      - id: resolve
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      # Worked out with git rather than a marketplace action: this workflow holds
+      # credentials to the production host, so it takes as few third-party
+      # dependencies as it can.
+      - id: scope
+        env:
+          BEFORE: ${{ github.event.before }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          sha=$(git rev-parse HEAD)
+          if [ "$EVENT" = "workflow_dispatch" ] || [ -z "$BEFORE" ] ||
+             [ "$BEFORE" = "0000000000000000000000000000000000000000" ] ||
+             ! git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+            # No usable base (manual run, first push, force push): do everything
+            # rather than guess and under-deploy.
+            changed=""
+            video=true
+            api=true
+          else
+            changed=$(git diff --name-only "$BEFORE" "$sha")
+            # `packages/` covers packages/video, so a bundle change always
+            # rebuilds the API too — which is required, not incidental.
+            grep -qE '^(packages/video/|pnpm-lock\.yaml$)' <<<"$changed" && video=true || video=false
+            grep -qE '^(apps/api/|packages/|package\.json$|pnpm-lock\.yaml$|pnpm-workspace\.yaml$|turbo\.json$)' <<<"$changed" && api=true || api=false
+          fi
+          echo "video=$video" >> "$GITHUB_OUTPUT"
+          echo "api=$api" >> "$GITHUB_OUTPUT"
+          echo "video=$video, api=$api"
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      # No database needed: the API suite drives the Hono app in-process. The
+      # openapi drift test lives here too — it fails when a route changed
+      # without `pnpm generate`.
+      - run: pnpm test
+      - run: pnpm build
+
+  deploy:
+    needs: check
+    if: needs.check.outputs.api == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.check.outputs.sha }}
+
+      - uses: pnpm/action-setup@v4
+        if: needs.check.outputs.video == 'true'
+      - uses: actions/setup-node@v4
+        if: needs.check.outputs.video == 'true'
+        with:
+          node-version: 22
+          cache: pnpm
+      - if: needs.check.outputs.video == 'true'
+        run: pnpm install --frozen-lockfile --filter @repo/video...
+
+      # The site is named after the commit, so this adds a bundle rather than
+      # replacing the one a shipped video was rendered from. Functions are reused
+      # when their (Remotion version, memory, timeout) already exists.
+      - name: Deploy the Remotion site and functions
+        if: needs.check.outputs.video == 'true'
+        env:
+          REMOTION_AWS_ACCESS_KEY_ID: ${{ secrets.REMOTION_AWS_ACCESS_KEY_ID }}
+          REMOTION_AWS_SECRET_ACCESS_KEY: ${{ secrets.REMOTION_AWS_SECRET_ACCESS_KEY }}
+          REMOTION_AWS_REGION: ${{ vars.REMOTION_AWS_REGION }}
+          REMOTION_DEPLOY_ENV_FILE: ${{ runner.temp }}/remotion.env
+        run: |
+          set -euo pipefail
+          # Unset would silently fall back to us-east-1 and deploy a second
+          # function and bucket in the wrong region.
+          test -n "$REMOTION_AWS_REGION" || {
+            echo "::error::Set the REMOTION_AWS_REGION repository variable"
+            exit 1
+          }
+          pnpm video:deploy
+
+      # Coolify's API is on :8000, which is tailnet-only. An ephemeral node
+      # tagged tag:ci joins for the length of this job; scope that tag in your
+      # ACL to this one host and this one port.
+      - name: Join the tailnet
+        uses: tailscale/github-action@v4
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+
+      - name: Point Coolify at this commit
+        env:
+          COOLIFY_URL: ${{ vars.COOLIFY_URL }}
+          COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
+          APP_UUID: ${{ vars.COOLIFY_APP_UUID }}
+          SHA: ${{ needs.check.outputs.sha }}
+        run: |
+          set -euo pipefail
+          # Without this, the build takes whatever is at the branch head when it
+          # starts, which is not necessarily what the check job just validated.
+          curl -sS -f -X PATCH \
+            "$COOLIFY_URL/api/v1/applications/$APP_UUID" \
+            -H "Authorization: Bearer $COOLIFY_TOKEN" \
+            -H 'Content-Type: application/json' \
+            --data "$(jq -nc --arg sha "$SHA" '{git_commit_sha:$sha}')" >/dev/null
+          echo "pinned to $SHA"
+
+      - name: Push the render variables to Coolify
+        if: needs.check.outputs.video == 'true'
+        env:
+          COOLIFY_URL: ${{ vars.COOLIFY_URL }}
+          COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
+          APP_UUID: ${{ vars.COOLIFY_APP_UUID }}
+          ENV_FILE: ${{ runner.temp }}/remotion.env
+        run: |
+          set -euo pipefail
+          # `read` with two names puts everything after the first `=` into the
+          # second, so a value containing `=` survives intact. The file is
+          # whatever the deploy script printed, so a new render profile becomes a
+          # new line and nothing here needs editing.
+          set_env() {
+            curl -sS -o /tmp/env.json -w '%{http_code}' -X "$1" \
+              "$COOLIFY_URL/api/v1/applications/$APP_UUID/envs" \
+              -H "Authorization: Bearer $COOLIFY_TOKEN" \
+              -H 'Content-Type: application/json' \
+              --data "$(jq -nc --arg k "$2" --arg v "$3" '{key:$k,value:$v}')"
+          }
+
+          while IFS='=' read -r key value; do
+            [ -n "$key" ] || continue
+            # PATCH updates, POST creates — Coolify has no upsert. A variable
+            # exists on every run but the first, and on the first run after a
+            # deploy script starts emitting a new one (a second render profile).
+            code=$(set_env PATCH "$key" "$value")
+            [ "$code" = 404 ] && code=$(set_env POST "$key" "$value")
+            case "$code" in
+              200|201) echo "set $key" ;;
+              *) echo "::error::Coolify rejected $key (HTTP $code)"; cat /tmp/env.json; exit 1 ;;
+            esac
+          done < "$ENV_FILE"
+
+      - name: Deploy and wait for it
+        env:
+          COOLIFY_URL: ${{ vars.COOLIFY_URL }}
+          COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
+          APP_UUID: ${{ vars.COOLIFY_APP_UUID }}
+        run: |
+          set -euo pipefail
+          deployment=$(curl -sS -f -X POST \
+            "$COOLIFY_URL/api/v1/deploy?uuid=$APP_UUID" \
+            -H "Authorization: Bearer $COOLIFY_TOKEN" \
+            | jq -r '.deployments[0].deployment_uuid')
+          test -n "$deployment" && test "$deployment" != "null" || {
+            echo "::error::Coolify accepted the request but returned no deployment uuid"
+            exit 1
+          }
+          echo "deployment $deployment"
+
+          # Without the poll this job is green the moment the request is
+          # accepted, and a failed build looks exactly like a shipped one.
+          for _ in $(seq 1 120); do
+            status=$(curl -sS -f \
+              "$COOLIFY_URL/api/v1/deployments/$deployment" \
+              -H "Authorization: Bearer $COOLIFY_TOKEN" | jq -r '.status')
+            echo "status: $status"
+            case "$status" in
+              finished) exit 0 ;;
+              failed|cancelled*) echo "::error::Deployment $status"; exit 1 ;;
+            esac
+            sleep 10
+          done
+          echo "::error::Deployment still running after 20 minutes"
+          exit 1

@@ -16,7 +16,7 @@
 // https://www.remotion.dev/docs/lambda/setup. Prints the env vars the API
 // needs; run with: pnpm --filter @repo/video deploy
 import { execFileSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, writeFileSync } from "node:fs";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { deployFunction, deploySite, getOrCreateBucket } from "@remotion/lambda";
@@ -113,10 +113,25 @@ const overrides = profiles
   .filter((profile) => profile !== defaultProfile)
   .map((profile) => `${functionNameEnvVar(profile)}=${functions.get(profile)}`);
 
+const envLines = [
+  `REMOTION_AWS_REGION=${region}`,
+  `REMOTION_FUNCTION_NAME=${functions.get(defaultProfile)}`,
+  ...overrides,
+  `REMOTION_SERVE_URL=${serveUrl}`,
+];
+
 console.log(`
 Add to apps/api/.env:
 
-REMOTION_AWS_REGION=${region}
-REMOTION_FUNCTION_NAME=${functions.get(defaultProfile)}
-${overrides.length ? `${overrides.join("\n")}\n` : ""}REMOTION_SERVE_URL=${serveUrl}
+${envLines.join("\n")}
 `);
+
+// CI pushes these to the running API rather than a human copying them across.
+// It reads the block from a file instead of scraping stdout, so adding a
+// profile adds a line here and nothing downstream needs editing — which is the
+// whole reason the names are derived in registry.ts rather than spelled twice.
+const envFile = process.env.REMOTION_DEPLOY_ENV_FILE;
+if (envFile) {
+  writeFileSync(envFile, `${envLines.join("\n")}\n`);
+  console.log(`Wrote ${envLines.length} variables to ${envFile}`);
+}
