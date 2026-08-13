@@ -14,7 +14,6 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { RunVideo } from "@/remotion/run-video/RunVideo";
 import {
-  chapterAtProgress,
   DURATION_IN_FRAMES,
   formatClock,
   FPS,
@@ -23,8 +22,8 @@ import {
 } from "@/remotion/run-video/data";
 
 /** The replay with its own transport. Remotion's built-in controls are a video
- *  chrome; this one speaks the film's language instead — a chapter name under
- *  the scrubber, and a theatre toggle that gives the 9:16 the whole row.
+ *  chrome; this one speaks the film's language instead — a mono clock, and a
+ *  theatre toggle that gives the 9:16 the whole row.
  *
  *  Mount one per activity (`key` on the id): `RunMap` builds its Mapbox
  *  instance once per mount, and the transport below subscribes to one player. */
@@ -88,9 +87,6 @@ export function RunPlayer({
     }
   }, [activity.id, activity.name]);
 
-  const progress = frame / Math.max(1, DURATION_IN_FRAMES - 1);
-  const chapter = chapterAtProgress(progress);
-
   return (
     // Fills whatever width it is given; the page owns the theatre-mode measure.
     <div className="flex flex-col gap-4">
@@ -150,8 +146,7 @@ export function RunPlayer({
       {/* The design's second action here was "Download MP4"; that is now a real
           Lambda render, and it lives in <RenderControls> under the player
           because it has three states and a progress bar to show. */}
-      <div className="flex items-center gap-2">
-        <MonoLabel className="mr-auto whitespace-nowrap">{chapter.label}</MonoLabel>
+      <div className="flex justify-end">
         <Button size="sm" variant="subtle" onClick={share}>
           <Share2Icon />
           Share
