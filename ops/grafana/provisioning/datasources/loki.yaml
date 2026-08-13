@@ -1,0 +1,22 @@
+# Provisioned at startup, so a fresh `docker compose up` has a working
+# datasource — nothing to click through in the UI.
+apiVersion: 1
+
+datasources:
+  - name: Loki
+    type: loki
+    uid: loki # the dashboards in ops/grafana/dashboards refer to this uid
+    access: proxy
+    url: http://loki:3100
+    isDefault: true
+    jsonData:
+      maxLines: 1000
+      derivedFields:
+        # Turns the requestId on any line into a link that pulls up every other
+        # line from the same request — the fastest way from "a 500 happened" to
+        # "here is what the user was doing".
+        - name: requestId
+          matcherType: label
+          matcherRegex: '"requestId":"([^"]+)"'
+          url: '{app="vivace"} | json | requestId = "$${__value.raw}"'
+          datasourceUid: loki

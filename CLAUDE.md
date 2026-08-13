@@ -36,6 +36,44 @@ Consequences:
 - New queries need no provider work — `QueryClientProvider` is already in
   `src/main.tsx` with the client from `src/lib/query-client.ts`.
 
+## Logging — structured, never `console.log`
+
+pino in `apps/api/src/logger.ts` → JSON on stdout, and to Grafana Loki when
+`LOKI_URL` is set. Dashboards live in `ops/grafana/dashboards`; see the README
+for how to run the stack.
+
+- **Every line carries an `event`** — a dotted, low-cardinality name
+  (`render.started`, `strava.request_failed`, `ui.page_view`). Dashboards group
+  by it; ids and other variable values go in sibling fields, never in the name.
+- **In a handler, log through `c.get("log")`, not `logger`.** The request child
+  already carries `requestId` and — after `identify(c, userId)` — `userId`, which
+  is what makes a line traceable. `logger` directly is for startup and shutdown.
+- **`app.use("*", requestLogger)` is first in the chain** and emits exactly one
+  `http_request` line per request, whatever the outcome. Don't log "handling X"
+  at the top of a handler; that line already exists.
+- **Never swallow an error silently.** A bare `catch {}` is the bug this whole
+  setup exists to prevent — log it, even when recovery is correct (see the
+  progress poll in `app.ts`).
+- **New sensitive fields go in `REDACTED`** in `logger.ts`. Tokens must never
+  reach a sink.
+- **Don't add a `level` formatter anywhere else, or move the streams into
+  `pino.transport()`.** A worker-thread transport re-reads `level` from the
+  serialised line, where the string form compares false against every threshold
+  and silently drops *all* output. `multistream` in the main thread is deliberate.
+
+In the browser, `@/lib/logger` batches to `POST /api/logs`, which re-logs
+server-side with `source: "web"`:
+
+- `trackEvent("ui.…")` for a user action, `trackError("…", err)` for a failure.
+  Errors flush immediately; actions flush on a timer and on page hide.
+- **Failed API calls are already logged** by the `QueryCache`/`MutationCache`
+  hooks in `@/lib/query-client` — don't add a `logError` to every `onError`.
+- The event name is validated server-side against `^[a-z][a-z0-9_]*(\.[a-z0-9_]+)*$`
+  and the batch is capped, because the endpoint is deliberately unauthenticated
+  (a crash on the sign-in page is exactly what it's for).
+- `apps/landing` has no logging: it is a static marketing page and never calls
+  the API. Keep it that way.
+
 ## UI — always shadcn/ui
 
 shadcn/ui is the default for anything user-facing. Before writing markup or CSS:

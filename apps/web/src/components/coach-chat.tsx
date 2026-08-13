@@ -10,6 +10,7 @@ import {
 import { CheckIcon, CopyIcon, RefreshCcwIcon, SparklesIcon } from "lucide-react";
 import { toast } from "sonner";
 import { COACH_CHAT_PATH, listCoachThreadsQueryKey } from "@/api";
+import { trackError } from "@/lib/logger";
 import {
   Attachment,
   AttachmentInfo,
@@ -202,6 +203,10 @@ export function CoachChat({ threadId, initialMessages }: CoachChatProps) {
     // The first message names the thread and every message reorders the list.
     onFinish: () =>
       queryClient.invalidateQueries({ queryKey: listCoachThreadsQueryKey() }),
+    // useChat sits outside React Query, so the cache-level logger in
+    // @/lib/query-client never sees this one. A stream that dies on the way to
+    // the browser leaves no server line either — this is the only report.
+    onError: (err) => trackError("coach.chat_failed", err, { threadId }),
   });
 
   const isBusy = status === "submitted" || status === "streaming";

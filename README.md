@@ -18,6 +18,7 @@ A Turborepo monorepo: sign in with Strava (and only Strava), then see your basic
 | Strava client | Generated from Strava's own Swagger (`packages/strava-api`) |
 | Video rendering | [Remotion Lambda](https://www.remotion.dev/lambda) → MP4 in S3 |
 | AI coach | [AI SDK](https://ai-sdk.dev) on both ends — Gemini 2.5 Flash, [AI Elements](https://elements.ai-sdk.dev) UI |
+| Logging | [pino](https://getpino.io) → [Grafana Loki](https://grafana.com/oss/loki/), dashboards in `ops/grafana` |
 | Tests | [Vitest](https://vitest.dev) |
 
 ## Prerequisites
@@ -298,6 +299,63 @@ its own. It has no session, no API client and no generated code: it never talks 
 - The coach waitlist has no backend; the form posts a mail draft to
   `NEXT_PUBLIC_WAITLIST_EMAIL`. Swap the `action` when there is an endpoint.
 
+## Logging and Grafana
+
+Every log line is JSON on stdout. Set `LOKI_URL` and the same lines are pushed to
+[Loki](https://grafana.com/oss/loki/), where two provisioned Grafana dashboards
+read them — one for what users are doing, one for what is breaking.
+
+```sh
+# 1. Start Loki + Grafana (db comes along; the app profile starts these too)
+docker compose --profile observability up -d
+
+# 2. Point the API at Loki — in apps/api/.env
+#    LOKI_URL=http://localhost:3100
+pnpm dev
+```
+
+Grafana is at <http://localhost:3002> — anonymous admin, no login. Open
+**Vivace — user activity** or **Vivace — errors & health**.
+
+**What gets logged.** The API writes one `http_request` line per request
+(method, `route`, status, `durationMs`, `userId`, `requestId`) plus a domain
+event for anything worth counting on its own: `render.started`,
+`render.finished`, `strava.request_failed`, `auth.strava_token_refresh_failed`,
+`request.invalid`, `unhandled_error`. The browser reports its own actions and
+crashes — `ui.page_view`, `ui.render_clicked`, `auth.sign_in_started`,
+`ui.render_crashed`, `api.query_failed` — by batching them to `POST /api/logs`,
+which re-logs them server-side with `source: "web"`. Both halves land in one
+Loki stream, so a click and the 502 it caused sit next to each other.
+
+**Following one request.** Every response carries `x-request-id`, every line
+from that request carries the same `requestId`, and the Loki datasource turns it
+into a link: click it on any line to pull up everything else that request did.
+
+```logql
+{app="vivace"} | json | requestId = "…"          # one request, end to end
+{app="vivace"} | json | userId = "…"             # one athlete's whole session
+{app="vivace", level="error"}                    # everything that broke
+{app="vivace"} | json | event =~ "^ui\\..*$"     # what people clicked
+```
+
+Note that label-filter regexes in LogQL match the **whole** value: write
+`event =~ "^render\\..*$"`, not `event =~ "render.*"` — the latter also matches
+`ui.render_crashed`.
+
+**Configuration** (`apps/api/.env`, all optional):
+
+| Variable | Effect |
+| --- | --- |
+| `LOKI_URL` | Where to push. Unset = stdout only |
+| `LOKI_USERNAME` / `LOKI_PASSWORD` | Basic auth, for Grafana Cloud |
+| `LOG_LEVEL` | `trace`…`fatal`, default `info` (`/health` logs at `debug`) |
+| `APP_ENV` | The `env` label in Loki — keeps staging out of production's panels |
+| `LOG_PRETTY` | Force human-readable (`true`) or JSON (`false`); defaults to a TTY check |
+
+For **Grafana Cloud**, skip the containers: point `LOKI_URL` at the hosted push
+URL, set the user id / API token, and import the two files in
+`ops/grafana/dashboards`.
+
 ## Commands
 
 ```sh
@@ -308,6 +366,7 @@ pnpm typecheck  # tsc --noEmit everywhere
 pnpm generate   # regenerate the OpenAPI document and both generated clients
 pnpm spec:pull  # re-download and bundle Strava's Swagger spec
 pnpm db:up      # start Postgres only (docker compose)
+pnpm logs:up    # start Loki + Grafana (Grafana on :3002)
 pnpm auth:migrate  # create/update better-auth tables in Postgres
 pnpm --filter @repo/web remotion:deploy  # deploy the Remotion Lambda function + site
 
@@ -324,8 +383,10 @@ BETTER_AUTH_SECRET=... STRAVA_CLIENT_ID=... STRAVA_CLIENT_SECRET=... \
   docker compose --profile app up --build
 ```
 
-Web is served at <http://localhost:8080> (nginx proxies `/api` to the API container)
-and the landing page at <http://localhost:3001>. Note: for the Docker setup, set
+Web is served at <http://localhost:8080> (nginx proxies `/api` to the API container),
+the landing page at <http://localhost:3001>, and Grafana at <http://localhost:3002>
+— the `app` profile brings Loki and Grafana up too, and the API container is
+already pointed at them. Note: for the Docker setup, set
 `BETTER_AUTH_URL`/`WEB_ORIGIN` and the landing page's `NEXT_PUBLIC_APP_URL` build arg
 accordingly in `docker-compose.yml` if you change ports.
 

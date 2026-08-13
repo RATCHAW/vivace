@@ -1,0 +1,248 @@
+{
+  "uid": "vivace-user-activity",
+  "title": "Vivace — user activity",
+  "description": "What athletes are doing: sign-ins, page views, renders. Every panel reads the same Loki stream the API and the browser both write to.",
+  "tags": ["vivace"],
+  "timezone": "browser",
+  "editable": true,
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-6h", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "env",
+        "label": "Environment",
+        "type": "query",
+        "datasource": { "type": "loki", "uid": "loki" },
+        "query": {
+          "label": "env",
+          "refId": "LokiVariableQueryEditor-VariableQuery",
+          "stream": "",
+          "type": 1
+        },
+        "refresh": 1,
+        "includeAll": true,
+        "multi": true,
+        "allValue": ".*",
+        "current": { "selected": true, "text": ["All"], "value": ["$__all"] }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Athletes seen",
+      "description": "Distinct userIds on any log line in the selected range.",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "refId": "A",
+          "editorMode": "code",
+          "queryType": "instant",
+          "expr": "count(sum by (userId) (count_over_time({app=\"vivace\", env=~\"$env\"} | json | userId != \"\" [$__range])))"
+        }
+      ],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "fixed", "fixedColor": "text" }, "unit": "short" },
+        "overrides": []
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Sign-ins started",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "targets": [
+        {
+          "refId": "A",
+          "editorMode": "code",
+          "queryType": "instant",
+          "expr": "sum(count_over_time({app=\"vivace\", env=~\"$env\"} | json | event = \"auth.sign_in_started\" [$__range]))"
+        }
+      ],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "fixed", "fixedColor": "text" }, "unit": "short" },
+        "overrides": []
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Renders started",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "refId": "A",
+          "editorMode": "code",
+          "queryType": "instant",
+          "expr": "sum(count_over_time({app=\"vivace\", env=~\"$env\"} | json | event = \"render.started\" [$__range]))"
+        }
+      ],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "fixed", "fixedColor": "text" }, "unit": "short" },
+        "overrides": []
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Videos downloaded",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+      "targets": [
+        {
+          "refId": "A",
+          "editorMode": "code",
+          "queryType": "instant",
+          "expr": "sum(count_over_time({app=\"vivace\", env=~\"$env\"} | json | event = \"ui.video_downloaded\" [$__range]))"
+        }
+      ],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "fixed", "fixedColor": "text" }, "unit": "short" },
+        "overrides": []
+      }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Actions by event",
+      "description": "Browser events (ui.*, auth.*) and the server-side actions they cause (render.*, runs.*).",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 4 },
+      "targets": [
+        {
+          "refId": "A",
+          "editorMode": "code",
+          "queryType": "range",
+          "legendFormat": "{{event}}",
+          "expr": "sum by (event) (count_over_time({app=\"vivace\", env=~\"$env\"} | json | event =~ \"^(ui|auth|render|runs|coach)\\\\..*$\" [$__auto]))"
+        }
+      ],
+      "options": {
+        "legend": { "displayMode": "table", "placement": "right", "showLegend": true, "calcs": ["sum"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "drawStyle": "bars", "fillOpacity": 60, "stacking": { "mode": "normal" }, "lineWidth": 0 },
+          "unit": "short"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Page views by screen",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 4 },
+      "targets": [
+        {
+          "refId": "A",
+          "editorMode": "code",
+          "queryType": "range",
+          "legendFormat": "{{path}}",
+          "expr": "sum by (path) (count_over_time({app=\"vivace\", env=~\"$env\"} | json | event = \"ui.page_view\" [$__auto]))"
+        }
+      ],
+      "options": {
+        "legend": { "displayMode": "table", "placement": "right", "showLegend": true, "calcs": ["sum"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "drawStyle": "bars", "fillOpacity": 60, "stacking": { "mode": "normal" }, "lineWidth": 0 },
+          "unit": "short"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "API requests by route",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 13 },
+      "targets": [
+        {
+          "refId": "A",
+          "editorMode": "code",
+          "queryType": "range",
+          "legendFormat": "{{route}}",
+          "expr": "sum by (route) (count_over_time({app=\"vivace\", env=~\"$env\"} | json | event = \"http_request\" [$__auto]))"
+        }
+      ],
+      "options": {
+        "legend": { "displayMode": "table", "placement": "right", "showLegend": true, "calcs": ["sum"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 2, "showPoints": "never" },
+          "unit": "short"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 8,
+      "type": "logs",
+      "title": "Action stream",
+      "description": "Expand a line for userId and requestId; the requestId links to everything else that request logged.",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 21 },
+      "targets": [
+        {
+          "refId": "A",
+          "editorMode": "code",
+          "queryType": "range",
+          "expr": "{app=\"vivace\", env=~\"$env\"} | json | event =~ \"^(ui|auth|render|runs|coach)\\\\..*$\""
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "showLabels": false,
+        "showCommonLabels": false,
+        "wrapLogMessage": true,
+        "prettifyLogMessage": false,
+        "enableLogDetails": true,
+        "dedupStrategy": "none",
+        "sortOrder": "Descending"
+      }
+    }
+  ]
+}

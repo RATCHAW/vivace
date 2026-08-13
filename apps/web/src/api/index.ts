@@ -7,7 +7,13 @@
 
 import type { UIMessage } from "ai";
 import { client } from "./generated/client.gen";
-import type { ApiError, CoachMessage, RunRender } from "./generated/types.gen";
+import { postClientLogs } from "./generated/sdk.gen";
+import type {
+  ApiError,
+  ClientLogEvent,
+  CoachMessage,
+  RunRender,
+} from "./generated/types.gen";
 
 client.setConfig({
   // Same-origin: Vite proxies /api to the Hono server in dev, nginx in Docker.
@@ -55,7 +61,7 @@ client.interceptors.error.use(
 /**
  * Live render progress for one run, over server-sent events.
  *
- * The one hand-written call in this app: the generated client (and the
+ * One of the three hand-written escapes below: the generated client (and the
  * TanStack layer on top of it) can't express a text/event-stream response, so
  * GET /api/runs/{id}/render/progress is consumed with EventSource instead.
  * The path mirrors the `streamRunRenderProgress` operation in the OpenAPI
@@ -83,14 +89,47 @@ export function subscribeRunRenderProgress(
   return () => source.close();
 }
 
+/**
+ * Ships a batch of browser events to POST /api/logs, where the server re-logs
+ * them into Loki. Called by `@/lib/logger` — track things through `trackEvent`
+ * / `trackError` there, not through this.
+ *
+ * The normal path is the generated `postClientLogs` operation. `beacon` is for
+ * the last flush before the page goes away, where a pending fetch is killed
+ * mid-flight: `navigator.sendBeacon` is the only transport a browser promises
+ * to finish, and it takes a URL and a body, not a client.
+ *
+ * Failures are swallowed on purpose. Telemetry that breaks the app, or that
+ * retries into a loop when the log endpoint is the thing that's down, is worse
+ * than a missing log line.
+ */
+export function sendClientLogs(
+  events: ClientLogEvent[],
+  { beacon = false }: { beacon?: boolean } = {},
+): void {
+  if (events.length === 0) return;
+  const body = { events };
+
+  if (beacon && typeof navigator !== "undefined" && navigator.sendBeacon) {
+    navigator.sendBeacon(
+      "/api/logs",
+      new Blob([JSON.stringify(body)], { type: "application/json" }),
+    );
+    return;
+  }
+
+  void postClientLogs({ body }).catch(() => {});
+}
+
 /** Where `useChat` posts, mirroring the `coachChat` operation in the document. */
 export const COACH_CHAT_PATH = "/api/coach/chat";
 
 /**
  * A stored transcript, back in the shape `useChat` wants.
  *
- * The second hand-written call in this app, and for the same reason as the one
- * above: a `UIMessage` part is a union that grows with every model capability,
+ * Hand-written for the same reason as `subscribeRunRenderProgress` above: the
+ * generated client can't express it. A `UIMessage` part is a union that grows
+ * with every model capability,
  * so the OpenAPI schema describes it as "an object with a `type`" rather than
  * re-deriving the AI SDK's types in Zod. The API only ever stores parts the SDK
  * itself produced, so this cast is narrowing back to the truth — and it lives
@@ -105,6 +144,8 @@ export * from "./generated/@tanstack/react-query.gen";
 export type {
   Athlete,
   ApiError,
+  ClientLogContext,
+  ClientLogEvent,
   CoachMessage,
   CoachThread,
   CoachThreadDetail,

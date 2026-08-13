@@ -1,5 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
 import { authClient } from "@/lib/auth-client";
+import { flushClientLogs, trackEvent } from "@/lib/logger";
 import { Wordmark } from "@/components/wordmark";
 import { ModeToggle } from "@/components/mode-toggle";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -52,7 +53,12 @@ export function AppHeader() {
           size="sm"
           variant="subtle"
           className="hidden sm:inline-flex"
-          onClick={() => authClient.signOut()}
+          onClick={() => {
+            trackEvent("auth.sign_out");
+            // Flush while the cookie is still ours to attribute the batch by.
+            flushClientLogs();
+            void authClient.signOut();
+          }}
         >
           Sign out
         </Button>

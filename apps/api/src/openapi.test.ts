@@ -29,6 +29,7 @@ describe("openapi", () => {
       "/api/coach/threads",
       "/api/coach/threads/{id}",
       "/api/coach/chat",
+      "/api/logs",
     ]);
     expect(document.components.schemas).toHaveProperty("Athlete");
     expect(document.paths["/api/me/strava"].get.operationId).toBe(

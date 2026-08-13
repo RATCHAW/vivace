@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { authClient } from "@/lib/auth-client";
+import { trackError, trackEvent } from "@/lib/logger";
 import { StravaIcon } from "@/components/icons";
 import { MonoLabel } from "@/components/mono";
 import { Wordmark } from "@/components/wordmark";
@@ -14,12 +15,23 @@ export function Login() {
 
   async function signInWithStrava() {
     setError(null);
+    // The redirect to Strava happens next, so this is the last thing we can
+    // record on our side — an athlete who never comes back shows up as a
+    // sign-in started with no session created after it.
+    trackEvent("auth.sign_in_started", { provider: "strava" });
+
     const { error } = await authClient.signIn.oauth2({
       providerId: "strava",
       callbackURL: `${window.location.origin}/`,
       errorCallbackURL: `${window.location.origin}/login`,
     });
-    if (error) setError(error.message ?? "Sign-in failed");
+    if (error) {
+      trackError("auth.sign_in_failed", error.message ?? "Sign-in failed", {
+        provider: "strava",
+        status: error.status ?? null,
+      });
+      setError(error.message ?? "Sign-in failed");
+    }
   }
 
   return (

@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, ServerSentEventsResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { CoachChatData, CoachChatErrors, CoachChatResponse, CoachChatResponses, CreateCoachThreadData, CreateCoachThreadErrors, CreateCoachThreadResponses, DeleteCoachThreadData, DeleteCoachThreadErrors, DeleteCoachThreadResponses, GetCoachThreadData, GetCoachThreadErrors, GetCoachThreadResponses, GetHealthData, GetHealthResponses, GetRunRenderData, GetRunRenderErrors, GetRunRenderResponses, GetRunsData, GetRunsErrors, GetRunsResponses, GetRunStreamsData, GetRunStreamsErrors, GetRunStreamsResponses, GetStravaAthleteData, GetStravaAthleteErrors, GetStravaAthleteResponses, ListCoachThreadsData, ListCoachThreadsErrors, ListCoachThreadsResponses, StartRunRenderData, StartRunRenderErrors, StartRunRenderResponses, StreamRunRenderProgressData, StreamRunRenderProgressErrors, StreamRunRenderProgressResponse, StreamRunRenderProgressResponses } from './types.gen';
+import type { CoachChatData, CoachChatErrors, CoachChatResponse, CoachChatResponses, CreateCoachThreadData, CreateCoachThreadErrors, CreateCoachThreadResponses, DeleteCoachThreadData, DeleteCoachThreadErrors, DeleteCoachThreadResponses, GetCoachThreadData, GetCoachThreadErrors, GetCoachThreadResponses, GetHealthData, GetHealthResponses, GetRunRenderData, GetRunRenderErrors, GetRunRenderResponses, GetRunsData, GetRunsErrors, GetRunsResponses, GetRunStreamsData, GetRunStreamsErrors, GetRunStreamsResponses, GetStravaAthleteData, GetStravaAthleteErrors, GetStravaAthleteResponses, ListCoachThreadsData, ListCoachThreadsErrors, ListCoachThreadsResponses, PostClientLogsData, PostClientLogsResponses, StartRunRenderData, StartRunRenderErrors, StartRunRenderResponses, StreamRunRenderProgressData, StreamRunRenderProgressErrors, StreamRunRenderProgressResponse, StreamRunRenderProgressResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -189,5 +189,19 @@ export const coachChat = <ThrowOnError extends boolean = false>(options?: Option
     headers: {
         'Content-Type': 'application/json',
         ...options?.headers
+    }
+});
+
+/**
+ * Forward a batch of browser events
+ *
+ * Re-logs events the browser recorded — user actions, failed requests, uncaught errors — through the server logger, so client and server lines share one stream in Loki. Deliberately open to signed-out callers: a crash on the sign-in page is exactly what this is for. The session, when there is one, only adds attribution.
+ */
+export const postClientLogs = <ThrowOnError extends boolean = false>(options: Options<PostClientLogsData, ThrowOnError>): RequestResult<PostClientLogsResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostClientLogsResponses, unknown, ThrowOnError>({
+    url: '/api/logs',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
     }
 });

@@ -213,3 +213,60 @@ export const CoachChatRequestSchema = z
   .openapi("CoachChatRequest");
 
 export type CoachChatRequest = z.infer<typeof CoachChatRequestSchema>;
+
+/**
+ * Values a browser event may carry. Scalars only — the context is meant for a
+ * handful of identifying fields (`activityId`, `status`, …), and keeping it
+ * flat stops a bug in the client from posting a whole React tree into Loki.
+ */
+const ClientLogContextSchema = z
+  .record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()]))
+  .openapi("ClientLogContext", {
+    example: { activityId: 987654321, status: 502 },
+  });
+
+/**
+ * One thing that happened in the browser: a user action, or an error the user
+ * hit. The server re-logs it so client and API lines end up in the same Loki
+ * stream and the same Grafana dashboard.
+ */
+const CLIENT_LOG_LEVELS = ["debug", "info", "warn", "error"] as const;
+
+/** Matches the pino method the server re-logs the event with. */
+export type ClientLogLevel = (typeof CLIENT_LOG_LEVELS)[number];
+
+export const ClientLogEventSchema = z
+  .object({
+    level: z.enum(CLIENT_LOG_LEVELS).openapi({ example: "info" }),
+    /**
+     * A dotted, low-cardinality name — this is what dashboards group by, so
+     * it is constrained rather than free text (ids belong in `context`).
+     */
+    event: z
+      .string()
+      .regex(/^[a-z][a-z0-9_]*(\.[a-z0-9_]+)*$/)
+      .max(48)
+      .openapi({ example: "ui.render_clicked" }),
+    message: z.string().max(500).optional(),
+    /** The route the user was on, e.g. `/runs`. */
+    path: z.string().max(200).optional(),
+    context: ClientLogContextSchema.optional(),
+    /** When it happened in the browser; the server stamps its own time too. */
+    ts: z.iso.datetime().optional(),
+  })
+  .openapi("ClientLogEvent");
+
+export type ClientLogEvent = z.infer<typeof ClientLogEventSchema>;
+
+/** Browser events arrive batched — one request per flush, not per event. */
+export const ClientLogBatchSchema = z
+  .object({
+    events: z.array(ClientLogEventSchema).min(1).max(50),
+  })
+  .openapi("ClientLogBatch");
+
+export const ClientLogAcceptedSchema = z
+  .object({
+    accepted: z.number().int().openapi({ example: 3 }),
+  })
+  .openapi("ClientLogAccepted");

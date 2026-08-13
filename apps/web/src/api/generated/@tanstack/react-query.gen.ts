@@ -3,8 +3,8 @@
 import { type DefaultError, queryOptions, type UseMutationOptions } from '@tanstack/react-query';
 
 import { client } from '../client.gen';
-import { createCoachThread, deleteCoachThread, getCoachThread, getHealth, getRunRender, getRuns, getRunStreams, getStravaAthlete, listCoachThreads, type Options, startRunRender } from '../sdk.gen';
-import type { CreateCoachThreadData, CreateCoachThreadError, CreateCoachThreadResponse, DeleteCoachThreadData, DeleteCoachThreadError, DeleteCoachThreadResponse, GetCoachThreadData, GetCoachThreadError, GetCoachThreadResponse, GetHealthData, GetHealthResponse, GetRunRenderData, GetRunRenderError, GetRunRenderResponse, GetRunsData, GetRunsError, GetRunsResponse, GetRunStreamsData, GetRunStreamsError, GetRunStreamsResponse, GetStravaAthleteData, GetStravaAthleteError, GetStravaAthleteResponse, ListCoachThreadsData, ListCoachThreadsError, ListCoachThreadsResponse, StartRunRenderData, StartRunRenderError, StartRunRenderResponse } from '../types.gen';
+import { createCoachThread, deleteCoachThread, getCoachThread, getHealth, getRunRender, getRuns, getRunStreams, getStravaAthlete, listCoachThreads, type Options, postClientLogs, startRunRender } from '../sdk.gen';
+import type { CreateCoachThreadData, CreateCoachThreadError, CreateCoachThreadResponse, DeleteCoachThreadData, DeleteCoachThreadError, DeleteCoachThreadResponse, GetCoachThreadData, GetCoachThreadError, GetCoachThreadResponse, GetHealthData, GetHealthResponse, GetRunRenderData, GetRunRenderError, GetRunRenderResponse, GetRunsData, GetRunsError, GetRunsResponse, GetRunStreamsData, GetRunStreamsError, GetRunStreamsResponse, GetStravaAthleteData, GetStravaAthleteError, GetStravaAthleteResponse, ListCoachThreadsData, ListCoachThreadsError, ListCoachThreadsResponse, PostClientLogsData, PostClientLogsResponse, StartRunRenderData, StartRunRenderError, StartRunRenderResponse } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
@@ -233,3 +233,22 @@ export const getCoachThreadOptions = (options: Options<GetCoachThreadData>) => q
     },
     queryKey: getCoachThreadQueryKey(options)
 });
+
+/**
+ * Forward a batch of browser events
+ *
+ * Re-logs events the browser recorded — user actions, failed requests, uncaught errors — through the server logger, so client and server lines share one stream in Loki. Deliberately open to signed-out callers: a crash on the sign-in page is exactly what this is for. The session, when there is one, only adds attribution.
+ */
+export const postClientLogsMutation = (options?: Partial<Options<PostClientLogsData>>): UseMutationOptions<PostClientLogsResponse, DefaultError, Options<PostClientLogsData>> => {
+    const mutationOptions: UseMutationOptions<PostClientLogsResponse, DefaultError, Options<PostClientLogsData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await postClientLogs({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
