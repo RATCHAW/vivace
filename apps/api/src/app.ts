@@ -31,6 +31,8 @@ import {
   type CoachThreadDetail,
   ErrorSchema,
   HealthSchema,
+  RunRenderOptionsSchema,
+  type RunRenderOptions,
   RunRenderStateSchema,
   RunSchema,
   RunStreamsSchema,
@@ -471,10 +473,16 @@ const startRunRenderRoute = createRoute({
     "Fetches the run and its streams from Strava, starts a Remotion Lambda " +
     "render of the story video, and persists the render state. The MP4 lands " +
     "in the Remotion S3 bucket. Idempotent while a render is in flight or " +
-    "already done — those return the existing state; a failed render is " +
-    "retried.",
+    "already done with the same options — those return the existing state; a " +
+    "failed render, or one whose options no longer match, is rendered again. " +
+    "The body is optional and defaults to the plain replay.",
   security: [{ sessionCookie: [] }],
-  request: { params: RunIdParamsSchema },
+  request: {
+    params: RunIdParamsSchema,
+    body: {
+      content: { "application/json": { schema: RunRenderOptionsSchema } },
+    },
+  },
   responses: {
     200: {
       description: "The render that is now in flight (or already finished).",
@@ -523,14 +531,19 @@ app.openapi(startRunRenderRoute, async (c) => {
 
   const { id } = c.req.valid("param");
   const activityId = Number(id);
+  // The body is optional, so the validator — and with it the schema's defaults —
+  // is skipped entirely when a caller posts nothing.
+  const options: RunRenderOptions | undefined = c.req.valid("json");
+  const showAvatar = options?.show_avatar ?? false;
 
-  // Don't double-render: an in-flight or finished render is simply returned.
+  // Don't double-render: an in-flight or finished render is simply returned —
+  // unless it was made with different options, which makes it a different video.
   const existing = await getRunRender(session.user.id, activityId);
-  if (existing && existing.status !== "error") {
+  if (existing && existing.status !== "error" && existing.showAvatar === showAvatar) {
     track(
       c,
       "render.reused",
-      { activityId, status: existing.status },
+      { activityId, status: existing.status, showAvatar },
       "Returned the existing render",
     );
     return c.json({ render: toRunRender(existing) }, 200);
@@ -540,21 +553,30 @@ app.openapi(startRunRenderRoute, async (c) => {
   if (!accessToken) return c.json({ error: "No Strava access token" }, 401);
 
   try {
-    const [run, streams] = await Promise.all([
+    const [run, streams, athlete] = await Promise.all([
       fetchRun(accessToken, activityId),
       fetchRunStreams(accessToken, activityId),
+      // Read from Strava rather than taken from the request: the browser does
+      // not get to choose the picture that is baked into the video.
+      showAvatar ? fetchAthlete(accessToken) : null,
     ]);
-    const { renderId, bucketName } = await startLambdaRender(config, run, streams);
+    const { renderId, bucketName } = await startLambdaRender(
+      config,
+      run,
+      streams,
+      athlete?.profile ?? "",
+    );
     const row = await saveStartedRender({
       userId: session.user.id,
       activityId,
       renderId,
       bucketName,
+      showAvatar,
     });
     track(
       c,
       "render.started",
-      { activityId, renderId, bucketName, retry: Boolean(existing) },
+      { activityId, renderId, bucketName, showAvatar, retry: Boolean(existing) },
       "Started a Lambda render",
     );
     return c.json({ render: toRunRender(row) }, 200);

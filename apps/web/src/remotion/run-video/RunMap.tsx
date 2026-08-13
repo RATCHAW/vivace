@@ -5,10 +5,14 @@ import "mapbox-gl/dist/mapbox-gl.css";
 import {
   buildCameraTrack,
   cameraAtProgress,
+  projectPoint,
   ROUTE_PADDING,
+  RUNNER_AVATAR_CLEARANCE,
+  RUNNER_CLEARANCE,
   sampleIndex,
   type LatLng,
 } from "./data";
+import { RunnerAvatar } from "./RunnerAvatar";
 
 // DESIGN.md {colors.primary} — the cobalt stamp, used here as illustration ink.
 const ROUTE_COLOR = "#494fdf";
@@ -31,19 +35,25 @@ const point = (coordinates: [number, number]) =>
 
 /** Deterministic Mapbox plate: the full route sits faint under a cobalt trace
  *  that draws with `progress`, while the camera follows the head of that trace
- *  — see `buildCameraTrack` for how it stays framed. */
+ *  — see `buildCameraTrack` for how it stays framed.
+ *
+ *  `avatarUrl` swaps the dot at that head for the athlete's picture. The puck is
+ *  a DOM layer over the plate rather than a Mapbox symbol: the image never has
+ *  to be decoded into the GL context, and the frame can be held on its load. */
 export function RunMap({
   points,
   progress,
   token,
   width,
   height,
+  avatarUrl,
 }: {
   points: LatLng[];
   progress: number;
   token: string;
   width: number;
   height: number;
+  avatarUrl: string;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const { delayRender, continueRender } = useDelayRender();
@@ -55,10 +65,13 @@ export function RunMap({
 
   const coords = points.map(toLngLat);
   // Pure geometry — the path exists before the first tile does, so the map can
-  // open on the right shot instead of easing into one once the style lands.
+  // open on the right shot instead of easing into one once the style lands. The
+  // avatar is the wider marker, so it is also the wider shot.
+  const clearance = avatarUrl ? RUNNER_AVATAR_CLEARANCE : RUNNER_CLEARANCE;
   const track = useMemo(
-    () => buildCameraTrack(points, { width, height, padding: ROUTE_PADDING }),
-    [points, width, height],
+    () =>
+      buildCameraTrack(points, { width, height, padding: ROUTE_PADDING }, { clearance }),
+    [points, width, height, clearance],
   );
 
   useEffect(() => {
@@ -150,6 +163,17 @@ export function RunMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [continueRender, isRendering, loadingHandle, token]);
 
+  // Its own effect, not a branch in the map builder: the option is toggled from
+  // the player's panel, where the map is already mounted and must stay that way.
+  useEffect(() => {
+    if (!map) return;
+    map.setLayoutProperty(
+      "runner-marker-dot",
+      "visibility",
+      avatarUrl ? "none" : "visible",
+    );
+  }, [map, avatarUrl]);
+
   useEffect(() => {
     if (!map) return;
 
@@ -178,9 +202,21 @@ export function RunMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [continueRender, delayRender, isRendering, map, progress, track]);
 
+  // The camera the frame is being drawn with projects the runner onto the plate
+  // — the same maths `buildCameraTrack` framed the shot with, so the puck lands
+  // exactly where the dot it replaces would have.
+  const camera = avatarUrl ? cameraAtProgress(track, progress) : null;
+  const head = camera
+    ? projectPoint(points[sampleIndex(points.length, progress)], camera, {
+        width,
+        height,
+      })
+    : null;
+
   return (
     <AbsoluteFill>
       <div ref={containerRef} style={{ width, height, position: "absolute" }} />
+      {head && <RunnerAvatar src={avatarUrl} x={head[0]} y={head[1]} />}
     </AbsoluteFill>
   );
 }

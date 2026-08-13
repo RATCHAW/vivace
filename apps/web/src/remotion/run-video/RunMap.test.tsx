@@ -11,6 +11,7 @@ const { instances, FakeMap } = vi.hoisted(() => {
     handlers: Record<string, Array<() => void>> = {};
     onceHandlers: Record<string, Array<() => void>> = {};
     sources: Record<string, { data: unknown }> = {};
+    layout: Record<string, Record<string, unknown>> = {};
     cameras: Array<{ center: [number, number]; zoom: number }> = [];
     removed = false;
 
@@ -49,6 +50,10 @@ const { instances, FakeMap } = vi.hoisted(() => {
       };
     }
 
+    setLayoutProperty(layer: string, key: string, value: unknown) {
+      (this.layout[layer] ??= {})[key] = value;
+    }
+
     jumpTo(camera: { center: [number, number]; zoom: number }) {
       this.cameras.push(camera);
     }
@@ -69,6 +74,7 @@ const {
   MAX_CAMERA_ZOOM,
   projectPoint,
   ROUTE_PADDING,
+  RUNNER_AVATAR_CLEARANCE,
   RUNNER_CLEARANCE,
   sampleIndex,
 } = await import("./data");
@@ -76,6 +82,7 @@ const { RunMap } = await import("./RunMap");
 
 const WIDTH = 1080;
 const HEIGHT = 1920;
+const AVATAR = "https://dgalywyr863hv.cloudfront.net/pictures/athletes/1/large.jpg";
 
 // A short route that turns, so following it is not the same as pointing at it.
 const POINTS = [
@@ -87,11 +94,42 @@ const POINTS = [
 
 const live = () => instances.filter((map) => !map.removed);
 
-const mapAt = (progress: number) => (
-  <RunMap points={POINTS} progress={progress} token="pk.test" width={WIDTH} height={HEIGHT} />
+const mapAt = (progress: number, avatarUrl = "") => (
+  <RunMap
+    points={POINTS}
+    progress={progress}
+    token="pk.test"
+    width={WIDTH}
+    height={HEIGHT}
+    avatarUrl={avatarUrl}
+  />
 );
 
 const strict = (node: ReactElement) => <StrictMode>{node}</StrictMode>;
+
+/** The progresses at which the head of the trace lands outside the safe box,
+ *  once the marker riding it is given the clearance its size demands. */
+function strandedFrames(
+  rerender: (node: ReactElement) => void,
+  map: InstanceType<typeof FakeMap>,
+  avatarUrl: string,
+  clearance: number,
+): number[] {
+  return [0.25, 0.5, 0.75, 1].filter((progress) => {
+    act(() => {
+      rerender(strict(mapAt(progress, avatarUrl)));
+    });
+    const camera = map.cameras[map.cameras.length - 1];
+    const runner = POINTS[sampleIndex(POINTS.length, progress)];
+    const [x, y] = projectPoint(runner, camera, { width: WIDTH, height: HEIGHT });
+    return (
+      x < ROUTE_PADDING.left + clearance - 1 ||
+      x > WIDTH - ROUTE_PADDING.right - clearance + 1 ||
+      y < ROUTE_PADDING.top + clearance - 1 ||
+      y > HEIGHT - ROUTE_PADDING.bottom - clearance + 1
+    );
+  });
+}
 
 /** Walk a freshly-constructed map through style load and first paint. */
 function settle(map: InstanceType<typeof FakeMap>) {
@@ -153,24 +191,37 @@ describe("RunMap in the Player", () => {
     // The opening shot is the tightest one, on the start line.
     expect(map.cameras[0].zoom).toBe(MAX_CAMERA_ZOOM);
 
-    const stranded = [0.25, 0.5, 0.75, 1].filter((progress) => {
-      act(() => {
-        rerender(strict(mapAt(progress)));
-      });
-      const camera = map.cameras[map.cameras.length - 1];
-      const runner = POINTS[sampleIndex(POINTS.length, progress)];
-      const [x, y] = projectPoint(runner, camera, { width: WIDTH, height: HEIGHT });
-      return (
-        x < ROUTE_PADDING.left + RUNNER_CLEARANCE - 1 ||
-        x > WIDTH - ROUTE_PADDING.right - RUNNER_CLEARANCE + 1 ||
-        y < ROUTE_PADDING.top + RUNNER_CLEARANCE - 1 ||
-        y > HEIGHT - ROUTE_PADDING.bottom - RUNNER_CLEARANCE + 1
-      );
-    });
-
     // The old camera ran a straight line from the start point to the whole
     // route's fit, so a route that turned left the dot outside the frame.
-    expect(stranded).toEqual([]);
+    expect(strandedFrames(rerender, map, "", RUNNER_CLEARANCE)).toEqual([]);
+  });
+
+  it("swaps the dot for the athlete's avatar and widens the shot to hold it", () => {
+    const { container, rerender } = render(strict(mapAt(0, AVATAR)));
+    const [map] = live();
+    settle(map);
+
+    act(() => {
+      rerender(strict(mapAt(0.5, AVATAR)));
+    });
+
+    // Two runners on one map: the Mapbox dot goes out as the puck comes in.
+    expect(map.layout["runner-marker-dot"]).toMatchObject({ visibility: "none" });
+
+    // The puck is a DOM layer, so it has to be projected onto the plate with
+    // the same camera Mapbox was just jumped to — otherwise it drifts off the
+    // head of the trace it is supposed to be leading.
+    const camera = map.cameras[map.cameras.length - 1];
+    const runner = POINTS[sampleIndex(POINTS.length, 0.5)];
+    const [x, y] = projectPoint(runner, camera, { width: WIDTH, height: HEIGHT });
+    const avatar = container.querySelector("img");
+    expect(avatar?.src).toBe(AVATAR);
+    expect(Math.round(parseFloat(avatar?.style.left ?? "NaN"))).toBe(Math.round(x));
+    expect(Math.round(parseFloat(avatar?.style.top ?? "NaN"))).toBe(Math.round(y));
+
+    // A puck framed like a dot would have the athlete's face cropped by the
+    // edge of the frame, so the camera owes it a wider berth.
+    expect(strandedFrames(rerender, map, AVATAR, RUNNER_AVATAR_CLEARANCE)).toEqual([]);
   });
 
   it("does not gate playback on the map going idle", () => {

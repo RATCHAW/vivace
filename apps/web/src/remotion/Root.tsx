@@ -34,7 +34,12 @@ export function RemotionRoot() {
       fps={FPS}
       width={VIDEO_WIDTH}
       height={VIDEO_HEIGHT}
-      defaultProps={{ activity: placeholderRun, streams: {}, mapboxToken: "" }}
+      defaultProps={{
+        activity: placeholderRun,
+        streams: {},
+        mapboxToken: "",
+        avatarUrl: "",
+      }}
     />
   );
 }

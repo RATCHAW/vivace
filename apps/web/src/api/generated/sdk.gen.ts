@@ -86,7 +86,7 @@ export const getRunRender = <ThrowOnError extends boolean = false>(options: Opti
 /**
  * Render this run's video on Remotion Lambda
  *
- * Fetches the run and its streams from Strava, starts a Remotion Lambda render of the story video, and persists the render state. The MP4 lands in the Remotion S3 bucket. Idempotent while a render is in flight or already done — those return the existing state; a failed render is retried.
+ * Fetches the run and its streams from Strava, starts a Remotion Lambda render of the story video, and persists the render state. The MP4 lands in the Remotion S3 bucket. Idempotent while a render is in flight or already done with the same options — those return the existing state; a failed render, or one whose options no longer match, is rendered again. The body is optional and defaults to the plain replay.
  */
 export const startRunRender = <ThrowOnError extends boolean = false>(options: Options<StartRunRenderData, ThrowOnError>): RequestResult<StartRunRenderResponses, StartRunRenderErrors, ThrowOnError> => (options.client ?? client).post<StartRunRenderResponses, StartRunRenderErrors, ThrowOnError>({
     security: [{
@@ -95,7 +95,11 @@ export const startRunRender = <ThrowOnError extends boolean = false>(options: Op
             type: 'apiKey'
         }],
     url: '/api/runs/{id}/render',
-    ...options
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
 });
 
 /**

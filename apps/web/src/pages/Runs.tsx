@@ -3,10 +3,17 @@ import { Link, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeftIcon, Loader2Icon } from "lucide-react";
 // Fully typed off the API's OpenAPI document — see apps/web/src/api.
-import { getRunsOptions, getRunStreamsOptions, type Run } from "@/api";
+import {
+  getRunsOptions,
+  getRunStreamsOptions,
+  getStravaAthleteOptions,
+  type Run,
+} from "@/api";
 import { AppHeader } from "@/components/app-header";
 import { MonoLabel, SoonBadge } from "@/components/mono";
 import { RunPlayer } from "@/components/run-player";
+import { VideoOptions } from "@/components/video-options";
+import { trackEvent } from "@/lib/logger";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -14,7 +21,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 // The theme toggle that used to sit here now lives in AppHeader.
 import { RenderControls } from "@/components/render-controls";
 import { cn } from "@/lib/utils";
-import { formatClock, formatPace } from "@/remotion/run-video/data";
+import { avatarSource, formatClock, formatPace } from "@/remotion/run-video/data";
 
 // Empty until the Mapbox token is provided; the video falls back to a plain
 // route canvas in the meantime.
@@ -42,8 +49,13 @@ export function Runs() {
   // Overview's "Replay →" rows and the player's Share button both point here.
   const [params, setParams] = useSearchParams();
   const [expanded, setExpanded] = useState(false);
+  // A cut of the film, not a property of the run — it outlives selecting
+  // another one, and both the player and the render request read it.
+  const [showAvatar, setShowAvatar] = useState(false);
 
   const { data: runs, error: runsError } = useQuery(getRunsOptions());
+  const { data: athlete, error: athleteError } = useQuery(getStravaAthleteOptions());
+  const avatarUrl = avatarSource(athlete?.profile);
   const requested = Number(params.get("run"));
   const selected =
     runs?.find((run) => run.id === requested) ?? runs?.[0] ?? null;
@@ -192,14 +204,40 @@ export function Runs() {
                   activity={selected}
                   streams={streams ?? {}}
                   mapboxToken={MAPBOX_TOKEN}
+                  avatarUrl={showAvatar ? avatarUrl : ""}
                   expanded={expanded}
                   onToggleExpanded={() => setExpanded((open) => !open)}
                 />
               )}
 
+              {selected && (
+                <VideoOptions
+                  avatarUrl={avatarUrl}
+                  name={athlete?.firstname ?? ""}
+                  pending={athlete === undefined && athleteError == null}
+                  failed={athleteError != null}
+                  showAvatar={showAvatar}
+                  onShowAvatarChange={(next) => {
+                    setShowAvatar(next);
+                    // Which options athletes actually want is a product
+                    // question, and this switch decides what gets rendered.
+                    trackEvent("ui.video_option_changed", {
+                      option: "show_avatar",
+                      value: next,
+                    });
+                  }}
+                />
+              )}
+
               {/* Rendering happens on Lambda from the API's copy of the run, so
                   it stands even when the browser could not load the streams. */}
-              {selected && <RenderControls key={selected.id} run={selected} />}
+              {selected && (
+                <RenderControls
+                  key={selected.id}
+                  run={selected}
+                  showAvatar={showAvatar}
+                />
+              )}
 
               {!MAPBOX_TOKEN && (
                 <p className="text-caption text-stone mt-4">

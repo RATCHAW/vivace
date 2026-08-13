@@ -312,6 +312,9 @@
             ],
             "example": "rendering"
           },
+          "show_avatar": {
+            "type": "boolean"
+          },
           "progress": {
             "type": "number",
             "minimum": 0,
@@ -343,12 +346,23 @@
         "required": [
           "activity_id",
           "status",
+          "show_avatar",
           "progress",
           "output_url",
           "error",
           "created_at",
           "updated_at"
         ]
+      },
+      "RunRenderOptions": {
+        "type": "object",
+        "properties": {
+          "show_avatar": {
+            "type": "boolean",
+            "default": false,
+            "example": true
+          }
+        }
       },
       "CoachThread": {
         "type": "object",
@@ -807,7 +821,7 @@
           "Runs"
         ],
         "summary": "Render this run's video on Remotion Lambda",
-        "description": "Fetches the run and its streams from Strava, starts a Remotion Lambda render of the story video, and persists the render state. The MP4 lands in the Remotion S3 bucket. Idempotent while a render is in flight or already done — those return the existing state; a failed render is retried.",
+        "description": "Fetches the run and its streams from Strava, starts a Remotion Lambda render of the story video, and persists the render state. The MP4 lands in the Remotion S3 bucket. Idempotent while a render is in flight or already done with the same options — those return the existing state; a failed render, or one whose options no longer match, is rendered again. The body is optional and defaults to the plain replay.",
         "security": [
           {
             "sessionCookie": []
@@ -825,6 +839,15 @@
             "in": "path"
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RunRenderOptions"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "The render that is now in flight (or already finished).",

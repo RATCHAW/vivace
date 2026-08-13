@@ -82,6 +82,26 @@ describe("api", () => {
       const res = await app.request(path, { method });
       expect(res.status, `${method} ${path}`).toBe(401);
     }
+
+    // The video options are an optional body, so a caller that sends one is
+    // still turned away by the session check and not by the validator.
+    const withOptions = await app.request("/api/runs/123/render", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ show_avatar: true }),
+    });
+    expect(withOptions.status).toBe(401);
+  });
+
+  it("rejects render options that aren't the options", async () => {
+    const res = await app.request("/api/runs/123/render", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ show_avatar: "yes" }),
+    });
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "Invalid request" });
   });
 
   it("rejects the coach endpoints without a session", async () => {
