@@ -3,8 +3,8 @@
 import { type DefaultError, queryOptions, type UseMutationOptions } from '@tanstack/react-query';
 
 import { client } from '../client.gen';
-import { createCoachThread, deleteCoachThread, getCoachThread, getHealth, getRunRender, getRuns, getRunStreams, getStravaAthlete, listCoachThreads, type Options, postClientLogs, startRunRender } from '../sdk.gen';
-import type { CreateCoachThreadData, CreateCoachThreadError, CreateCoachThreadResponse, DeleteCoachThreadData, DeleteCoachThreadError, DeleteCoachThreadResponse, GetCoachThreadData, GetCoachThreadError, GetCoachThreadResponse, GetHealthData, GetHealthResponse, GetRunRenderData, GetRunRenderError, GetRunRenderResponse, GetRunsData, GetRunsError, GetRunsResponse, GetRunStreamsData, GetRunStreamsError, GetRunStreamsResponse, GetStravaAthleteData, GetStravaAthleteError, GetStravaAthleteResponse, ListCoachThreadsData, ListCoachThreadsError, ListCoachThreadsResponse, PostClientLogsData, PostClientLogsResponse, StartRunRenderData, StartRunRenderError, StartRunRenderResponse } from '../types.gen';
+import { acceptCoachPlan, createCoachThread, deleteCoachThread, getCoachBriefing, getCoachThread, getHealth, getRunRender, getRuns, getRunStreams, getStravaAthlete, listCoachThreads, type Options, postClientLogs, receiveStravaWebhook, startRunRender, updateCoachContext, validateStravaWebhook } from '../sdk.gen';
+import type { AcceptCoachPlanData, AcceptCoachPlanError, AcceptCoachPlanResponse, CreateCoachThreadData, CreateCoachThreadError, CreateCoachThreadResponse, DeleteCoachThreadData, DeleteCoachThreadError, DeleteCoachThreadResponse, GetCoachBriefingData, GetCoachBriefingError, GetCoachBriefingResponse, GetCoachThreadData, GetCoachThreadError, GetCoachThreadResponse, GetHealthData, GetHealthResponse, GetRunRenderData, GetRunRenderError, GetRunRenderResponse, GetRunsData, GetRunsError, GetRunsResponse, GetRunStreamsData, GetRunStreamsError, GetRunStreamsResponse, GetStravaAthleteData, GetStravaAthleteError, GetStravaAthleteResponse, ListCoachThreadsData, ListCoachThreadsError, ListCoachThreadsResponse, PostClientLogsData, PostClientLogsResponse, ReceiveStravaWebhookData, ReceiveStravaWebhookResponse, StartRunRenderData, StartRunRenderError, StartRunRenderResponse, UpdateCoachContextData, UpdateCoachContextError, UpdateCoachContextResponse, ValidateStravaWebhookData, ValidateStravaWebhookError, ValidateStravaWebhookResponse } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
@@ -233,6 +233,103 @@ export const getCoachThreadOptions = (options: Options<GetCoachThreadData>) => q
     },
     queryKey: getCoachThreadQueryKey(options)
 });
+
+export const getCoachBriefingQueryKey = (options?: Options<GetCoachBriefingData>) => createQueryKey('getCoachBriefing', options);
+
+/**
+ * The coach's read on the athlete, before they ask anything
+ *
+ * Everything the Coach screen's rails show: the goal race the coach remembers, this week's accepted plan measured against what was actually run, the measured training signals (load ratio, easy-run intensity, aerobic decoupling, shoe mileage) and the queue of things worth asking about. Signals that cannot be computed from the athlete's data are omitted rather than returned empty.
+ */
+export const getCoachBriefingOptions = (options?: Options<GetCoachBriefingData>) => queryOptions<GetCoachBriefingResponse, GetCoachBriefingError, GetCoachBriefingResponse, ReturnType<typeof getCoachBriefingQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getCoachBriefing({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getCoachBriefingQueryKey(options)
+});
+
+/**
+ * Change what the coach remembers between threads
+ *
+ * Merges into the stored context. An omitted field is left alone; a field sent as null is cleared — that is the difference between changing the target time and dropping the race. The coach writes here too, through its setAthleteContext tool.
+ */
+export const updateCoachContextMutation = (options?: Partial<Options<UpdateCoachContextData>>): UseMutationOptions<UpdateCoachContextResponse, UpdateCoachContextError, Options<UpdateCoachContextData>> => {
+    const mutationOptions: UseMutationOptions<UpdateCoachContextResponse, UpdateCoachContextError, Options<UpdateCoachContextData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await updateCoachContext({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+/**
+ * Accept a week the coach proposed
+ *
+ * Stores the seven sessions as the athlete's week and returns them measured against what they have already run. Accepting again for the same week replaces it, which is what a revision is.
+ */
+export const acceptCoachPlanMutation = (options?: Partial<Options<AcceptCoachPlanData>>): UseMutationOptions<AcceptCoachPlanResponse, AcceptCoachPlanError, Options<AcceptCoachPlanData>> => {
+    const mutationOptions: UseMutationOptions<AcceptCoachPlanResponse, AcceptCoachPlanError, Options<AcceptCoachPlanData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await acceptCoachPlan({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const validateStravaWebhookQueryKey = (options: Options<ValidateStravaWebhookData>) => createQueryKey('validateStravaWebhook', options);
+
+/**
+ * Answer Strava's subscription challenge
+ *
+ * Strava calls this while `POST /push_subscriptions` is in flight and expects `{ "hub.challenge": … }` back within two seconds. The challenge is only echoed when `hub.verify_token` matches the server's STRAVA_WEBHOOK_VERIFY_TOKEN, so somebody else's subscription cannot point at this callback.
+ */
+export const validateStravaWebhookOptions = (options: Options<ValidateStravaWebhookData>) => queryOptions<ValidateStravaWebhookResponse, ValidateStravaWebhookError, ValidateStravaWebhookResponse, ReturnType<typeof validateStravaWebhookQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await validateStravaWebhook({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: validateStravaWebhookQueryKey(options)
+});
+
+/**
+ * Receive a Strava activity or athlete event
+ *
+ * Acknowledged immediately and processed afterwards: Strava requires a 200 within two seconds and retries up to three times otherwise, which is far less time than reading an activity and writing a debrief takes. A new run becomes a post-run debrief in the athlete's "Post-run debriefs" thread; everything else is recorded and ignored.
+ */
+export const receiveStravaWebhookMutation = (options?: Partial<Options<ReceiveStravaWebhookData>>): UseMutationOptions<ReceiveStravaWebhookResponse, DefaultError, Options<ReceiveStravaWebhookData>> => {
+    const mutationOptions: UseMutationOptions<ReceiveStravaWebhookResponse, DefaultError, Options<ReceiveStravaWebhookData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await receiveStravaWebhook({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
 
 /**
  * Forward a batch of browser events

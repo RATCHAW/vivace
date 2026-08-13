@@ -4,6 +4,7 @@ import {
   getActivityStreams,
   getLoggedInAthlete,
   getLoggedInAthleteActivities,
+  type DetailedActivity,
   type DetailedAthlete,
   type StreamSet,
   type SummaryActivity,
@@ -69,6 +70,19 @@ export async function fetchAthlete(accessToken: string): Promise<Athlete> {
  */
 type StravaActivityResponse = SummaryActivity & {
   average_heartrate?: number;
+  max_heartrate?: number;
+};
+
+/**
+ * `workout_type` is a plain integer in Strava's payload with no enum behind it.
+ * These four are the run values; a ride uses the same field for its own set,
+ * which is why the mapping is keyed off run activities only.
+ */
+const WORKOUT_TYPES: Record<number, Run["workout_type"]> = {
+  0: "default",
+  1: "race",
+  2: "long_run",
+  3: "workout",
 };
 
 /** Maps a Strava activity onto our own run contract. */
@@ -83,6 +97,13 @@ function toRun(activity: StravaActivityResponse): Run {
     start_date_local: activity.start_date_local ?? new Date().toISOString(),
     average_speed: activity.average_speed ?? 0,
     average_heartrate: activity.average_heartrate ?? null,
+    max_heartrate: activity.max_heartrate ?? null,
+    // Undefined means "the athlete never tagged it", which is what `default`
+    // says too — but an unknown integer must not become a confident label.
+    workout_type:
+      activity.workout_type == null
+        ? "default"
+        : (WORKOUT_TYPES[activity.workout_type] ?? "default"),
   };
 }
 
@@ -154,4 +175,146 @@ export async function fetchRunStreams(
   }
 
   return toRunStreams(data);
+}
+
+/**
+ * One of Strava's own best efforts on a run — it computes the fastest 400 m,
+ * 1 k, mile, 5 k, 10 k, half and marathon inside every activity, which is a PR
+ * table we would otherwise have to derive from streams ourselves.
+ */
+export interface BestEffort {
+  /** Strava's label: "5k", "10k", "Half-Marathon", … */
+  name: string;
+  /** Metres. */
+  distance: number;
+  /** Seconds. */
+  elapsed_time: number;
+  /** 1 when this effort is the athlete's all-time best at the distance. */
+  pr_rank: number | null;
+  activity_id: number;
+  /** The date of the run the effort was set on, `YYYY-MM-DD`. */
+  date: string;
+}
+
+/** A run with the fields only `GET /activities/{id}` returns. */
+export interface RunDetail {
+  run: Run;
+  /** Google-encoded route, for a thumbnail. Null on treadmill runs. */
+  polyline: string | null;
+  calories: number | null;
+  device_name: string | null;
+  /** Ties the run to a pair of shoes; resolve the name with `fetchShoes`. */
+  gear_id: string | null;
+  best_efforts: BestEffort[];
+}
+
+type StravaDetailResponse = DetailedActivity & {
+  average_heartrate?: number;
+  max_heartrate?: number;
+};
+
+/**
+ * Detail calls are per-activity, and Strava's budget is ~100 requests per 15
+ * minutes for the whole app. A race prediction reads several runs at once and
+ * the athlete will ask for it more than once an hour, so answers are held for
+ * the length of a rate-limit window. Activity ids are globally unique, so one
+ * athlete can never read another's row out of here.
+ */
+const DETAIL_TTL_MS = 15 * 60 * 1000;
+const DETAIL_CACHE_MAX = 500;
+const detailCache = new Map<number, { at: number; detail: RunDetail }>();
+
+function cachedDetail(id: number): RunDetail | null {
+  const hit = detailCache.get(id);
+  if (!hit) return null;
+  if (Date.now() - hit.at > DETAIL_TTL_MS) {
+    detailCache.delete(id);
+    return null;
+  }
+  return hit.detail;
+}
+
+function cacheDetail(id: number, detail: RunDetail): void {
+  // Insertion-ordered, so the oldest key is the first one out.
+  if (detailCache.size >= DETAIL_CACHE_MAX) {
+    const oldest = detailCache.keys().next().value;
+    if (oldest !== undefined) detailCache.delete(oldest);
+  }
+  detailCache.set(id, { at: Date.now(), detail });
+}
+
+/** `GET /activities/{id}` with the fields the summary list leaves out. */
+export async function fetchRunDetail(
+  accessToken: string,
+  id: number,
+): Promise<RunDetail> {
+  const cached = cachedDetail(id);
+  if (cached) return cached;
+
+  const { data, response } = await getActivityById({
+    client: createStravaClient(accessToken),
+    path: { id },
+  });
+
+  if (!data) throw new StravaApiError(response?.status ?? 502);
+
+  const activity = data as StravaDetailResponse;
+  const detail: RunDetail = {
+    run: toRun(activity),
+    polyline: activity.map?.summary_polyline || null,
+    calories: activity.calories ?? null,
+    device_name: activity.device_name ?? null,
+    gear_id: activity.gear_id ?? null,
+    best_efforts: (activity.best_efforts ?? [])
+      .filter((effort) => effort.name && effort.elapsed_time)
+      .map((effort) => ({
+        name: effort.name ?? "",
+        distance: effort.distance ?? 0,
+        elapsed_time: effort.elapsed_time ?? 0,
+        pr_rank: effort.pr_rank ?? null,
+        activity_id: activity.id ?? id,
+        date: (
+          activity.start_date_local ??
+          effort.start_date_local ??
+          ""
+        ).slice(0, 10),
+      })),
+  };
+
+  cacheDetail(id, detail);
+  return detail;
+}
+
+/** A pair of shoes and the distance logged on them. */
+export interface Shoe {
+  id: string;
+  name: string;
+  /** Metres. */
+  distance: number;
+  primary: boolean;
+}
+
+/**
+ * The athlete's shoes, or an empty list.
+ *
+ * Gear only comes back on `GET /athlete` when the token carries
+ * `profile:read_all`; ours asks for `read,activity:read` (see auth.ts), so this
+ * is empty for every athlete until that scope is added. Absence is a normal
+ * answer here rather than an error — the shoe signal simply doesn't appear.
+ */
+export async function fetchShoes(accessToken: string): Promise<Shoe[]> {
+  const { data, response } = await getLoggedInAthlete({
+    client: createStravaClient(accessToken),
+  });
+
+  if (!data) throw new StravaApiError(response?.status ?? 502);
+
+  return (data.shoes ?? [])
+    .filter((shoe) => shoe.id)
+    .map((shoe) => ({
+      id: shoe.id ?? "",
+      name: shoe.name ?? "Shoes",
+      distance: shoe.distance ?? 0,
+      primary: shoe.primary ?? false,
+    }));
 }

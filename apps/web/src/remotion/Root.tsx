@@ -23,6 +23,8 @@ const placeholderRun: Run = {
   start_date_local: "2026-08-09T07:12:00Z",
   average_speed: 2.91,
   average_heartrate: 152,
+  max_heartrate: 171,
+  workout_type: "default",
 };
 
 export function RemotionRoot() {

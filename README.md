@@ -66,6 +66,14 @@ The landing page runs alongside on <http://localhost:3001>.
 4. `GET /api/me/strava` reads your session, gets the stored Strava access token
    (auto-refreshing it when expired), and proxies the athlete profile.
 
+Scopes are `read,activity:read_all,profile:read_all` (`apps/api/src/auth.ts`).
+`activity:read_all` because a run marked "Only You" is still a run, and a coach
+that can't see it reports the wrong weekly volume; `profile:read_all` because
+that is what puts gear — and so shoe mileage — on `GET /athlete`. Widening the
+list doesn't invalidate anything, but an athlete who authorised an older set
+keeps their old token until they sign out and back in, so every caller degrades
+rather than failing.
+
 In dev, Vite proxies `/api` → `http://localhost:3000`, so the browser only ever talks
 to one origin.
 
@@ -191,16 +199,25 @@ state. The MP4 lands in the Remotion S3 bucket with a public download URL.
 
 `/coach` is a real chat, streamed end to end with the
 [AI SDK](https://ai-sdk.dev): `useChat` in the browser, `streamText` in Hono,
-Gemini 2.5 Flash in between. It is not a general-purpose assistant — it has four
-tools that read the signed-in athlete's Strava history, and the UI shows each
-one as it runs:
+Gemini 2.5 Flash in between. It is not a general-purpose assistant — it has nine
+tools that read the signed-in athlete's Strava history, and five of them return a
+card the browser draws rather than a paragraph:
 
-| Tool | What it reads |
-| --- | --- |
-| `getAthleteProfile` | Name, location, weight |
-| `listRuns` | Recent runs: distance, duration, pace, heart rate, elevation |
-| `summariseTraining` | Weekly volume, Monday-start, for the last *n* weeks |
-| `getRunSplits` | One run, kilometre by kilometre, with heart rate |
+| Tool | What it reads | Draws |
+| --- | --- | --- |
+| `getAthleteProfile` | Name, location, weight | |
+| `getAthleteContext` / `setAthleteContext` | Goal race, target time, long-run day, injuries — remembered across every thread | |
+| `listRuns` | Recent runs: distance, duration, pace, heart rate, elevation, how the run was tagged | |
+| `getRunDebrief` | One run's numbers and its route | Run card |
+| `getRunSplits` | One run kilometre by kilometre, with heart rate and Pa:HR decoupling | Splits chart |
+| `summariseTraining` | Weekly volume with the ramp against each previous week, plus the 7:28 day load ratio | Volume chart |
+| `getTrainingSignals` | Load ratio, easy-run zone mix, decoupling, shoe mileage | |
+| `predictRaces` | Strava's own best efforts inside the fastest recent runs, extrapolated with Riegel | Prediction table |
+| `proposeWeek` | — the coach writes seven days | Week plan, with Accept |
+
+The maths behind all of it is pure and unit-tested in `apps/api/src/training.ts`;
+`apps/api/src/briefing.ts` turns it into the two rails on `/coach`, so a number
+in the rail and the same number in an answer are the same object.
 
 Setup is one key (without it `/coach` loads and every message returns a 503;
 the rest of the app is unaffected):
@@ -231,6 +248,43 @@ How it flows, and why it looks like this:
 - **Reasoning is on.** Gemini streams its thinking (`includeThoughts`), which the
   UI collapses above each answer.
 - Attachments (images and PDFs, ≤8 MB) ride along as `UIMessage` file parts.
+- **A run can be attached to a question.** The composer's `@` picker puts the run
+  on the message's `metadata`, which reaches the model as a line in the system
+  prompt — so "why did I fade?" names a session instead of being guessed at.
+
+### Post-run debriefs (Strava webhooks)
+
+With a [push subscription](https://developers.strava.com/docs/webhooks/), a
+finished run becomes a debrief in the athlete's "Post-run debriefs" thread
+without anyone asking:
+
+```sh
+# 1. Any random string, in apps/api/.env — the API echoes Strava's challenge
+#    only when it matches.
+STRAVA_WEBHOOK_VERIFY_TOKEN=$(openssl rand -hex 16)
+
+# 2. With the API publicly reachable (in development, a tunnel:
+#    cloudflared tunnel --url http://localhost:3000)
+pnpm --filter @repo/api webhook subscribe https://<host>/api/strava/webhook
+pnpm --filter @repo/api webhook view
+pnpm --filter @repo/api webhook delete <id>
+```
+
+Strava allows one subscription per application, and gives the callback two
+seconds to answer — both the validation handshake and every event. So
+`POST /api/strava/webhook` acknowledges first and works afterwards, guarded
+twice: `strava_webhook_event` absorbs Strava's three retries of an identical
+event, and `coach_debrief` makes sure a run is never debriefed twice even if a
+redelivery arrives long after those rows are pruned.
+
+The card in an automatic debrief is a **`data-` part, not a tool part** — nothing
+called a tool, and a function call at the head of a thread with no question in
+front of it makes the athlete's *next* message fail. `convertToModelMessages`
+drops data parts, so the card stays UI and the written read is what the model
+sees. There is a test pinning that (`debrief.test.ts`).
+
+Unset the verify token and the callback refuses to validate; nothing else in the
+app changes.
 
 ## UI
 

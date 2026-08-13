@@ -9,6 +9,7 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "openapi:emit": "tsx scripts/emit-openapi.ts",
+    "webhook": "tsx scripts/strava-webhook.ts",
     "auth:migrate": "better-auth migrate --config src/auth.ts -y"
   },
   "dependencies": {

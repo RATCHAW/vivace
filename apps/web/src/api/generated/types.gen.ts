@@ -41,6 +41,8 @@ export type Run = {
     start_date_local: string;
     average_speed: number;
     average_heartrate: number | null;
+    max_heartrate: number | null;
+    workout_type: 'default' | 'race' | 'long_run' | 'workout';
 };
 
 export type RunStreams = {
@@ -94,6 +96,91 @@ export type CoachMessage = {
         type: string;
         [key: string]: unknown;
     }>;
+    metadata?: CoachMessageMetadata;
+};
+
+export type CoachMessageMetadata = {
+    run?: {
+        id: number;
+        name: string;
+        date: string;
+    };
+} | null;
+
+export type CoachBriefing = {
+    context: CoachContext;
+    plan: PlanProgress;
+    signals: Array<CoachSignal>;
+    queue: Array<CoachQueueItem>;
+};
+
+export type CoachContext = {
+    race_name: string | null;
+    race_date: string | null;
+    race_distance_m: number | null;
+    target_seconds: number | null;
+    long_run_day: number | null;
+    notes: string | null;
+    updated_at: string | null;
+};
+
+export type PlanProgress = {
+    week_starting: string;
+    label: string | null;
+    planned_km: number;
+    actual_km: number;
+    remaining: number;
+    days: Array<{
+        day: number;
+        type: string;
+        planned_km: number;
+        actual_km: number;
+        run_ids: Array<number>;
+    }>;
+} | null;
+
+export type CoachSignal = {
+    id: string;
+    label: string;
+    value: string;
+    note: string;
+    tone: CoachTone;
+    question: string;
+};
+
+export type CoachTone = 'neutral' | 'warn' | 'alert';
+
+export type CoachQueueItem = {
+    id: string;
+    title: string;
+    when: string;
+    tone: CoachTone;
+    question: string;
+    run_id: number | null;
+    thread_id: string | null;
+};
+
+export type CoachContextPatch = {
+    race_name?: string | null;
+    race_date?: string | null;
+    race_distance_m?: number | null;
+    target_seconds?: number | null;
+    long_run_day?: number | null;
+    notes?: string | null;
+};
+
+export type CoachPlan = {
+    week_starting: string;
+    label: string | null;
+    sessions: Array<PlannedSession>;
+};
+
+export type PlannedSession = {
+    day: number;
+    type: string;
+    km: number;
+    pace: string;
+    key: boolean;
 };
 
 export type CoachChatRequest = {
@@ -101,6 +188,19 @@ export type CoachChatRequest = {
     trigger?: 'submit-message' | 'regenerate-message';
     message?: CoachMessage;
     message_id?: string;
+    range_weeks?: number;
+};
+
+export type StravaEvent = {
+    object_type: 'activity' | 'athlete';
+    object_id: number;
+    aspect_type: 'create' | 'update' | 'delete';
+    updates?: {
+        [key: string]: string | boolean;
+    };
+    owner_id: number;
+    subscription_id: number;
+    event_time: number;
 };
 
 export type ClientLogAccepted = {
@@ -446,6 +546,97 @@ export type GetCoachThreadResponses = {
 
 export type GetCoachThreadResponse = GetCoachThreadResponses[keyof GetCoachThreadResponses];
 
+export type GetCoachBriefingData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/coach/briefing';
+};
+
+export type GetCoachBriefingErrors = {
+    /**
+     * No valid session.
+     */
+    401: ApiError;
+    /**
+     * The stored Strava token lacks the activity:read scope; sign out and back in.
+     */
+    403: ApiError;
+    /**
+     * Strava rejected or failed the upstream request.
+     */
+    502: ApiError;
+};
+
+export type GetCoachBriefingError = GetCoachBriefingErrors[keyof GetCoachBriefingErrors];
+
+export type GetCoachBriefingResponses = {
+    /**
+     * The athlete's briefing.
+     */
+    200: CoachBriefing;
+};
+
+export type GetCoachBriefingResponse = GetCoachBriefingResponses[keyof GetCoachBriefingResponses];
+
+export type UpdateCoachContextData = {
+    body: CoachContextPatch;
+    path?: never;
+    query?: never;
+    url: '/api/coach/context';
+};
+
+export type UpdateCoachContextErrors = {
+    /**
+     * No valid session.
+     */
+    401: ApiError;
+};
+
+export type UpdateCoachContextError = UpdateCoachContextErrors[keyof UpdateCoachContextErrors];
+
+export type UpdateCoachContextResponses = {
+    /**
+     * The context after the change.
+     */
+    200: CoachContext;
+};
+
+export type UpdateCoachContextResponse = UpdateCoachContextResponses[keyof UpdateCoachContextResponses];
+
+export type AcceptCoachPlanData = {
+    body: CoachPlan;
+    path?: never;
+    query?: never;
+    url: '/api/coach/plan';
+};
+
+export type AcceptCoachPlanErrors = {
+    /**
+     * No valid session.
+     */
+    401: ApiError;
+    /**
+     * The stored Strava token lacks the activity:read scope; sign out and back in.
+     */
+    403: ApiError;
+    /**
+     * Strava rejected or failed the upstream request.
+     */
+    502: ApiError;
+};
+
+export type AcceptCoachPlanError = AcceptCoachPlanErrors[keyof AcceptCoachPlanErrors];
+
+export type AcceptCoachPlanResponses = {
+    /**
+     * The accepted week, against what was actually run.
+     */
+    200: PlanProgress;
+};
+
+export type AcceptCoachPlanResponse = AcceptCoachPlanResponses[keyof AcceptCoachPlanResponses];
+
 export type CoachChatData = {
     body?: CoachChatRequest;
     path?: never;
@@ -482,6 +673,55 @@ export type CoachChatResponses = {
 };
 
 export type CoachChatResponse = CoachChatResponses[keyof CoachChatResponses];
+
+export type ValidateStravaWebhookData = {
+    body?: never;
+    path?: never;
+    query: {
+        'hub.mode': string;
+        'hub.challenge': string;
+        'hub.verify_token': string;
+    };
+    url: '/api/strava/webhook';
+};
+
+export type ValidateStravaWebhookErrors = {
+    /**
+     * The verify token did not match, or none is configured.
+     */
+    403: ApiError;
+};
+
+export type ValidateStravaWebhookError = ValidateStravaWebhookErrors[keyof ValidateStravaWebhookErrors];
+
+export type ValidateStravaWebhookResponses = {
+    /**
+     * The challenge, echoed.
+     */
+    200: {
+        'hub.challenge': string;
+    };
+};
+
+export type ValidateStravaWebhookResponse = ValidateStravaWebhookResponses[keyof ValidateStravaWebhookResponses];
+
+export type ReceiveStravaWebhookData = {
+    body: StravaEvent;
+    path?: never;
+    query?: never;
+    url: '/api/strava/webhook';
+};
+
+export type ReceiveStravaWebhookResponses = {
+    /**
+     * Acknowledged. Always, whatever the event turns out to be.
+     */
+    200: {
+        received: true;
+    };
+};
+
+export type ReceiveStravaWebhookResponse = ReceiveStravaWebhookResponses[keyof ReceiveStravaWebhookResponses];
 
 export type PostClientLogsData = {
     body: ClientLogBatch;

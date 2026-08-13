@@ -71,6 +71,9 @@ services:
       # Unset just means the coach answers 503; the rest of the app is fine.
       GOOGLE_GENERATIVE_AI_API_KEY: ${GOOGLE_GENERATIVE_AI_API_KEY:-}
       COACH_MODEL: ${COACH_MODEL:-}
+      # Unset means the Strava webhook refuses to validate, so no automatic
+      # post-run debriefs. Everything else is unaffected.
+      STRAVA_WEBHOOK_VERIFY_TOKEN: ${STRAVA_WEBHOOK_VERIFY_TOKEN:-}
       # Logs go to stdout and to Loki; unset this to keep them on stdout only.
       LOKI_URL: ${LOKI_URL-http://loki:3100}
       LOG_LEVEL: ${LOG_LEVEL:-info}

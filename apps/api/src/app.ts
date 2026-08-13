@@ -19,16 +19,23 @@ import {
   AthleteSchema,
   ClientLogAcceptedSchema,
   ClientLogBatchSchema,
+  CoachBriefingSchema,
   CoachChatRequestSchema,
+  CoachContextPatchSchema,
+  CoachContextSchema,
+  CoachPlanSchema,
   CoachThreadDetailSchema,
   CoachThreadSchema,
   type CoachThreadDetail,
   ErrorSchema,
   HealthSchema,
+  PlanProgressSchema,
   RunRenderStateSchema,
   RunSchema,
   RunStreamsSchema,
+  StravaEventSchema,
   type ClientLogLevel,
+  type StravaEvent,
 } from "./schemas.js";
 import {
   fetchAthlete,
@@ -45,15 +52,29 @@ import {
   updateRunRender,
 } from "./render-store.js";
 import {
+  attachedRun,
   COACH_NOT_CONFIGURED,
   COACH_PROVIDER_OPTIONS,
-  COACH_SYSTEM_PROMPT,
+  coachMessageMetadataSchema,
+  coachSystemPrompt,
   createCoachTools,
   getCoachConfig,
 } from "./coach.js";
+import { buildBriefing, todayLocal } from "./briefing.js";
+import { saveContext, savePlan } from "./coach-store.js";
+import { planProgress } from "./training.js";
+import { postRunDebrief } from "./debrief.js";
+import {
+  claimEvent,
+  pruneEvents,
+  userForAthlete,
+  verifyToken,
+  WEBHOOK_PATH,
+} from "./webhook.js";
 import {
   createThread,
   deleteThread,
+  findDebrief,
   getMessages,
   getThread,
   listThreads,
@@ -90,6 +111,10 @@ export const openAPIConfig = {
     { name: "Athlete", description: "The signed-in athlete's Strava profile" },
     { name: "Runs", description: "The signed-in athlete's runs and their streams" },
     { name: "Coach", description: "Conversations with the AI running coach" },
+    {
+      name: "Webhooks",
+      description: "Strava push subscription callbacks — called by Strava, not the browser",
+    },
     { name: "Telemetry", description: "Browser events and errors, forwarded to Loki" },
   ],
 };
@@ -189,6 +214,27 @@ async function stravaAccessToken(
   } catch (err) {
     c.get("log").error(
       { event: "auth.strava_token_refresh_failed", err },
+      "Could not refresh the Strava token",
+    );
+    return null;
+  }
+}
+
+/**
+ * The same token lookup, for work that has no request behind it.
+ *
+ * The webhook processes an event after the response has gone, so there is no
+ * `Context` to log through and no caller to return a 401 to.
+ */
+async function stravaTokenFor(userId: string): Promise<string | null> {
+  try {
+    const { accessToken } = await auth.api.getAccessToken({
+      body: { providerId: "strava", userId },
+    });
+    return accessToken ?? null;
+  } catch (err) {
+    logger.error(
+      { event: "auth.strava_token_refresh_failed", userId, err },
       "Could not refresh the Strava token",
     );
     return null;
@@ -764,6 +810,191 @@ app.openapi(deleteCoachThreadRoute, async (c) => {
   return c.body(null, 204);
 });
 
+const coachBriefingRoute = createRoute({
+  method: "get",
+  path: "/api/coach/briefing",
+  operationId: "getCoachBriefing",
+  tags: ["Coach"],
+  summary: "The coach's read on the athlete, before they ask anything",
+  description:
+    "Everything the Coach screen's rails show: the goal race the coach " +
+    "remembers, this week's accepted plan measured against what was actually " +
+    "run, the measured training signals (load ratio, easy-run intensity, " +
+    "aerobic decoupling, shoe mileage) and the queue of things worth asking " +
+    "about. Signals that cannot be computed from the athlete's data are " +
+    "omitted rather than returned empty.",
+  security: [{ sessionCookie: [] }],
+  responses: {
+    200: {
+      description: "The athlete's briefing.",
+      content: { "application/json": { schema: CoachBriefingSchema } },
+    },
+    401: {
+      description: "No valid session.",
+      content: { "application/json": { schema: ErrorSchema } },
+    },
+    403: {
+      description:
+        "The stored Strava token lacks the activity:read scope; sign out and back in.",
+      content: { "application/json": { schema: ErrorSchema } },
+    },
+    502: {
+      description: "Strava rejected or failed the upstream request.",
+      content: { "application/json": { schema: ErrorSchema } },
+    },
+  },
+});
+
+app.openapi(coachBriefingRoute, async (c) => {
+  const session = await currentUser(c);
+  if (!session) return c.json({ error: "Not signed in" }, 401);
+
+  const accessToken = await stravaAccessToken(c, session.user.id);
+  if (!accessToken) return c.json({ error: "No Strava access token" }, 401);
+
+  try {
+    const briefing = await buildBriefing(accessToken, session.user.id);
+    c.get("log").info(
+      {
+        event: "coach.briefing_built",
+        signals: briefing.signals.length,
+        queue: briefing.queue.length,
+        hasPlan: briefing.plan !== null,
+      },
+      "Built the coach briefing",
+    );
+    return c.json(briefing, 200);
+  } catch (err) {
+    logStravaFailure(c, err, "build coach briefing");
+    if (err instanceof StravaApiError) {
+      if (err.status === 401 || err.status === 403) {
+        return c.json({ error: MISSING_SCOPE_ERROR }, 403);
+      }
+      return c.json({ error: err.message }, 502);
+    }
+    throw err;
+  }
+});
+
+const updateCoachContextRoute = createRoute({
+  method: "put",
+  path: "/api/coach/context",
+  operationId: "updateCoachContext",
+  tags: ["Coach"],
+  summary: "Change what the coach remembers between threads",
+  description:
+    "Merges into the stored context. An omitted field is left alone; a field " +
+    "sent as null is cleared — that is the difference between changing the " +
+    "target time and dropping the race. The coach writes here too, through " +
+    "its setAthleteContext tool.",
+  security: [{ sessionCookie: [] }],
+  request: {
+    body: {
+      required: true,
+      content: { "application/json": { schema: CoachContextPatchSchema } },
+    },
+  },
+  responses: {
+    200: {
+      description: "The context after the change.",
+      content: { "application/json": { schema: CoachContextSchema } },
+    },
+    401: {
+      description: "No valid session.",
+      content: { "application/json": { schema: ErrorSchema } },
+    },
+  },
+});
+
+app.openapi(updateCoachContextRoute, async (c) => {
+  const session = await currentUser(c);
+  if (!session) return c.json({ error: "Not signed in" }, 401);
+
+  const patch = c.req.valid("json");
+  const context = await saveContext(session.user.id, patch);
+  c.get("log").info(
+    { event: "coach.context_updated", fields: Object.keys(patch) },
+    "Athlete context updated",
+  );
+  return c.json(context, 200);
+});
+
+const acceptCoachPlanRoute = createRoute({
+  method: "post",
+  path: "/api/coach/plan",
+  operationId: "acceptCoachPlan",
+  tags: ["Coach"],
+  summary: "Accept a week the coach proposed",
+  description:
+    "Stores the seven sessions as the athlete's week and returns them measured " +
+    "against what they have already run. Accepting again for the same week " +
+    "replaces it, which is what a revision is.",
+  security: [{ sessionCookie: [] }],
+  request: {
+    body: {
+      required: true,
+      content: { "application/json": { schema: CoachPlanSchema } },
+    },
+  },
+  responses: {
+    200: {
+      description: "The accepted week, against what was actually run.",
+      content: { "application/json": { schema: PlanProgressSchema } },
+    },
+    401: {
+      description: "No valid session.",
+      content: { "application/json": { schema: ErrorSchema } },
+    },
+    403: {
+      description:
+        "The stored Strava token lacks the activity:read scope; sign out and back in.",
+      content: { "application/json": { schema: ErrorSchema } },
+    },
+    502: {
+      description: "Strava rejected or failed the upstream request.",
+      content: { "application/json": { schema: ErrorSchema } },
+    },
+  },
+});
+
+app.openapi(acceptCoachPlanRoute, async (c) => {
+  const session = await currentUser(c);
+  if (!session) return c.json({ error: "Not signed in" }, 401);
+
+  const accessToken = await stravaAccessToken(c, session.user.id);
+  if (!accessToken) return c.json({ error: "No Strava access token" }, 401);
+
+  const plan = await savePlan(session.user.id, c.req.valid("json"));
+  c.get("log").info(
+    {
+      event: "coach.plan_accepted",
+      weekStarting: plan.week_starting,
+      sessions: plan.sessions.length,
+    },
+    "Week accepted",
+  );
+
+  try {
+    const runs = await fetchRuns(accessToken);
+    return c.json(
+      {
+        ...planProgress(plan.sessions, runs, plan.week_starting, todayLocal()),
+        label: plan.label,
+      },
+      200,
+    );
+  } catch (err) {
+    logStravaFailure(c, err, "measure the accepted plan");
+    if (err instanceof StravaApiError) {
+      if (err.status === 401 || err.status === 403) {
+        return c.json({ error: MISSING_SCOPE_ERROR }, 403);
+      }
+      return c.json({ error: err.message }, 502);
+    }
+    throw err;
+  }
+});
+
 /** Enough room for a few tool calls and the answer that follows them. */
 const COACH_MAX_STEPS = 8;
 
@@ -835,7 +1066,11 @@ app.openapi(coachChatRoute, async (c) => {
     if (!body.message) return c.json({ error: "No message to answer" }, 400);
     // `validateUIMessages` is the SDK's own guard against a malformed parts
     // array reaching the model — the OpenAPI schema only checks the envelope.
-    const [message] = await validateUIMessages({ messages: [body.message] });
+    // The metadata schema has to be named or the attached run is dropped.
+    const [message] = await validateUIMessages({
+      messages: [body.message],
+      metadataSchema: coachMessageMetadataSchema,
+    });
     await saveMessage(thread.id, message);
     const title = titleFrom(message);
     if (title) await setTitleIfUnset(thread.id, title);
@@ -855,11 +1090,17 @@ app.openapi(coachChatRoute, async (c) => {
     "Answering a coach turn",
   );
 
+  const today = todayLocal();
   const result = streamText({
     model: config.model,
-    system: COACH_SYSTEM_PROMPT,
+    system: coachSystemPrompt(today, body.range_weeks, attachedRun(messages)),
     messages: await convertToModelMessages(messages),
-    tools: createCoachTools(accessToken),
+    tools: createCoachTools({
+      accessToken,
+      userId: session.user.id,
+      today,
+      rangeWeeks: body.range_weeks,
+    }),
     // Every tool call costs a round trip; the cap keeps a confused model from
     // looping through the athlete's whole history.
     stopWhen: stepCountIs(COACH_MAX_STEPS),
@@ -886,6 +1127,178 @@ app.openapi(coachChatRoute, async (c) => {
         : "The coach could not answer that.";
     },
   });
+});
+
+// --- Strava webhook -----------------------------------------------------------
+// Both of these are called by Strava, never by the browser, so neither carries
+// a session. See webhook.ts for the two-second budget both of them work to.
+
+const webhookValidationRoute = createRoute({
+  method: "get",
+  path: WEBHOOK_PATH,
+  operationId: "validateStravaWebhook",
+  tags: ["Webhooks"],
+  summary: "Answer Strava's subscription challenge",
+  description:
+    "Strava calls this while `POST /push_subscriptions` is in flight and " +
+    "expects `{ \"hub.challenge\": … }` back within two seconds. The challenge " +
+    "is only echoed when `hub.verify_token` matches the server's " +
+    "STRAVA_WEBHOOK_VERIFY_TOKEN, so somebody else's subscription cannot point " +
+    "at this callback.",
+  request: {
+    query: z.object({
+      "hub.mode": z.string().openapi({ example: "subscribe" }),
+      "hub.challenge": z.string().openapi({ example: "15f7d1a91c1f40f8a748fd134752feb3" }),
+      "hub.verify_token": z.string(),
+    }),
+  },
+  responses: {
+    200: {
+      description: "The challenge, echoed.",
+      content: {
+        "application/json": {
+          schema: z.object({ "hub.challenge": z.string() }),
+        },
+      },
+    },
+    403: {
+      description: "The verify token did not match, or none is configured.",
+      content: { "application/json": { schema: ErrorSchema } },
+    },
+  },
+});
+
+app.openapi(webhookValidationRoute, (c) => {
+  const query = c.req.valid("query");
+  const expected = verifyToken();
+  const log = c.get("log");
+
+  if (!expected) {
+    log.error(
+      { event: "webhook.no_verify_token" },
+      "STRAVA_WEBHOOK_VERIFY_TOKEN is not set; refusing to validate",
+    );
+    return c.json({ error: "Webhooks are not configured on this server" }, 403);
+  }
+
+  if (query["hub.mode"] !== "subscribe" || query["hub.verify_token"] !== expected) {
+    log.warn(
+      { event: "webhook.validation_rejected", mode: query["hub.mode"] },
+      "Rejected a subscription challenge",
+    );
+    return c.json({ error: "Bad verify token" }, 403);
+  }
+
+  log.info({ event: "webhook.validated" }, "Answered Strava's subscription challenge");
+  return c.json({ "hub.challenge": query["hub.challenge"] }, 200);
+});
+
+const webhookEventRoute = createRoute({
+  method: "post",
+  path: WEBHOOK_PATH,
+  operationId: "receiveStravaWebhook",
+  tags: ["Webhooks"],
+  summary: "Receive a Strava activity or athlete event",
+  description:
+    "Acknowledged immediately and processed afterwards: Strava requires a 200 " +
+    "within two seconds and retries up to three times otherwise, which is far " +
+    "less time than reading an activity and writing a debrief takes. A new run " +
+    "becomes a post-run debrief in the athlete's \"Post-run debriefs\" thread; " +
+    "everything else is recorded and ignored.",
+  request: {
+    body: {
+      required: true,
+      content: { "application/json": { schema: StravaEventSchema } },
+    },
+  },
+  responses: {
+    200: {
+      description: "Acknowledged. Always, whatever the event turns out to be.",
+      content: { "application/json": { schema: z.object({ received: z.literal(true) }) } },
+    },
+  },
+});
+
+/**
+ * The work behind an acknowledged event.
+ *
+ * Deliberately returns nothing and throws nothing: it runs after the response
+ * has gone, so a failure here can only ever be a log line.
+ */
+async function processStravaEvent(event: StravaEvent): Promise<void> {
+  const log = logger.child({ event_source: "strava_webhook", objectId: event.object_id });
+
+  const userId = await userForAthlete(event.owner_id);
+  if (!userId) {
+    log.info(
+      { event: "webhook.unknown_athlete", ownerId: event.owner_id },
+      "Event for an athlete who has not connected here",
+    );
+    return;
+  }
+
+  if (event.object_type === "athlete") {
+    // The only athlete event Strava sends is a deauthorisation.
+    if (event.updates.authorized === "false") {
+      log.warn({ event: "webhook.deauthorized", userId }, "Athlete revoked access");
+    }
+    return;
+  }
+
+  if (event.aspect_type !== "create") {
+    log.info(
+      { event: "webhook.activity_ignored", userId, aspect: event.aspect_type },
+      "Not a new activity",
+    );
+    return;
+  }
+
+  if (await findDebrief(userId, event.object_id)) {
+    log.info({ event: "webhook.already_debriefed", userId }, "Run already debriefed");
+    return;
+  }
+
+  const accessToken = await stravaTokenFor(userId);
+  if (!accessToken) {
+    log.warn({ event: "webhook.no_token", userId }, "No Strava token for this athlete");
+    return;
+  }
+
+  await postRunDebrief(userId, accessToken, event.object_id);
+}
+
+app.openapi(webhookEventRoute, async (c) => {
+  const event = c.req.valid("json");
+  const log = c.get("log");
+
+  log.info(
+    {
+      event: "webhook.received",
+      objectType: event.object_type,
+      aspect: event.aspect_type,
+      objectId: event.object_id,
+    },
+    "Strava webhook event",
+  );
+
+  // Claimed before the ack so a retry that arrives while the first one is still
+  // working is turned away rather than racing it.
+  const mine = await claimEvent(event);
+  if (mine) {
+    // Floating on purpose: the response must not wait for this. Nothing can
+    // reject — processStravaEvent swallows and logs — but the catch is kept so
+    // a future bug in it cannot take the process down.
+    void processStravaEvent(event)
+      .then(() => pruneEvents())
+      .catch((err: unknown) => {
+        logger.error(
+          { event: "webhook.processing_failed", objectId: event.object_id, err },
+          "Failed to process a Strava event",
+        );
+      });
+  }
+
+  return c.json({ received: true } as const, 200);
 });
 
 const clientLogsRoute = createRoute({

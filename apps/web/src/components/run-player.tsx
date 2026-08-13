@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { Player, type PlayerRef } from "@remotion/player";
 import { toast } from "sonner";
 import {
@@ -7,8 +8,10 @@ import {
   PauseIcon,
   PlayIcon,
   Share2Icon,
+  SparklesIcon,
 } from "lucide-react";
 import type { Run, RunStreams } from "@/api";
+import { trackEvent } from "@/lib/logger";
 import { MonoLabel } from "@/components/mono";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -152,6 +155,18 @@ export function RunPlayer({
           because it has three states and a progress bar to show. */}
       <div className="flex items-center gap-2">
         <MonoLabel className="mr-auto whitespace-nowrap">{chapter.label}</MonoLabel>
+        {/* The coach reads the run you are watching: `?run=` arrives at the
+            Coach screen as an attached run, so the first question is about
+            this session without naming it. */}
+        <Button
+          onClick={() => trackEvent("ui.ask_coach_clicked", { activityId: activity.id })}
+          render={<Link to={`/coach?run=${activity.id}`} />}
+          size="sm"
+          variant="subtle"
+        >
+          <SparklesIcon />
+          Ask the coach
+        </Button>
         <Button size="sm" variant="subtle" onClick={share}>
           <Share2Icon />
           Share

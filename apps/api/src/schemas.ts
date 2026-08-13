@@ -77,6 +77,16 @@ export const RunSchema = z
     average_speed: z.number(),
     /** Beats per minute, or null when recorded without a heart-rate monitor. */
     average_heartrate: z.number().nullable(),
+    /** Beats per minute, or null when recorded without a heart-rate monitor. */
+    max_heartrate: z.number().nullable(),
+    /**
+     * What the athlete tagged the session as in Strava. This is the only field
+     * that separates a race from a jog without reading the run's name, so the
+     * coach's intensity maths leans on it.
+     */
+    workout_type: z
+      .enum(["default", "race", "long_run", "workout"])
+      .openapi({ example: "long_run" }),
   })
   .openapi("Run");
 
@@ -167,6 +177,30 @@ export type CoachThread = z.infer<typeof CoachThreadSchema>;
  * on every SDK release. The browser casts this back to `UIMessage` in one
  * documented place — see `coachMessages()` in apps/web/src/api.
  */
+/**
+ * What a message carries besides what was said.
+ *
+ * `run` is the athlete attaching a run to a question with the composer's `@`
+ * picker — it is what makes "why did I fade?" answerable without the model
+ * guessing which run "I" meant. It rides on the message rather than in its text
+ * so the transcript reads as a question, not as a question with an id stapled
+ * to it, and so a reload still knows which run was meant.
+ */
+export const CoachMessageMetadataSchema = z
+  .object({
+    run: z
+      .object({
+        id: z.number().int(),
+        name: z.string(),
+        /** `YYYY-MM-DD`, the run's own local day. */
+        date: z.string(),
+      })
+      .optional(),
+  })
+  .openapi("CoachMessageMetadata");
+
+export type CoachMessageMetadata = z.infer<typeof CoachMessageMetadataSchema>;
+
 export const CoachMessageSchema = z
   .object({
     id: z.string(),
@@ -174,6 +208,7 @@ export const CoachMessageSchema = z
     parts: z.array(
       z.looseObject({ type: z.string().openapi({ example: "text" }) }),
     ),
+    metadata: CoachMessageMetadataSchema.nullish(),
   })
   .openapi("CoachMessage");
 
@@ -209,10 +244,196 @@ export const CoachChatRequestSchema = z
     message: CoachMessageSchema.optional(),
     /** The message to regenerate from, when `trigger` is `regenerate-message`. */
     message_id: z.string().optional(),
+    /**
+     * The window selected in the thread header. It reaches the model as part of
+     * the system prompt and as the default for the volume tool, so "how has it
+     * been going" answers over the range the athlete is looking at.
+     */
+    range_weeks: z.number().int().min(1).max(52).default(6),
   })
   .openapi("CoachChatRequest");
 
 export type CoachChatRequest = z.infer<typeof CoachChatRequestSchema>;
+
+/** `YYYY-MM-DD`. Calendar dates, never timestamps — see coach-store.ts. */
+const CalendarDateSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/)
+  .openapi({ example: "2026-10-18" });
+
+/**
+ * What the coach remembers about the athlete between threads.
+ *
+ * Everything is nullable: an athlete who has never named a goal race still has
+ * a context row's worth of nothing, and the rail renders an empty state rather
+ * than the coach opening every conversation by asking again.
+ */
+export const CoachContextSchema = z
+  .object({
+    race_name: z.string().nullable().openapi({ example: "Casablanca Half" }),
+    race_date: CalendarDateSchema.nullable(),
+    /** Metres — 21097.5 for a half. */
+    race_distance_m: z.number().nullable(),
+    /** The goal time in seconds, or null when the athlete only named a race. */
+    target_seconds: z.number().int().nullable(),
+    /** 0 = Monday … 6 = Sunday. The day the long run is protected on. */
+    long_run_day: z.number().int().min(0).max(6).nullable(),
+    /** Injuries, life constraints, anything the athlete asked to be remembered. */
+    notes: z.string().nullable(),
+    updated_at: z.iso.datetime().nullable(),
+  })
+  .openapi("CoachContext");
+
+export type CoachContext = z.infer<typeof CoachContextSchema>;
+
+/**
+ * A change to the context. Every field is optional, and an omitted field is
+ * left alone rather than cleared — see `saveContext` in coach-store.ts.
+ */
+export const CoachContextPatchSchema = CoachContextSchema.omit({
+  updated_at: true,
+})
+  .partial()
+  .openapi("CoachContextPatch");
+
+/** One session of a coach-written week. */
+export const PlannedSessionSchema = z
+  .object({
+    /** 0 = Monday … 6 = Sunday. */
+    day: z.number().int().min(0).max(6),
+    type: z.string().max(40).openapi({ example: "8 × 400" }),
+    /** Kilometres; 0 on a rest day. */
+    km: z.number().min(0).max(200),
+    /** A target pace, or a note like "legs up" on a rest day. */
+    pace: z.string().max(40).openapi({ example: "4:35 /km" }),
+    /** A session the week is built around — quality days and the long run. */
+    key: z.boolean(),
+  })
+  .openapi("PlannedSession");
+
+export type PlannedSession = z.infer<typeof PlannedSessionSchema>;
+
+/** A week the athlete accepted, as sessions rather than a paragraph. */
+export const CoachPlanSchema = z
+  .object({
+    week_starting: CalendarDateSchema,
+    label: z.string().nullable().openapi({ example: "Build 4 of 9" }),
+    sessions: z.array(PlannedSessionSchema).max(7),
+  })
+  .openapi("CoachPlan");
+
+export type CoachPlan = z.infer<typeof CoachPlanSchema>;
+
+/** The accepted week against what the athlete actually ran. */
+export const PlanProgressSchema = z
+  .object({
+    week_starting: CalendarDateSchema,
+    label: z.string().nullable(),
+    planned_km: z.number(),
+    actual_km: z.number(),
+    /** Sessions still to come, counting today. */
+    remaining: z.number().int(),
+    days: z.array(
+      z.object({
+        day: z.number().int().min(0).max(6),
+        type: z.string(),
+        planned_km: z.number(),
+        actual_km: z.number(),
+        run_ids: z.array(z.number().int()),
+      }),
+    ),
+  })
+  .openapi("PlanProgress");
+
+export type PlanProgress = z.infer<typeof PlanProgressSchema>;
+
+/**
+ * How loudly a number should read. `alert` is a measurement outside a band the
+ * athlete should care about today; `warn` is one drifting towards it.
+ */
+const ToneSchema = z.enum(["neutral", "warn", "alert"]).openapi("CoachTone");
+
+/** One measured thing about the athlete's training, and what to ask about it. */
+export const CoachSignalSchema = z
+  .object({
+    id: z.string().openapi({ example: "acwr" }),
+    label: z.string().openapi({ example: "ACWR · 7:28 day load" }),
+    value: z.string().openapi({ example: "1.31" }),
+    note: z.string().openapi({ example: "Above the 1.3 band" }),
+    tone: ToneSchema,
+    /** Tapping the signal asks the coach this. */
+    question: z.string(),
+  })
+  .openapi("CoachSignal");
+
+export type CoachSignal = z.infer<typeof CoachSignalSchema>;
+
+/** Something the coach noticed that the athlete hasn't asked about yet. */
+export const CoachQueueItemSchema = z
+  .object({
+    id: z.string().openapi({ example: "debrief" }),
+    title: z.string().openapi({ example: "Debrief ready · Aug 5 evening run" }),
+    /** A mono stamp: when this was noticed, not a timestamp to parse. */
+    when: z.string().openapi({ example: "LAST RUN · 2 DAYS AGO" }),
+    tone: ToneSchema,
+    question: z.string(),
+    /** The run the item is about, when it is about one. */
+    run_id: z.number().int().nullable(),
+    /**
+     * A conversation that already holds the answer — set when the coach posted
+     * a debrief for this run on its own. Tapping the item opens it instead of
+     * asking the same question a second time.
+     */
+    thread_id: z.string().nullable(),
+  })
+  .openapi("CoachQueueItem");
+
+export type CoachQueueItem = z.infer<typeof CoachQueueItemSchema>;
+
+/**
+ * Everything the coach's rails show, in one request.
+ *
+ * Signals and the queue are both derived from the same page of Strava
+ * activities, so splitting them into separate endpoints would fetch that page
+ * twice to render one screen.
+ */
+export const CoachBriefingSchema = z
+  .object({
+    context: CoachContextSchema,
+    plan: PlanProgressSchema.nullable(),
+    signals: z.array(CoachSignalSchema),
+    queue: z.array(CoachQueueItemSchema),
+  })
+  .openapi("CoachBriefing");
+
+export type CoachBriefing = z.infer<typeof CoachBriefingSchema>;
+
+/**
+ * One Strava webhook event.
+ *
+ * https://developers.strava.com/docs/webhooks/ — `updates` is documented with
+ * string values for a title or type change and `"authorized": "false"` on a
+ * deauthorisation, but a privacy change arrives as a boolean, so the value type
+ * is widened rather than trusted.
+ */
+export const StravaEventSchema = z
+  .object({
+    object_type: z.enum(["activity", "athlete"]),
+    object_id: z.number().openapi({ example: 987654321 }),
+    aspect_type: z.enum(["create", "update", "delete"]),
+    updates: z
+      .record(z.string(), z.union([z.string(), z.boolean()]))
+      .default({})
+      .openapi({ example: { title: "Morning Run" } }),
+    /** The Strava athlete id, which is what maps the event back to a user. */
+    owner_id: z.number().openapi({ example: 165387970 }),
+    subscription_id: z.number(),
+    /** Seconds since the epoch. */
+    event_time: z.number(),
+  })
+  .openapi("StravaEvent");
+
+export type StravaEvent = z.infer<typeof StravaEventSchema>;
 
 /**
  * Values a browser event may carry. Scalars only — the context is meant for a

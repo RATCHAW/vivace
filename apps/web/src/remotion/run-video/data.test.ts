@@ -41,6 +41,8 @@ const activity: Run = {
   start_date_local: "2026-08-09T07:12:00Z",
   average_speed: 5000 / 1500,
   average_heartrate: 152.4,
+  max_heartrate: 171,
+  workout_type: "default",
 };
 
 describe("chapters", () => {
