@@ -68,12 +68,17 @@ export type RunRenderState = {
 export type RunRender = {
     activity_id: number;
     status: 'rendering' | 'done' | 'error';
+    show_avatar: boolean;
     progress: number;
     output_url: string | null;
     error: string | null;
     created_at: string;
     updated_at: string;
 } | null;
+
+export type RunRenderOptions = {
+    show_avatar?: boolean;
+};
 
 export type CoachThread = {
     id: string;
@@ -265,7 +270,7 @@ export type GetRunRenderResponses = {
 export type GetRunRenderResponse = GetRunRenderResponses[keyof GetRunRenderResponses];
 
 export type StartRunRenderData = {
-    body?: never;
+    body?: RunRenderOptions;
     path: {
         id: string;
     };

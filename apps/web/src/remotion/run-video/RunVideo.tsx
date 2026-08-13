@@ -1,6 +1,6 @@
 import { AbsoluteFill, Easing, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
 import type { Run, RunStreams } from "@/api";
-import { DRAW_END, DRAW_START, fadeAt, metricsAtProgress } from "./data";
+import { avatarSource, DRAW_END, DRAW_START, fadeAt, metricsAtProgress } from "./data";
 import { RouteOverlay, StoryProgress, TYPE, Watermark } from "./overlay";
 import { RunMap } from "./RunMap";
 import { RouteFallback } from "./RouteFallback";
@@ -11,12 +11,20 @@ export type RunVideoProps = {
   activity: Run;
   streams: RunStreams;
   mapboxToken: string;
+  /** The athlete's Strava picture, riding the head of the trace in place of the
+   *  dot. Empty — the default — keeps the dot. */
+  avatarUrl: string;
 };
 
 /** The replay is one shot: the route drawing under live metrics, with the camera
  *  following the runner. It opens on the start line and closes on the whole
  *  route — no title card, no cut away from the map. */
-export function RunVideo({ activity, streams, mapboxToken }: RunVideoProps) {
+export function RunVideo({
+  activity,
+  streams,
+  mapboxToken,
+  avatarUrl,
+}: RunVideoProps) {
   const frame = useCurrentFrame();
   const { fps, width, height, durationInFrames } = useVideoConfig();
 
@@ -34,6 +42,8 @@ export function RunVideo({ activity, streams, mapboxToken }: RunVideoProps) {
   const points = streams.latlng?.data ?? [];
   const hasRoute = points.length >= 2;
   const hasMap = hasRoute && mapboxToken !== "";
+  // An athlete with no Strava picture gets the dot, whatever the option said.
+  const avatar = avatarSource(avatarUrl);
   const live = metricsAtProgress(activity, streams, routeProgress, fps);
 
   // The type dissolves up over the opening beat rather than being there on frame
@@ -52,6 +62,7 @@ export function RunVideo({ activity, streams, mapboxToken }: RunVideoProps) {
             token={mapboxToken}
             width={width}
             height={height}
+            avatarUrl={avatar}
           />
         ) : hasRoute ? (
           <RouteFallback
@@ -59,6 +70,7 @@ export function RunVideo({ activity, streams, mapboxToken }: RunVideoProps) {
             progress={routeProgress}
             width={width}
             height={height}
+            avatarUrl={avatar}
           />
         ) : null}
 

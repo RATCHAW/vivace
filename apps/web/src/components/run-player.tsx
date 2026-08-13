@@ -31,12 +31,16 @@ export function RunPlayer({
   activity,
   streams,
   mapboxToken,
+  avatarUrl,
   expanded,
   onToggleExpanded,
 }: {
   activity: Run;
   streams: RunStreams;
   mapboxToken: string;
+  /** The athlete's picture when the avatar option is on, else "" — see
+   *  `<VideoOptions>`. A change re-renders the film, not the player. */
+  avatarUrl: string;
   expanded: boolean;
   onToggleExpanded: () => void;
 }) {
@@ -94,7 +98,7 @@ export function RunPlayer({
         <Player
           ref={player}
           component={RunVideo}
-          inputProps={{ activity, streams, mapboxToken }}
+          inputProps={{ activity, streams, mapboxToken, avatarUrl }}
           durationInFrames={DURATION_IN_FRAMES}
           fps={FPS}
           compositionWidth={VIDEO_WIDTH}
