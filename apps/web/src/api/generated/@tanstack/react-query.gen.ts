@@ -122,7 +122,7 @@ export const getRunRenderQueryKey = (options: Options<GetRunRenderData>) => crea
 /**
  * Get one run's stored render
  *
- * Reads the persisted render state for this run and athlete. `render` is null when the run has never been rendered. While a render is in flight, live progress comes from the SSE endpoint, which also keeps this state up to date.
+ * Reads the persisted render state for this run, athlete and template. `render` is null when this run has never been rendered with this template. While a render is in flight, live progress comes from the SSE endpoint, which also keeps this state up to date.
  */
 export const getRunRenderOptions = (options: Options<GetRunRenderData>) => queryOptions<GetRunRenderResponse, GetRunRenderError, GetRunRenderResponse, ReturnType<typeof getRunRenderQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
@@ -140,7 +140,7 @@ export const getRunRenderOptions = (options: Options<GetRunRenderData>) => query
 /**
  * Render this run's video on Remotion Lambda
  *
- * Fetches the run and its streams from Strava, starts a Remotion Lambda render of the story video, and persists the render state. The MP4 lands in the Remotion S3 bucket. Idempotent while a render is in flight or already done with the same options — those return the existing state; a failed render, or one whose options no longer match, is rendered again. The body is optional and defaults to the plain replay.
+ * Fetches the run and its streams from Strava, starts a Remotion Lambda render of the chosen template, and persists the render state. The MP4 lands in the Remotion S3 bucket. Idempotent while a render is in flight or already done with the same options — those return the existing state; a failed render, or one whose options no longer match, is rendered again. Each template gets its own render, so switching template does not replace the video already made with the last one. The body is optional and defaults to the plain replay.
  */
 export const startRunRenderMutation = (options?: Partial<Options<StartRunRenderData>>): UseMutationOptions<StartRunRenderResponse, StartRunRenderError, Options<StartRunRenderData>> => {
     const mutationOptions: UseMutationOptions<StartRunRenderResponse, StartRunRenderError, Options<StartRunRenderData>> = {

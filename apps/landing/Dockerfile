@@ -10,6 +10,7 @@ COPY apps/api/package.json apps/api/package.json
 COPY apps/web/package.json apps/web/package.json
 COPY apps/landing/package.json apps/landing/package.json
 COPY packages/strava-api/package.json packages/strava-api/package.json
+COPY packages/video/package.json packages/video/package.json
 RUN pnpm install --frozen-lockfile --filter @repo/landing...
 
 COPY apps/landing apps/landing

@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { DownloadIcon, FilmIcon, Loader2Icon } from "lucide-react";
+import type { TemplateId } from "@repo/video";
 import {
   getRunRenderOptions,
   getRunRenderQueryKey,
@@ -32,17 +33,28 @@ const RENDER_FLAG = "video-render";
  * here is the persisted render state — reloading mid-render resumes the
  * progress bar, and an already-rendered run goes straight to download.
  *
- * `showAvatar` is the option the film in the player is playing with, and it
- * travels with the render request. A finished render made with a different
- * answer is a different video, so the panel offers that one for download and
- * this one to render, rather than passing the old MP4 off as the new choice.
+ * `template` and `showAvatar` are what the film in the player is playing, and
+ * they travel with the render request. A run holds one render per template, so
+ * switching template swaps which one this panel is about rather than replacing
+ * it; within a template, a finished render made with a different answer is a
+ * different video, so the panel offers that one for download and this one to
+ * render, rather than passing the old MP4 off as the new choice.
  */
-export function RenderControls({ run, showAvatar }: { run: Run; showAvatar: boolean }) {
+export function RenderControls({
+  run,
+  template,
+  showAvatar,
+}: {
+  run: Run;
+  template: TemplateId;
+  showAvatar: boolean;
+}) {
   const queryClient = useQueryClient();
   // On unless PostHog says otherwise, so no key (or no flag) changes nothing.
   const renderEnabled = useFeatureFlag(RENDER_FLAG, true);
   const path = { id: String(run.id) } as const;
-  const { data, error: loadError } = useQuery(getRunRenderOptions({ path }));
+  const query = { template } as const;
+  const { data, error: loadError } = useQuery(getRunRenderOptions({ path, query }));
   const render = data?.render ?? null;
   const stale = render != null && render.show_avatar !== showAvatar;
 
@@ -52,20 +64,20 @@ export function RenderControls({ run, showAvatar }: { run: Run; showAvatar: bool
     // when the failure reaches the MutationCache logger in @/lib/query-client.
     mutationKey: ["startRunRender"],
     onSuccess: (state) =>
-      queryClient.setQueryData(getRunRenderQueryKey({ path }), state),
+      queryClient.setQueryData(getRunRenderQueryKey({ path, query }), state),
   });
 
   // While a render is in flight, the SSE stream is the source of truth; every
   // message lands in the same query cache the panel reads from.
   useEffect(() => {
     if (render?.status !== "rendering") return;
-    return subscribeRunRenderProgress(run.id, (next) =>
+    return subscribeRunRenderProgress(run.id, template, (next) =>
       queryClient.setQueryData<RunRenderState>(
-        getRunRenderQueryKey({ path: { id: String(run.id) } }),
+        getRunRenderQueryKey({ path: { id: String(run.id) }, query: { template } }),
         { render: next },
       ),
     );
-  }, [run.id, render?.status, queryClient]);
+  }, [run.id, template, render?.status, queryClient]);
 
   if (loadError) {
     return (
@@ -139,10 +151,11 @@ export function RenderControls({ run, showAvatar }: { run: Run; showAvatar: bool
         onClick={() => {
           trackEvent("ui.render_clicked", {
             activityId: run.id,
+            template,
             retry: render?.status === "error",
             showAvatar,
           });
-          start.mutate({ path, body: { show_avatar: showAvatar } });
+          start.mutate({ path, body: { template, show_avatar: showAvatar } });
         }}
       >
         {start.isPending ? <Loader2Icon className="animate-spin" /> : <FilmIcon />}

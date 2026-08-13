@@ -8,7 +8,7 @@ import type { CoachBriefing, CoachSignal, CoachTone, PlanProgress } from "@/api"
 import { MonoLabel } from "@/components/mono";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { formatClock } from "@/remotion/run-video/data";
+import { formatClock } from "@repo/video";
 import { cn } from "@/lib/utils";
 
 const DAY_SHORT = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;

@@ -8,11 +8,9 @@
     "skipLibCheck": true,
     "noEmit": true,
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "types": ["vite/client"],
-    "baseUrl": ".",
-    "paths": {
-      "@/*": ["./src/*"]
-    }
+    // For the `import "mapbox-gl/dist/mapbox-gl.css"` in RunMap — the same
+    // ambient declarations apps/web relies on.
+    "types": ["vite/client", "node"]
   },
-  "include": ["src"]
+  "include": ["src", "scripts"]
 }

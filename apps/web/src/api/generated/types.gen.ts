@@ -69,6 +69,7 @@ export type RunRenderState = {
 
 export type RunRender = {
     activity_id: number;
+    template: VideoTemplate;
     status: 'rendering' | 'done' | 'error';
     show_avatar: boolean;
     progress: number;
@@ -78,7 +79,10 @@ export type RunRender = {
     updated_at: string;
 } | null;
 
+export type VideoTemplate = 'run-video';
+
 export type RunRenderOptions = {
+    template?: VideoTemplate;
     show_avatar?: boolean;
 };
 
@@ -347,7 +351,9 @@ export type GetRunRenderData = {
     path: {
         id: string;
     };
-    query?: never;
+    query?: {
+        template?: VideoTemplate;
+    };
     url: '/api/runs/{id}/render';
 };
 
@@ -413,7 +419,9 @@ export type StreamRunRenderProgressData = {
     path: {
         id: string;
     };
-    query?: never;
+    query?: {
+        template?: VideoTemplate;
+    };
     url: '/api/runs/{id}/render/progress';
 };
 

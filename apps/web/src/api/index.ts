@@ -13,6 +13,7 @@ import type {
   ClientLogEvent,
   CoachMessage,
   RunRender,
+  VideoTemplate,
 } from "./generated/types.gen";
 
 client.setConfig({
@@ -71,12 +72,18 @@ client.interceptors.error.use(
  * a terminal status (`done`/`error`), or after a lone `null` when there is no
  * render — both of which close the source here so EventSource doesn't
  * reconnect forever. Returns an unsubscribe function.
+ *
+ * `template` says which of the run's renders to watch: a run holds one per
+ * template, and they progress independently.
  */
 export function subscribeRunRenderProgress(
   activityId: number,
+  template: VideoTemplate,
   onUpdate: (render: RunRender) => void,
 ): () => void {
-  const source = new EventSource(`/api/runs/${activityId}/render/progress`);
+  const source = new EventSource(
+    `/api/runs/${activityId}/render/progress?template=${encodeURIComponent(template)}`,
+  );
   source.onmessage = (event) => {
     const render = JSON.parse(event.data) as RunRender | null;
     if (render === null) {
@@ -161,4 +168,5 @@ export type {
   RunRender,
   RunRenderState,
   RunStreams,
+  VideoTemplate,
 } from "./generated/types.gen";

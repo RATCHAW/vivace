@@ -37,7 +37,7 @@ import {
   Suggestions,
 } from "@/components/ai-elements/suggestion";
 import { MonoLabel } from "@/components/mono";
-import { formatPace } from "@/remotion/run-video/data";
+import { formatPace } from "@repo/video";
 import { cn } from "@/lib/utils";
 
 /** Gemini takes images and PDFs; anything else would just cost tokens. */

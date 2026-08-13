@@ -71,7 +71,7 @@ export const getRunStreams = <ThrowOnError extends boolean = false>(options: Opt
 /**
  * Get one run's stored render
  *
- * Reads the persisted render state for this run and athlete. `render` is null when the run has never been rendered. While a render is in flight, live progress comes from the SSE endpoint, which also keeps this state up to date.
+ * Reads the persisted render state for this run, athlete and template. `render` is null when this run has never been rendered with this template. While a render is in flight, live progress comes from the SSE endpoint, which also keeps this state up to date.
  */
 export const getRunRender = <ThrowOnError extends boolean = false>(options: Options<GetRunRenderData, ThrowOnError>): RequestResult<GetRunRenderResponses, GetRunRenderErrors, ThrowOnError> => (options.client ?? client).get<GetRunRenderResponses, GetRunRenderErrors, ThrowOnError>({
     security: [{
@@ -86,7 +86,7 @@ export const getRunRender = <ThrowOnError extends boolean = false>(options: Opti
 /**
  * Render this run's video on Remotion Lambda
  *
- * Fetches the run and its streams from Strava, starts a Remotion Lambda render of the story video, and persists the render state. The MP4 lands in the Remotion S3 bucket. Idempotent while a render is in flight or already done with the same options — those return the existing state; a failed render, or one whose options no longer match, is rendered again. The body is optional and defaults to the plain replay.
+ * Fetches the run and its streams from Strava, starts a Remotion Lambda render of the chosen template, and persists the render state. The MP4 lands in the Remotion S3 bucket. Idempotent while a render is in flight or already done with the same options — those return the existing state; a failed render, or one whose options no longer match, is rendered again. Each template gets its own render, so switching template does not replace the video already made with the last one. The body is optional and defaults to the plain replay.
  */
 export const startRunRender = <ThrowOnError extends boolean = false>(options: Options<StartRunRenderData, ThrowOnError>): RequestResult<StartRunRenderResponses, StartRunRenderErrors, ThrowOnError> => (options.client ?? client).post<StartRunRenderResponses, StartRunRenderErrors, ThrowOnError>({
     security: [{
@@ -105,7 +105,7 @@ export const startRunRender = <ThrowOnError extends boolean = false>(options: Op
 /**
  * Stream a render's progress (SSE)
  *
- * Server-sent events. While the run's render is in flight, polls Remotion Lambda every ~1.5s, persists the result, and emits the updated RunRender as a JSON message. The final message has status `done` or `error`, after which the stream closes; a lone `null` message means there is no render. Consumed with EventSource, not the generated client.
+ * Server-sent events. While this run's render of the given template is in flight, polls Remotion Lambda every ~1.5s, persists the result, and emits the updated RunRender as a JSON message. The final message has status `done` or `error`, after which the stream closes; a lone `null` message means there is no render. Consumed with EventSource, not the generated client.
  */
 export const streamRunRenderProgress = <ThrowOnError extends boolean = false>(options: Options<StreamRunRenderProgressData, ThrowOnError, StreamRunRenderProgressResponse>): Promise<ServerSentEventsResult<StreamRunRenderProgressResponses>> => (options.client ?? client).sse.get<StreamRunRenderProgressResponses, StreamRunRenderProgressErrors, ThrowOnError>({
     security: [{

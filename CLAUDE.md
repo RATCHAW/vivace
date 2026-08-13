@@ -2,7 +2,7 @@
 
 Turborepo + pnpm workspaces. `apps/api` (Hono), `apps/web` (Vite + React),
 `apps/landing` (Next.js marketing page), `packages/strava-api` (generated Strava
-SDK). See [README](./README.md) for setup.
+SDK), `packages/video` (Remotion templates). See [README](./README.md) for setup.
 
 ## API contract — generated, never hand-written
 
@@ -35,6 +35,45 @@ Consequences:
   `ApiRequestError`), never from `@/api/generated`.
 - New queries need no provider work — `QueryClientProvider` is already in
   `src/main.tsx` with the client from `src/lib/query-client.ts`.
+
+## Video — one catalogue, in packages/video
+
+Every video is a template declared in `packages/video/src/registry.ts`. That file
+is the source of truth for what can be rendered; apps/api, apps/web and the
+Lambda bundle all read it rather than each holding their own list.
+
+- **Adding a template touches three files, none of them in apps/api.** An entry
+  in `registry.ts` → a component under `src/templates/` → a line in the two maps
+  in `Root.tsx`. `registry.test.ts` fails if the halves drift. Then run
+  `pnpm --filter @repo/video bundle:check` — webpack, not tsc, is what finds a
+  bad import in the Lambda entry, and otherwise `deploySite` finds it for you.
+- **`registry.ts` must stay React-free.** apps/api imports `@repo/video` for the
+  catalogue, and its tsconfig has no `jsx` setting — a type-level reference to a
+  `.tsx` file from there breaks the API's typecheck, which is the point. The
+  components live behind `@repo/video/compositions`; the Lambda bundle enters at
+  `./lambda-entry` and loads each template with `lazyComponent`.
+- **A serve URL is a bundle, not a video.** One site holds every composition and
+  `renderMediaOnLambda` picks one by `compositionId`. Don't reach for a second
+  deployment to add a template — reach for `REMOTION_SERVE_URL_<TEMPLATE>` only
+  when a template's dependencies are heavy enough that every *other* template
+  shouldn't download them on a cold start.
+- **The axis that costs money is the profile, not the URL.** `RENDER_PROFILES`
+  declares memory, timeout, GL backend and frame budget; Lambda bills
+  GB-seconds. A new template picks a profile, and the deploy script creates a
+  function for it. Never hardcode `gl` or a timeout at a call site again.
+- **The props contract is `VideoActivity` / `VideoStreams` in `types.ts`**, not
+  `Run` from either app. Both apps' `Run` types are structurally assignable to
+  it, which is what lets one composition serve the browser `<Player>`, the API
+  and a headless Lambda render.
+- **A render's identity is `renderPropsHash(template, options)`** — template plus
+  what the athlete chose, and deliberately *not* the serve URL or the resolved
+  input props. Adding an option means adding it to that hash, which is the
+  decision to invalidate every stored video made without it.
+- **A run holds one render per template** (`run_render`'s key is user + activity
+  + template), so switching template must never discard the last one's MP4.
+- The Vivace mark is copied into `packages/video/src/brand/` for the same reason
+  apps/landing copies its primitives — nothing from apps/web exists on Lambda.
+  `vivace-mark.test.tsx` in apps/web fails if the two paths drift.
 
 ## Logging — structured, never `console.log`
 
