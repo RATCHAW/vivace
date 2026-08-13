@@ -36,7 +36,7 @@ export function VideoOptions({
 
       {/* DESIGN.md: a hairline and a surface, no elevation shadow. */}
       <div className="bg-muted/40 flex items-center gap-4 rounded-md border px-5 py-4">
-        <Avatar className="size-9">
+        <Avatar className="ph-no-capture size-9">
           <AvatarImage src={avatarUrl || undefined} alt="" />
           <AvatarFallback>{name.charAt(0).toUpperCase() || "?"}</AvatarFallback>
         </Avatar>

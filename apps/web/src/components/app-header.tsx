@@ -1,6 +1,7 @@
 import { Link, useLocation } from "react-router-dom";
 import { authClient } from "@/lib/auth-client";
 import { flushClientLogs, trackEvent } from "@/lib/logger";
+import { resetPostHog } from "@/lib/posthog";
 import { Wordmark } from "@/components/wordmark";
 import { ModeToggle } from "@/components/mode-toggle";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -41,10 +42,10 @@ export function AppHeader() {
       </nav>
 
       <div className="ml-auto flex items-center gap-3">
-        <span className="text-body-sm text-muted-foreground hidden md:inline">
+        <span className="ph-no-capture text-body-sm text-muted-foreground hidden md:inline">
           {name}
         </span>
-        <Avatar>
+        <Avatar className="ph-no-capture">
           <AvatarImage src={session?.user.image ?? undefined} alt="" />
           <AvatarFallback>{name.charAt(0).toUpperCase() || "?"}</AvatarFallback>
         </Avatar>
@@ -57,6 +58,8 @@ export function AppHeader() {
             trackEvent("auth.sign_out");
             // Flush while the cookie is still ours to attribute the batch by.
             flushClientLogs();
+            // The next athlete on this browser must not inherit this person.
+            resetPostHog();
             void authClient.signOut();
           }}
         >

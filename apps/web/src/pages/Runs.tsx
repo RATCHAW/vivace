@@ -13,6 +13,7 @@ import { AppHeader } from "@/components/app-header";
 import { MonoLabel, SoonBadge } from "@/components/mono";
 import { RunPlayer } from "@/components/run-player";
 import { VideoOptions } from "@/components/video-options";
+import { trackEvent } from "@/lib/logger";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -216,7 +217,15 @@ export function Runs() {
                   pending={athlete === undefined && athleteError == null}
                   failed={athleteError != null}
                   showAvatar={showAvatar}
-                  onShowAvatarChange={setShowAvatar}
+                  onShowAvatarChange={(next) => {
+                    setShowAvatar(next);
+                    // Which options athletes actually want is a product
+                    // question, and this switch decides what gets rendered.
+                    trackEvent("ui.video_option_changed", {
+                      option: "show_avatar",
+                      value: next,
+                    });
+                  }}
                 />
               )}
 

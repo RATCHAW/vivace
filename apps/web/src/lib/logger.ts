@@ -1,13 +1,16 @@
-// Browser-side logging. Everything recorded here is batched to POST /api/logs,
-// re-logged by the server and lands in the same Loki stream as the API's own
-// lines — so one Grafana dashboard shows "user clicked render" next to
-// "Lambda refused the render".
+// Browser-side instrumentation. Everything recorded here goes to both tools:
+// batched to POST /api/logs, where the server re-logs it into the same Loki
+// stream as its own lines, and captured in PostHog as a product event.
 //
 // Two entry points: `trackEvent` for something the user did, `trackError` for
 // something that broke. Names are dotted and low-cardinality (`ui.page_view`,
 // not `ui.page_view./runs`) because dashboards group by them — anything
 // variable belongs in `context`.
+//
+// One funnel, two destinations, because the alternative — a `posthog.capture`
+// next to every `trackEvent` — is how the two views of the app drift apart.
 import { sendClientLogs, type ClientLogContext, type ClientLogEvent } from "@/api";
+import { capturePostHogEvent, capturePostHogException } from "@/lib/posthog";
 
 /** The server rejects longer batches; matches ClientLogBatchSchema. */
 const MAX_BATCH = 50;
@@ -40,9 +43,16 @@ function enqueue(
   else timer ??= setTimeout(() => flushClientLogs(), FLUSH_INTERVAL_MS);
 }
 
+/**
+ * Events PostHog records for itself. Sending our own copy would double every
+ * number on the web-analytics dashboards.
+ */
+const POSTHOG_CAPTURES_NATIVELY = new Set(["ui.page_view"]);
+
 /** Something the user did. */
 export function trackEvent(event: string, context?: ClientLogContext): void {
   enqueue("info", event, undefined, context);
+  if (!POSTHOG_CAPTURES_NATIVELY.has(event)) capturePostHogEvent(event, context);
 }
 
 /** Something that broke, with whatever the thrower gave us. */
@@ -57,6 +67,10 @@ export function trackError(
     ...(error?.name ? { name: error.name } : {}),
     ...(error?.stack ? { stack: error.stack.slice(0, MAX_STACK_CHARS) } : {}),
   });
+
+  // PostHog wants the Error itself — it reads the stack for grouping, which a
+  // truncated string can't support.
+  capturePostHogException(error ?? new Error(String(cause)), { event, ...context });
 }
 
 /**

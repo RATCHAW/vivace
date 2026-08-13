@@ -142,12 +142,19 @@ function createLogger(): Logger {
 
 export const logger = createLogger();
 
+/** Whatever else needs draining on the way out — PostHog, in practice. */
+let beforeExit: (() => Promise<void>) | undefined;
+
 /**
  * Crashes and dropped promises are the failures you most want in Grafana, and
  * the ones a bare Node process reports the worst. Log, flush, then let the
  * process die so the orchestrator restarts it.
  */
-export function installProcessLogging(): void {
+export function installProcessLogging(
+  options: { flush?: () => Promise<void> } = {},
+): void {
+  beforeExit = options.flush;
+
   process.on("uncaughtException", (err) => {
     logger.fatal({ event: "process.uncaught_exception", err }, err.message);
     void flushAndExit(1);
@@ -170,10 +177,13 @@ export function installProcessLogging(): void {
 async function flushAndExit(code: number): Promise<void> {
   // Ending the Loki stream runs its close hook, which pushes whatever is still
   // batched. Bounded, because exiting late is better than not exiting at all.
-  const flushed = new Promise<void>((resolve) => {
-    if (!lokiStream) return resolve();
-    lokiStream.end(() => resolve());
-  });
+  const flushed = Promise.all([
+    new Promise<void>((resolve) => {
+      if (!lokiStream) return resolve();
+      lokiStream.end(() => resolve());
+    }),
+    beforeExit?.().catch(() => {}) ?? Promise.resolve(),
+  ]);
   await Promise.race([flushed, new Promise((r) => setTimeout(r, 2_000))]);
   process.exit(code);
 }

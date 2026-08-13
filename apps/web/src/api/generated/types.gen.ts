@@ -292,7 +292,7 @@ export type StartRunRenderErrors = {
      */
     502: ApiError;
     /**
-     * Remotion Lambda is not configured on this server.
+     * Remotion Lambda is not configured on this server, or rendering is switched off for this athlete by the `video-render` feature flag.
      */
     503: ApiError;
 };
