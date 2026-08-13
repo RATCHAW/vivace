@@ -140,7 +140,7 @@ export const getRunRenderOptions = (options: Options<GetRunRenderData>) => query
 /**
  * Render this run's video on Remotion Lambda
  *
- * Fetches the run and its streams from Strava, starts a Remotion Lambda render of the story video, and persists the render state. The MP4 lands in the Remotion S3 bucket. Idempotent while a render is in flight or already done — those return the existing state; a failed render is retried.
+ * Fetches the run and its streams from Strava, starts a Remotion Lambda render of the story video, and persists the render state. The MP4 lands in the Remotion S3 bucket. Idempotent while a render is in flight or already done with the same options — those return the existing state; a failed render, or one whose options no longer match, is rendered again. The body is optional and defaults to the plain replay.
  */
 export const startRunRenderMutation = (options?: Partial<Options<StartRunRenderData>>): UseMutationOptions<StartRunRenderResponse, StartRunRenderError, Options<StartRunRenderData>> => {
     const mutationOptions: UseMutationOptions<StartRunRenderResponse, StartRunRenderError, Options<StartRunRenderData>> = {

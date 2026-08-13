@@ -126,6 +126,21 @@ export const RunStreamsSchema = z
 export type RunStreams = z.infer<typeof RunStreamsSchema>;
 
 /**
+ * What the athlete chose in the replay's options panel, sent when a render is
+ * started. Part of a render's identity, not a display setting: the same run
+ * with the avatar on is a different video, so the stored render carries these
+ * back and the browser offers a re-render rather than the wrong MP4.
+ */
+export const RunRenderOptionsSchema = z
+  .object({
+    /** Draw the runner as the athlete's Strava picture instead of a dot. */
+    show_avatar: z.boolean().default(false).openapi({ example: true }),
+  })
+  .openapi("RunRenderOptions");
+
+export type RunRenderOptions = z.infer<typeof RunRenderOptionsSchema>;
+
+/**
  * One run's Lambda render — the persisted row in `run_render`, as served to
  * the browser. `output_url` is the public S3 URL of the MP4 once `status` is
  * `"done"`.
@@ -134,6 +149,8 @@ export const RunRenderSchema = z
   .object({
     activity_id: z.number().int().openapi({ example: 987654321 }),
     status: z.enum(["rendering", "done", "error"]).openapi({ example: "rendering" }),
+    /** The option this render was started with — see `RunRenderOptions`. */
+    show_avatar: z.boolean(),
     /** Overall Lambda render progress, 0–1. */
     progress: z.number().min(0).max(1).openapi({ example: 0.42 }),
     output_url: z.string().nullable().openapi({

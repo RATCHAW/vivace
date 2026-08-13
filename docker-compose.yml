@@ -78,6 +78,10 @@ services:
       LOKI_URL: ${LOKI_URL-http://loki:3100}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       APP_ENV: ${APP_ENV:-docker}
+      # Product analytics, error tracking and feature flags. Unset means the
+      # API runs exactly as before, minus the reporting.
+      POSTHOG_KEY: ${POSTHOG_KEY:-}
+      POSTHOG_HOST: ${POSTHOG_HOST:-}
     ports:
       - "3000:3000"
     depends_on:
@@ -91,6 +95,10 @@ services:
     build:
       context: .
       dockerfile: apps/web/Dockerfile
+      args:
+        # Inlined into the bundle at build time, not read at runtime
+        VITE_POSTHOG_KEY: ${VITE_POSTHOG_KEY:-}
+        VITE_POSTHOG_HOST: ${VITE_POSTHOG_HOST:-}
     ports:
       - "8080:80"
     depends_on:
@@ -104,6 +112,8 @@ services:
       args:
         # Baked into the bundle at build time — where "Connect Strava" goes
         NEXT_PUBLIC_APP_URL: http://localhost:8080
+        NEXT_PUBLIC_POSTHOG_KEY: ${NEXT_PUBLIC_POSTHOG_KEY:-}
+        NEXT_PUBLIC_POSTHOG_HOST: ${NEXT_PUBLIC_POSTHOG_HOST:-}
     ports:
       - "3001:3001"
 

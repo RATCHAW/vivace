@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { AbsoluteFill } from "remotion";
 import { projectRoute, ROUTE_PADDING, sampleIndex, type LatLng } from "./data";
+import { RunnerAvatar } from "./RunnerAvatar";
 
 // DESIGN.md {colors.primary} — cobalt as illustration ink on the black canvas.
 const ROUTE_COLOR = "#494fdf";
@@ -15,11 +16,13 @@ export function RouteFallback({
   progress,
   width,
   height,
+  avatarUrl,
 }: {
   points: LatLng[];
   progress: number;
   width: number;
   height: number;
+  avatarUrl: string;
 }) {
   const projected = useMemo(
     () => projectRoute(points, width, height, ROUTE_PADDING),
@@ -53,8 +56,14 @@ export function RouteFallback({
           strokeLinejoin="round"
         />
         <circle cx={startX} cy={startY} r={9} fill="#000000" stroke="#ffffff" strokeWidth={4} />
-        <circle cx={runnerX} cy={runnerY} r={13} fill="#ffffff" stroke={ROUTE_COLOR} strokeWidth={7} />
+        {!avatarUrl && (
+          <circle cx={runnerX} cy={runnerY} r={13} fill="#ffffff" stroke={ROUTE_COLOR} strokeWidth={7} />
+        )}
       </svg>
+      {/* Over the SVG rather than a <foreignObject> in it: the puck is a plain
+          DOM image, and the route here is already projected into the same
+          composition pixels it is positioned in. */}
+      {avatarUrl && <RunnerAvatar src={avatarUrl} x={runnerX} y={runnerY} />}
     </AbsoluteFill>
   );
 }

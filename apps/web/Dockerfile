@@ -13,6 +13,14 @@ RUN pnpm install --frozen-lockfile --filter @repo/web...
 
 COPY packages/strava-api packages/strava-api
 COPY apps/web apps/web
+
+# Vite inlines VITE_* at build time, so the PostHog project is a build input
+# rather than a runtime variable. Unset simply builds without analytics.
+ARG VITE_POSTHOG_KEY
+ENV VITE_POSTHOG_KEY=$VITE_POSTHOG_KEY
+ARG VITE_POSTHOG_HOST
+ENV VITE_POSTHOG_HOST=$VITE_POSTHOG_HOST
+
 RUN pnpm --filter @repo/web build
 
 FROM nginx:alpine

@@ -1,23 +1,19 @@
 import { describe, expect, it } from "vitest";
 import type { Run, RunStreams } from "@/api";
 import {
+  avatarSource,
   buildCameraTrack,
-  buildSparkline,
-  buildSplits,
   CAMERA_TRACK_SAMPLES,
   cameraAtProgress,
-  chapterAtProgress,
-  chapterProgress,
-  CHAPTERS,
   DRAW_END,
   DRAW_START,
+  DURATION_IN_FRAMES,
   fadeAt,
   FPS,
   formatClock,
   formatKm,
   formatPace,
   MAX_CAMERA_ZOOM,
-  MAX_SPLIT_ROWS,
   metricsAtProgress,
   projectPoint,
   projectRoute,
@@ -45,33 +41,14 @@ const activity: Run = {
   workout_type: "default",
 };
 
-describe("chapters", () => {
-  it("covers the whole timeline without a gap", () => {
-    expect(CHAPTERS[0].start).toBe(0);
-    expect(CHAPTERS[CHAPTERS.length - 1].end).toBe(1);
-    for (let i = 1; i < CHAPTERS.length; i += 1) {
-      expect(CHAPTERS[i].start).toBe(CHAPTERS[i - 1].end);
-    }
-  });
-
-  it("reads the chapter under a progress", () => {
-    expect(chapterAtProgress(0).id).toBe("title");
-    expect(chapterAtProgress(0.3).id).toBe("route");
-    expect(chapterAtProgress(0.7).id).toBe("effort");
-    // The boundary belongs to the chapter starting there, and the end of the
-    // film stays on the last one rather than falling off it.
-    expect(chapterAtProgress(0.85).id).toBe("summary");
-    expect(chapterAtProgress(1).id).toBe("summary");
-  });
-
-  it("measures progress within a chapter", () => {
-    const route = CHAPTERS[1];
-    expect(chapterProgress(route, 0.1)).toBe(0);
-    expect(chapterProgress(route, 0.38)).toBeCloseTo(0.5);
-    expect(chapterProgress(route, 0.66)).toBe(1);
-    // Chapters behind read full, chapters ahead read empty.
-    expect(chapterProgress(route, 0.9)).toBe(1);
-    expect(chapterProgress(route, 0)).toBe(0);
+describe("the draw window", () => {
+  it("spans the story, holding at both ends", () => {
+    // The route is the whole film now, but it neither starts on frame one nor
+    // finishes on the last: the story opens on the start line and closes on the
+    // completed route, which is the frame it gets paused on.
+    expect(DRAW_START).toBeGreaterThan(0);
+    expect(DRAW_END).toBeLessThan(DURATION_IN_FRAMES - 1);
+    expect((DRAW_END - DRAW_START) / DURATION_IN_FRAMES).toBeGreaterThan(0.8);
   });
 });
 
@@ -123,6 +100,25 @@ describe("sampleIndex", () => {
   });
   it("is empty-safe", () => {
     expect(sampleIndex(0, 0.5)).toBe(0);
+  });
+});
+
+describe("avatarSource", () => {
+  it("takes an athlete's picture", () => {
+    const url = "https://dgalywyr863hv.cloudfront.net/pictures/athletes/1/large.jpg";
+    expect(avatarSource(url)).toBe(url);
+  });
+
+  it("refuses Strava's placeholder for an athlete with no picture", () => {
+    // Not a URL but a sprite name — an <img> pointed at it 404s against our own
+    // origin, which in a headless render is a frame with a hole in it.
+    expect(avatarSource("avatar/athlete/large.png")).toBe("");
+  });
+
+  it("treats a missing profile as no avatar", () => {
+    expect(avatarSource(undefined)).toBe("");
+    expect(avatarSource(null)).toBe("");
+    expect(avatarSource("")).toBe("");
   });
 });
 
@@ -215,141 +211,6 @@ describe("metricsAtProgress smoothing", () => {
     const mid = metricsAtProgress(activity, streams, 0.5, FPS);
     expect(mid.elapsedSeconds).toBe(spikeIndex);
     expect(mid.distanceMeters).toBe(spikeIndex * 3);
-  });
-});
-
-describe("buildSparkline", () => {
-  const rising = Array.from({ length: 200 }, (_, i) => 120 + i * 0.2);
-
-  it("spans the box and stays inside it", () => {
-    const line = buildSparkline(rising, 900, 240);
-    if (!line) throw new Error("no sparkline");
-
-    const coords = line.d
-      .split(/[ML]/)
-      .filter(Boolean)
-      .map((pair) => pair.trim().split(" ").map(Number));
-    expect(coords[0][0]).toBe(0);
-    expect(coords[coords.length - 1][0]).toBe(900);
-    for (const [, y] of coords) {
-      expect(y).toBeGreaterThanOrEqual(0);
-      expect(y).toBeLessThanOrEqual(240);
-    }
-    // Screen y runs down, so a rising channel falls across the plot.
-    expect(coords[coords.length - 1][1]).toBeLessThan(coords[0][1]);
-    expect(line.length).toBeGreaterThan(900);
-    expect(line.min).toBeCloseTo(rising[0], 0);
-    expect(line.max).toBeCloseTo(rising[rising.length - 1], 0);
-  });
-
-  it("leaves headroom above the peak", () => {
-    const line = buildSparkline(rising, 900, 240);
-    if (!line) throw new Error("no sparkline");
-    const ys = line.d
-      .split(/[ML]/)
-      .filter(Boolean)
-      .map((pair) => Number(pair.trim().split(" ")[1]));
-    expect(Math.min(...ys)).toBeGreaterThan(0);
-    expect(Math.max(...ys)).toBeLessThan(240);
-  });
-
-  it("has nothing to plot for missing, short or flat channels", () => {
-    expect(buildSparkline(undefined, 900, 240)).toBeNull();
-    expect(buildSparkline([150], 900, 240)).toBeNull();
-    expect(buildSparkline(Array(200).fill(150), 900, 240)).toBeNull();
-  });
-
-  it("ignores non-finite samples", () => {
-    const line = buildSparkline([1, Number.NaN, 2, 3, 4, 5], 100, 50, 4);
-    expect(line).not.toBeNull();
-  });
-});
-
-describe("buildSplits", () => {
-  /** A run at a dead-steady pace, sampled every 10 metres. */
-  const steady = (metres: number, seconds: number) => {
-    const samples = metres / 10 + 1;
-    return {
-      activity: {
-        ...activity,
-        distance: metres,
-        moving_time: seconds,
-        average_speed: metres / seconds,
-      },
-      streams: {
-        distance: { data: Array.from({ length: samples }, (_, i) => i * 10) },
-        time: {
-          data: Array.from({ length: samples }, (_, i) => (i * 10 * seconds) / metres),
-        },
-      } satisfies RunStreams,
-    };
-  };
-
-  it("splits a short run by the kilometre", () => {
-    const { activity: run, streams } = steady(5000, 1500);
-    const splits = buildSplits(run, streams);
-    expect(splits.map((s) => s.label)).toEqual(["1", "2", "3", "4", "5"]);
-    for (const split of splits) {
-      expect(split.paceSecondsPerKm).toBeCloseTo(300);
-      expect(split.weight).toBeCloseTo(1);
-    }
-  });
-
-  it("weights each split against the fastest one", () => {
-    const { activity: run } = steady(3000, 900);
-    // 5:00, 6:00 then 4:00 per km.
-    const streams: RunStreams = {
-      distance: { data: [0, 1000, 2000, 3000] },
-      time: { data: [0, 300, 660, 900] },
-    };
-    const splits = buildSplits(run, streams);
-    expect(splits.map((s) => s.paceSecondsPerKm)).toEqual([300, 360, 240]);
-    expect(splits[2].weight).toBe(1);
-    expect(splits[0].weight).toBeCloseTo(240 / 300);
-    expect(splits[1].weight).toBeCloseTo(240 / 360);
-  });
-
-  it("groups a long run into whole-kilometre steps within the row budget", () => {
-    const { activity: run, streams } = steady(20000, 6000);
-    const splits = buildSplits(run, streams);
-    expect(splits.length).toBeLessThanOrEqual(MAX_SPLIT_ROWS);
-    expect(splits.map((s) => s.label)).toEqual([
-      "3",
-      "6",
-      "9",
-      "12",
-      "15",
-      "18",
-      "20",
-    ]);
-    // Three kilometres each, so the pace is still per kilometre.
-    for (const split of splits) expect(split.paceSecondsPerKm).toBeCloseTo(300);
-  });
-
-  it("folds an overflowing trailing split into the one before it", () => {
-    const { activity: run, streams } = steady(8510, 2553);
-    const splits = buildSplits(run, streams);
-    expect(splits).toHaveLength(MAX_SPLIT_ROWS);
-    expect(splits[splits.length - 1].label).toBe("8.5");
-  });
-
-  it("absorbs a trailing split too short to compare", () => {
-    const { activity: run, streams } = steady(3160, 948);
-    const splits = buildSplits(run, streams);
-    // 3.16km: the last 160m rides along with kilometre three.
-    expect(splits.map((s) => s.label)).toEqual(["1", "2", "3.2"]);
-  });
-
-  it("falls back to the average pace without streams", () => {
-    const { activity: run } = steady(5000, 1500);
-    const splits = buildSplits(run, {});
-    expect(splits).toHaveLength(5);
-    for (const split of splits) expect(split.paceSecondsPerKm).toBeCloseTo(300);
-  });
-
-  it("has nothing to compare on a run under two kilometres", () => {
-    const { activity: run, streams } = steady(1500, 450);
-    expect(buildSplits(run, streams)).toEqual([]);
   });
 });
 

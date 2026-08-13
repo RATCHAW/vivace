@@ -19,6 +19,7 @@ A Turborepo monorepo: sign in with Strava (and only Strava), then see your basic
 | Video rendering | [Remotion Lambda](https://www.remotion.dev/lambda) → MP4 in S3 |
 | AI coach | [AI SDK](https://ai-sdk.dev) on both ends — Gemini 2.5 Flash, [AI Elements](https://elements.ai-sdk.dev) UI |
 | Logging | [pino](https://getpino.io) → [Grafana Loki](https://grafana.com/oss/loki/), dashboards in `ops/grafana` |
+| Product analytics | [PostHog](https://posthog.com) — events, replay, flags, error tracking, LLM traces |
 | Tests | [Vitest](https://vitest.dev) |
 
 ## Prerequisites
@@ -170,6 +171,16 @@ progress bar streams live over SSE, and once done the button becomes
 (`run_render`), so an already-rendered run offers the download straight away —
 even after a reload or on another device.
 
+**Video options** sit between the player and that button, and change the film
+rather than the page. There is one today: *Run as your avatar* swaps the dot at
+the head of the route for the athlete's Strava picture — three times the size,
+with the camera widened to keep it in frame. The `<Player>` updates as the
+switch is thrown, and the same choice travels with the render request. Options
+are part of a render's identity, so a run already rendered with the other answer
+offers **Render again** (and the previous MP4) instead of passing the old file
+off as the new choice. An athlete who never set a Strava picture gets the dot,
+and the switch says so.
+
 One-time setup (all optional — without it the render button returns a 503 and
 the rest of the app is unaffected):
 
@@ -189,8 +200,10 @@ bundle is what Lambda renders, not your local code. After a Remotion version
 upgrade the function must be redeployed too; all `remotion`/`@remotion/*`
 packages are pinned to the same exact version for this reason.
 
-How it flows: `POST /api/runs/{id}/render` fetches the run + streams from
-Strava, calls `renderMediaOnLambda()`, and stores the render row.
+How it flows: `POST /api/runs/{id}/render` fetches the run + streams from Strava
+— plus the athlete, when the avatar option is on, so the picture baked into the
+video is read from Strava rather than named by the browser — calls
+`renderMediaOnLambda()`, and stores the render row with the options it used.
 `GET /api/runs/{id}/render/progress` (SSE) polls Lambda, persists each update,
 and streams it to the browser. `GET /api/runs/{id}/render` serves the stored
 state. The MP4 lands in the Remotion S3 bucket with a public download URL.
@@ -409,6 +422,72 @@ Note that label-filter regexes in LogQL match the **whole** value: write
 For **Grafana Cloud**, skip the containers: point `LOKI_URL` at the hosted push
 URL, set the user id / API token, and import the two files in
 `ops/grafana/dashboards`.
+
+## PostHog
+
+Grafana answers "is the server healthy"; PostHog answers "is the product
+working for the people using it". Both are fed from the *same* call sites —
+`trackEvent`/`trackError` in the browser, `track`/`trackError` in the API — so
+an event can't reach one and miss the other.
+
+Set a project API key and it turns on. Leave it unset — the default, and the
+state of every test run — and none of it loads.
+
+```sh
+# apps/api/.env
+POSTHOG_KEY=phc_...
+# apps/web/.env      (VITE_* is inlined at build time)
+VITE_POSTHOG_KEY=phc_...
+# apps/landing/.env  (NEXT_PUBLIC_* likewise)
+NEXT_PUBLIC_POSTHOG_KEY=phc_...
+```
+
+The key is the *project* key, which is public by design — it can only write
+events. Add `POSTHOG_HOST=https://eu.i.posthog.com` (and the matching
+`VITE_`/`NEXT_PUBLIC_` variants) for an EU or self-hosted project.
+
+What each product is wired to:
+
+| Product | Where it comes from |
+| --- | --- |
+| **Product analytics** | `trackEvent` in the browser and `track()` in the API — `ui.render_clicked`, `render.started`, `coach.turn_started`, … |
+| **Web analytics** | `$pageview` / `$pageleave` and autocapture, on the app *and* the landing page — which is where the sign-up funnel actually starts |
+| **Session replay** | On, inputs masked. The athlete's name and avatar carry `ph-no-capture` |
+| **Error tracking** | Every `trackError`, the React `ErrorBoundary`, `window.onerror`, the React Query caches, and the API's `onError` |
+| **Feature flags** | `useFeatureFlag()` in the browser, `isFeatureEnabledFor()` in the API. `video-render` is a real one — see below |
+| **AI observability** | One `$ai_generation` per coach turn: model, tokens, cost, latency, stop reason, tool steps |
+| **Surveys** | Enabled in the SDK; author and target them in PostHog against the events above — no deploy needed |
+
+### The `video-render` flag
+
+A Lambda render is the one click here that costs real money, so it has a kill
+switch. The browser hides the button and the API refuses to start a render —
+the second is what enforces it.
+
+It **defaults to on**: no PostHog, no flag, or an unreachable PostHog all mean
+"behave exactly as the app shipped". Create a `video-render` flag in PostHog and
+roll it to 0% to switch rendering off without a deploy. Note that this is why
+the API reads `getFlag()` rather than `isEnabled()` — the latter reports a flag
+that doesn't exist as *off*, which would disable the feature the moment PostHog
+was switched on.
+
+### Privacy
+
+- Session replay masks all inputs, and `ph-no-capture` blocks the athlete's
+  name and avatar in both replay and autocapture.
+- **Coach transcripts are not sent.** `$ai_generation` carries the numbers —
+  tokens, cost, latency, errors — with `$ai_input` and `$ai_output` redacted.
+  Set `POSTHOG_LLM_CAPTURE_CONTENT=true` in `apps/api/.env` to include the
+  prompt and reply when you need to debug answer quality.
+- `person_profiles: "identified_only"`, so anonymous traffic doesn't create a
+  person for every visitor.
+
+### Not wired up
+
+PostHog's **Logs** and **Metrics** products ingest over OTLP and would duplicate
+the Loki pipeline above — one log store is enough, and Grafana already has the
+dashboards. **MCP analytics** needs an MCP server, which this repo doesn't have.
+**Support** is configured in PostHog rather than in code.
 
 ## Commands
 

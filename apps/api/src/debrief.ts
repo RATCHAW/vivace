@@ -11,6 +11,7 @@
 import { generateText } from "ai";
 import { createIdGenerator, type UIMessage } from "ai";
 import { logger } from "./logger.js";
+import { captureCoachGeneration, captureUserEvent } from "./posthog.js";
 import { buildRunDebriefCard, getCoachConfig, coachSystemPrompt } from "./coach.js";
 import { findOrCreateThread, recordDebrief, saveMessage } from "./chat-store.js";
 import { fetchRuns } from "./strava.js";
@@ -82,23 +83,50 @@ export async function postRunDebrief(
   const config = getCoachConfig();
   let read = withoutModel(card);
   if (config) {
+    const prompt = `${DEBRIEF_PROMPT}\n\nThe run:\n${JSON.stringify(card)}\n\nTheir last few weeks:\n${JSON.stringify(
+      runs.slice(0, 12).map((other) => ({
+        date: localDate(other),
+        km: Number((other.distance / 1000).toFixed(1)),
+        type: other.workout_type,
+        avg_hr: other.average_heartrate,
+      })),
+    )}`;
+    const startedAt = Date.now();
+
     try {
-      const { text } = await generateText({
+      const { text, usage, finishReason } = await generateText({
         model: config.model,
         system: coachSystemPrompt(today, 6),
-        prompt: `${DEBRIEF_PROMPT}\n\nThe run:\n${JSON.stringify(card)}\n\nTheir last few weeks:\n${JSON.stringify(
-          runs.slice(0, 12).map((other) => ({
-            date: localDate(other),
-            km: Number((other.distance / 1000).toFixed(1)),
-            type: other.workout_type,
-            avg_hr: other.average_heartrate,
-          })),
-        )}`,
+        prompt,
       });
       if (text.trim()) read = text.trim();
+
+      // The app's other model call, and the only one nobody is watching — so
+      // its tokens, latency and stop reason belong in the same LLM analytics as
+      // a coach turn rather than being the invisible half of the bill.
+      captureCoachGeneration({
+        distinctId: userId,
+        modelId: config.modelId,
+        latencySeconds: (Date.now() - startedAt) / 1000,
+        inputTokens: usage.inputTokens,
+        outputTokens: usage.outputTokens,
+        input: prompt,
+        output: text,
+        finishReason,
+        properties: { $ai_span_name: "post-run debrief", activity_id: activityId },
+      });
     } catch (err) {
       // A model that is down should cost the athlete the prose, not the card.
       log.error({ event: "debrief.model_failed", err }, "Could not write the debrief");
+      captureCoachGeneration({
+        distinctId: userId,
+        modelId: config.modelId,
+        latencySeconds: (Date.now() - startedAt) / 1000,
+        input: prompt,
+        output: null,
+        error: err,
+        properties: { $ai_span_name: "post-run debrief", activity_id: activityId },
+      });
     }
   }
 
@@ -123,9 +151,19 @@ export async function postRunDebrief(
 
   await saveMessage(thread.id, message);
   await recordDebrief(userId, activityId, thread.id, message.id);
-  log.info(
-    { event: "debrief.posted", threadId: thread.id, model: config?.modelId ?? null },
-    "Posted a post-run debrief",
-  );
+
+  // `track()` takes a request context and there isn't one here — a webhook is
+  // the one thing the app does with nobody waiting on it. This is still an
+  // athlete-facing event, and the only one they didn't ask for, so it goes to
+  // PostHog by hand rather than being left out of their timeline.
+  const properties = {
+    threadId: thread.id,
+    activityId,
+    model: config?.modelId ?? null,
+    written: config !== null,
+  };
+  log.info({ event: "debrief.posted", ...properties }, "Posted a post-run debrief");
+  captureUserEvent({ distinctId: userId, event: "debrief.posted", properties });
+
   return thread.id;
 }

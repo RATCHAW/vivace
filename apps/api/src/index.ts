@@ -1,8 +1,9 @@
 import { serve } from "@hono/node-server";
 import { app } from "./app.js";
 import { installProcessLogging, logger } from "./logger.js";
+import { posthogEnabled, shutdownPostHog } from "./posthog.js";
 
-installProcessLogging();
+installProcessLogging({ flush: shutdownPostHog });
 
 const port = Number(process.env.PORT ?? 3000);
 
@@ -14,6 +15,7 @@ serve({ fetch: app.fetch, port }, (info) => {
       // Absent means logs stay on stdout only — worth seeing at boot rather
       // than wondering later why Grafana is empty.
       loki: process.env.LOKI_URL ?? null,
+      posthog: posthogEnabled,
     },
     `API listening on http://localhost:${info.port}`,
   );

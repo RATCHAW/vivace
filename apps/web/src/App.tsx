@@ -3,6 +3,7 @@ import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { Loader2Icon } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import { trackEvent } from "@/lib/logger";
+import { identifyAthlete } from "@/lib/posthog";
 import { Login } from "@/pages/Login";
 import { Home } from "@/pages/Home";
 
@@ -40,10 +41,21 @@ function usePageViews(signedIn: boolean, ready: boolean): void {
   }, [pathname, signedIn, ready]);
 }
 
+/**
+ * Names the athlete in PostHog, which stitches everything they did while
+ * signed out — the landing page, the sign-in screen — onto the same person.
+ */
+function useIdentify(userId: string | undefined, name: string | null): void {
+  useEffect(() => {
+    if (userId) identifyAthlete(userId, name);
+  }, [userId, name]);
+}
+
 export function App() {
   const { data: session, isPending } = authClient.useSession();
 
   usePageViews(Boolean(session), !isPending);
+  useIdentify(session?.user.id, session?.user.name ?? null);
 
   if (isPending) {
     return <FullPageSpinner />;

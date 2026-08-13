@@ -38,6 +38,8 @@ export async function startLambdaRender(
   config: RenderConfig,
   run: Run,
   streams: RunStreams,
+  /** The athlete's Strava picture URL when the avatar option is on, else "". */
+  avatarUrl: string,
 ): Promise<{ renderId: string; bucketName: string }> {
   const { renderId, bucketName } = await renderMediaOnLambda({
     ...config,
@@ -48,6 +50,7 @@ export async function startLambdaRender(
       // The server-side token; the browser's VITE_MAPBOX_TOKEN never leaves
       // the client. Empty renders the plain route canvas fallback.
       mapboxToken: process.env.MAPBOX_TOKEN ?? "",
+      avatarUrl,
     },
     codec: "h264",
     // Public so output_url is directly downloadable from the browser.

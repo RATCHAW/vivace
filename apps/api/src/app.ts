@@ -13,7 +13,13 @@ import {
   type UIMessage,
 } from "ai";
 import { auth } from "./auth.js";
+import { track, trackError } from "./analytics.js";
 import { logger } from "./logger.js";
+import {
+  captureCoachGeneration,
+  captureServerException,
+  isFeatureEnabledFor,
+} from "./posthog.js";
 import { identify, requestLogger, type AppEnv } from "./request-logger.js";
 import {
   AthleteSchema,
@@ -30,6 +36,8 @@ import {
   ErrorSchema,
   HealthSchema,
   PlanProgressSchema,
+  RunRenderOptionsSchema,
+  type RunRenderOptions,
   RunRenderStateSchema,
   RunSchema,
   RunStreamsSchema,
@@ -152,6 +160,11 @@ app.onError((err, c) => {
     { event: "unhandled_error", route: c.req.routePath, err },
     err.message,
   );
+  captureServerException(err, c.get("userId"), {
+    event: "unhandled_error",
+    route: c.req.routePath,
+    requestId: c.get("requestId"),
+  });
   return c.json({ error: "Internal server error" }, 500);
 });
 
@@ -357,7 +370,7 @@ app.openapi(runsRoute, async (c) => {
 
   try {
     const runs = await fetchRuns(accessToken);
-    c.get("log").info({ event: "runs.listed", count: runs.length }, "Listed runs");
+    track(c, "runs.listed", { count: runs.length }, "Listed runs");
     return c.json(runs, 200);
   } catch (err) {
     logStravaFailure(c, err, "list runs");
@@ -452,6 +465,16 @@ const RENDER_NOT_CONFIGURED =
   "(pnpm --filter @repo/web remotion:deploy) and set REMOTION_FUNCTION_NAME / " +
   "REMOTION_SERVE_URL in apps/api/.env.";
 
+/**
+ * The PostHog flag that can switch rendering off — per athlete, or for
+ * everyone — without a deploy. The browser reads the same flag to hide the
+ * button (see RenderControls); this check is what actually enforces it.
+ */
+export const RENDER_FLAG = "video-render";
+
+const RENDER_DISABLED =
+  "Video rendering is temporarily switched off. It should be back shortly.";
+
 const getRunRenderRoute = createRoute({
   method: "get",
   path: "/api/runs/{id}/render",
@@ -496,10 +519,16 @@ const startRunRenderRoute = createRoute({
     "Fetches the run and its streams from Strava, starts a Remotion Lambda " +
     "render of the story video, and persists the render state. The MP4 lands " +
     "in the Remotion S3 bucket. Idempotent while a render is in flight or " +
-    "already done — those return the existing state; a failed render is " +
-    "retried.",
+    "already done with the same options — those return the existing state; a " +
+    "failed render, or one whose options no longer match, is rendered again. " +
+    "The body is optional and defaults to the plain replay.",
   security: [{ sessionCookie: [] }],
-  request: { params: RunIdParamsSchema },
+  request: {
+    params: RunIdParamsSchema,
+    body: {
+      content: { "application/json": { schema: RunRenderOptionsSchema } },
+    },
+  },
   responses: {
     200: {
       description: "The render that is now in flight (or already finished).",
@@ -519,7 +548,9 @@ const startRunRenderRoute = createRoute({
       content: { "application/json": { schema: ErrorSchema } },
     },
     503: {
-      description: "Remotion Lambda is not configured on this server.",
+      description:
+        "Remotion Lambda is not configured on this server, or rendering is " +
+        "switched off for this athlete by the `video-render` feature flag.",
       content: { "application/json": { schema: ErrorSchema } },
     },
   },
@@ -536,14 +567,29 @@ app.openapi(startRunRenderRoute, async (c) => {
     return c.json({ error: RENDER_NOT_CONFIGURED }, 503);
   }
 
+  // A Lambda render is the one thing here that costs real money per click, so
+  // it gets a kill switch. Defaults to on: with PostHog absent, or the flag
+  // never created, this is the behaviour the app shipped with.
+  if (!(await isFeatureEnabledFor(RENDER_FLAG, session.user.id, true))) {
+    log.warn({ event: "render.flag_off", flag: RENDER_FLAG }, "Rendering is switched off");
+    return c.json({ error: RENDER_DISABLED }, 503);
+  }
+
   const { id } = c.req.valid("param");
   const activityId = Number(id);
+  // The body is optional, so the validator — and with it the schema's defaults —
+  // is skipped entirely when a caller posts nothing.
+  const options: RunRenderOptions | undefined = c.req.valid("json");
+  const showAvatar = options?.show_avatar ?? false;
 
-  // Don't double-render: an in-flight or finished render is simply returned.
+  // Don't double-render: an in-flight or finished render is simply returned —
+  // unless it was made with different options, which makes it a different video.
   const existing = await getRunRender(session.user.id, activityId);
-  if (existing && existing.status !== "error") {
-    log.info(
-      { event: "render.reused", activityId, status: existing.status },
+  if (existing && existing.status !== "error" && existing.showAvatar === showAvatar) {
+    track(
+      c,
+      "render.reused",
+      { activityId, status: existing.status, showAvatar },
       "Returned the existing render",
     );
     return c.json({ render: toRunRender(existing) }, 200);
@@ -553,19 +599,30 @@ app.openapi(startRunRenderRoute, async (c) => {
   if (!accessToken) return c.json({ error: "No Strava access token" }, 401);
 
   try {
-    const [run, streams] = await Promise.all([
+    const [run, streams, athlete] = await Promise.all([
       fetchRun(accessToken, activityId),
       fetchRunStreams(accessToken, activityId),
+      // Read from Strava rather than taken from the request: the browser does
+      // not get to choose the picture that is baked into the video.
+      showAvatar ? fetchAthlete(accessToken) : null,
     ]);
-    const { renderId, bucketName } = await startLambdaRender(config, run, streams);
+    const { renderId, bucketName } = await startLambdaRender(
+      config,
+      run,
+      streams,
+      athlete?.profile ?? "",
+    );
     const row = await saveStartedRender({
       userId: session.user.id,
       activityId,
       renderId,
       bucketName,
+      showAvatar,
     });
-    log.info(
-      { event: "render.started", activityId, renderId, bucketName, retry: Boolean(existing) },
+    track(
+      c,
+      "render.started",
+      { activityId, renderId, bucketName, showAvatar, retry: Boolean(existing) },
       "Started a Lambda render",
     );
     return c.json({ render: toRunRender(row) }, 200);
@@ -579,7 +636,7 @@ app.openapi(startRunRenderRoute, async (c) => {
     }
     // Lambda refused the render (bad serve URL, missing AWS permissions, …).
     const message = err instanceof Error ? err.message : "Failed to start the render";
-    log.error({ event: "render.start_failed", activityId, err }, message);
+    trackError(c, "render.start_failed", err, { activityId }, message);
     return c.json({ error: message }, 502);
   }
 });
@@ -663,8 +720,17 @@ app.openapi(runRenderProgressRoute, async (c) => {
             durationMs: updated.updatedAt.getTime() - updated.createdAt.getTime(),
             error: updated.error,
           };
-          if (updated.status === "error") log.error(finished, "Render failed on Lambda");
-          else log.info(finished, "Render finished");
+          if (updated.status === "error") {
+            trackError(
+              c,
+              "render.finished",
+              new Error(updated.error ?? "Render failed on Lambda"),
+              finished,
+              "Render failed on Lambda",
+            );
+          } else {
+            track(c, "render.finished", finished, "Render finished");
+          }
           return;
         }
       } catch (err) {
@@ -854,9 +920,10 @@ app.openapi(coachBriefingRoute, async (c) => {
 
   try {
     const briefing = await buildBriefing(accessToken, session.user.id);
-    c.get("log").info(
+    track(
+      c,
+      "coach.briefing_built",
       {
-        event: "coach.briefing_built",
         signals: briefing.signals.length,
         queue: briefing.queue.length,
         hasPlan: briefing.plan !== null,
@@ -912,8 +979,10 @@ app.openapi(updateCoachContextRoute, async (c) => {
 
   const patch = c.req.valid("json");
   const context = await saveContext(session.user.id, patch);
-  c.get("log").info(
-    { event: "coach.context_updated", fields: Object.keys(patch) },
+  track(
+    c,
+    "coach.context_updated",
+    { fields: Object.keys(patch) },
     "Athlete context updated",
   );
   return c.json(context, 200);
@@ -965,12 +1034,10 @@ app.openapi(acceptCoachPlanRoute, async (c) => {
   if (!accessToken) return c.json({ error: "No Strava access token" }, 401);
 
   const plan = await savePlan(session.user.id, c.req.valid("json"));
-  c.get("log").info(
-    {
-      event: "coach.plan_accepted",
-      weekStarting: plan.week_starting,
-      sessions: plan.sessions.length,
-    },
+  track(
+    c,
+    "coach.plan_accepted",
+    { weekStarting: plan.week_starting, sessions: plan.sessions.length },
     "Week accepted",
   );
 
@@ -1080,17 +1147,15 @@ app.openapi(coachChatRoute, async (c) => {
 
   // The interesting part of a coach turn isn't in the URL: which thread, and
   // whether the athlete asked something new or re-rolled the last answer.
-  log.info(
-    {
-      event: "coach.turn_started",
-      threadId: thread.id,
-      trigger: body.trigger,
-      messages: messages.length,
-    },
+  track(
+    c,
+    "coach.turn_started",
+    { threadId: thread.id, trigger: body.trigger, messages: messages.length },
     "Answering a coach turn",
   );
 
   const today = todayLocal();
+  const startedAt = Date.now();
   const result = streamText({
     model: config.model,
     system: coachSystemPrompt(today, body.range_weeks, attachedRun(messages)),
@@ -1105,6 +1170,27 @@ app.openapi(coachChatRoute, async (c) => {
     // looping through the athlete's whole history.
     stopWhen: stepCountIs(COACH_MAX_STEPS),
     providerOptions: COACH_PROVIDER_OPTIONS,
+    // Tokens, cost, latency and stop reason for this turn, into PostHog's LLM
+    // analytics. The SDK hands them over here, which is why the coach needs no
+    // tracing wrapper around its model.
+    onFinish: ({ usage, finishReason, text, steps }) => {
+      captureCoachGeneration({
+        distinctId: session.user.id,
+        modelId: config.modelId,
+        latencySeconds: (Date.now() - startedAt) / 1000,
+        inputTokens: usage.inputTokens,
+        outputTokens: usage.outputTokens,
+        input: messages,
+        output: text,
+        finishReason,
+        properties: {
+          thread_id: thread.id,
+          trigger: body.trigger,
+          // How many times it went back to Strava before answering.
+          steps: steps.length,
+        },
+      });
+    },
   });
 
   return result.toUIMessageStreamResponse({
@@ -1114,14 +1200,14 @@ app.openapi(coachChatRoute, async (c) => {
     generateMessageId: createIdGenerator({ prefix: "msg", size: 16 }),
     onEnd: async ({ responseMessage }) => {
       await saveMessage(thread.id, responseMessage);
-      log.info({ event: "coach.turn_finished", threadId: thread.id }, "Coach answered");
+      track(c, "coach.turn_finished", { threadId: thread.id }, "Coach answered");
     },
     onError: (error) => {
       // The default swallows everything as "An error occurred." — a coach that
       // can't reach its model should say why, to the athlete and to Grafana.
       // The stream is already open, so this never becomes a 5xx: without a log
       // line a failing model is invisible on the server.
-      log.error({ event: "coach.turn_failed", threadId: thread.id, err: error }, "Coach failed");
+      trackError(c, "coach.turn_failed", error, { threadId: thread.id }, "Coach failed");
       return error instanceof Error
         ? error.message
         : "The coach could not answer that.";
