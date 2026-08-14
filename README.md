@@ -69,9 +69,8 @@ cp apps/landing/.env.example apps/landing/.env
 #    → add VITE_MAPBOX_TOKEN for map tiles in the local replay;
 #      both files also contain optional PostHog settings
 
-# 3. Start Postgres and create the auth tables
+# 3. Start Postgres — the API migrates its own tables when it boots
 pnpm db:up
-pnpm auth:migrate
 
 # 4. Run everything
 pnpm dev
@@ -642,7 +641,7 @@ pnpm generate   # regenerate the OpenAPI document and both generated clients
 pnpm spec:pull  # re-download and bundle Strava's Swagger spec
 pnpm db:up      # start Postgres only (docker compose)
 pnpm logs:up    # start Postgres + Loki + Grafana (Grafana on :3002)
-pnpm auth:migrate  # create/update better-auth tables in Postgres
+pnpm auth:migrate  # the same better-auth migration the API runs at boot, by hand
 pnpm video:deploy  # deploy the Remotion Lambda functions + the site bundle
 pnpm --filter @repo/video bundle:check  # compile the Lambda bundle without AWS
 

@@ -52,7 +52,7 @@ export interface RunRenderRow {
   updatedAt: Date;
 }
 
-// better-auth migrates its own tables via `pnpm auth:migrate`; this one table
+// better-auth migrates its own tables at boot (see migrate.ts); this one table
 // is ours, so it is created idempotently on first use instead.
 let tableReady: Promise<unknown> | null = null;
 

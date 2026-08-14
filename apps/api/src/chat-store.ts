@@ -28,7 +28,7 @@ interface MessageRow {
   metadata: UIMessage["metadata"];
 }
 
-// better-auth migrates its own tables via `pnpm auth:migrate`; these two are
+// better-auth migrates its own tables at boot (see migrate.ts); these two are
 // ours, so they are created idempotently on first use — the same bargain
 // run_render makes.
 let tablesReady: Promise<unknown> | null = null;
