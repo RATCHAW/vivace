@@ -1,7 +1,12 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Trans, useTranslation } from "react-i18next";
-import { ArrowLeftIcon, ChevronDownIcon, ChevronUpIcon, Loader2Icon } from "lucide-react";
+import {
+  ArrowLeftIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
+  Loader2Icon,
+} from "lucide-react";
 import {
   avatarSource,
   DEFAULT_THEME,
@@ -82,7 +87,9 @@ export function RunStudio({
   const { data: streams, error: streamsError } = useQuery(
     getRunStreamsOptions({ path: { id: String(run.id) } }),
   );
-  const { data: athlete, error: athleteError } = useQuery(getStravaAthleteOptions());
+  const { data: athlete, error: athleteError } = useQuery(
+    getStravaAthleteOptions(),
+  );
   const avatarUrl = avatarSource(athlete?.profile);
 
   // The narrow studio covers the page rather than replacing it, so the list is
@@ -102,12 +109,16 @@ export function RunStudio({
   // What decides which templates this run can be cut with. Null until the
   // streams are here: a treadmill run and a run whose streams are still loading
   // look identical, and only one of them should lose the route replay.
-  const input: TemplateInput | null = streams ? { activity: run, streams } : null;
+  const input: TemplateInput | null = streams
+    ? { activity: run, streams }
+    : null;
   // The athlete's choice, unless this run can't have it — clicking a treadmill
   // run in the list must not leave the route replay selected and empty. Derived
   // rather than stored, so their choice comes back the moment a run can serve it.
   const template =
-    input && !templateEligibility(chosen, input).eligible ? recommendTemplate(input) : chosen;
+    input && !templateEligibility(chosen, input).eligible
+      ? recommendTemplate(input)
+      : chosen;
   // A template that draws no runner has nothing for the avatar switch to do,
   // and one whose plate isn't ours to re-tint has nothing for the theme. Both
   // are resolved once, so the player and the render are handed the same answers.
@@ -222,7 +233,9 @@ export function RunStudio({
             <ArrowLeftIcon />
           </Button>
           <span className="flex min-w-0 flex-col gap-1">
-            <span className="text-body-sm truncate font-semibold">{run.name}</span>
+            <span className="text-body-sm truncate font-semibold">
+              {run.name}
+            </span>
             <MonoLabel className="truncate">
               {format.shortDate(run.start_date_local)} ·{" "}
               {(run.distance / 1000).toFixed(2)} {t("common.km")} ·{" "}
@@ -260,7 +273,9 @@ export function RunStudio({
               <CollapsibleTrigger className="flex w-full items-center gap-3 text-left outline-none">
                 <MonoLabel>{t("videoOptions.section")}</MonoLabel>
                 <span className="text-caption text-muted-foreground ml-auto inline-flex items-center gap-1 font-semibold">
-                  {optionsOpen ? t("videoOptions.hide") : t("videoOptions.edit")}
+                  {optionsOpen
+                    ? t("videoOptions.hide")
+                    : t("videoOptions.edit")}
                   {optionsOpen ? (
                     <ChevronDownIcon className="size-3.5" />
                   ) : (
@@ -287,7 +302,9 @@ export function RunStudio({
   return (
     // Theatre mode hides the list, so the studio centres itself in the row it
     // is left alone in rather than sitting against the left margin.
-    <div className={cn("flex shrink-0 items-start gap-6", expanded && "mx-auto")}>
+    <div
+      className={cn("flex shrink-0 items-start gap-6", expanded && "mx-auto")}
+    >
       <div
         className={cn(
           "flex flex-col gap-3.5",

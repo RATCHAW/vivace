@@ -216,7 +216,10 @@ export async function findDebrief(
     })
     .from(coachDebrief)
     .where(
-      and(eq(coachDebrief.userId, userId), eq(coachDebrief.activityId, activityId)),
+      and(
+        eq(coachDebrief.userId, userId),
+        eq(coachDebrief.activityId, activityId),
+      ),
     );
   return row ?? null;
 }
@@ -242,5 +245,7 @@ export async function setTitleIfUnset(
   await db
     .update(coachThread)
     .set({ title })
-    .where(and(eq(coachThread.id, threadId), sql`${coachThread.title} IS NULL`));
+    .where(
+      and(eq(coachThread.id, threadId), sql`${coachThread.title} IS NULL`),
+    );
 }

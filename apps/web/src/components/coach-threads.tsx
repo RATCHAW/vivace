@@ -79,9 +79,7 @@ export function CoachThreads({ selectedId, onSelect }: CoachThreadsProps) {
         {t("threads.newConversation")}
       </Button>
 
-      {error && (
-        <p className="text-body-sm text-destructive">{error.error}</p>
-      )}
+      {error && <p className="text-body-sm text-destructive">{error.error}</p>}
 
       {!threads && !error && (
         <div className="flex flex-col gap-2">
@@ -92,7 +90,9 @@ export function CoachThreads({ selectedId, onSelect }: CoachThreadsProps) {
       )}
 
       {threads?.length === 0 && (
-        <p className="text-body-sm text-muted-foreground">{t("threads.empty")}</p>
+        <p className="text-body-sm text-muted-foreground">
+          {t("threads.empty")}
+        </p>
       )}
 
       {threads && threads.length > 0 && (
@@ -107,9 +107,7 @@ export function CoachThreads({ selectedId, onSelect }: CoachThreadsProps) {
                   aria-current={thread.id === selectedId ? "page" : undefined}
                   className={cn(
                     "focus-visible:ring-ring/50 flex w-full flex-col gap-1 rounded-sm px-3.5 py-2.5 pr-10 text-left outline-none focus-visible:ring-3 focus-visible:ring-inset",
-                    thread.id === selectedId
-                      ? "bg-muted"
-                      : "hover:bg-muted/40",
+                    thread.id === selectedId ? "bg-muted" : "hover:bg-muted/40",
                   )}
                   onClick={() => onSelect(thread.id)}
                   type="button"

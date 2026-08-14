@@ -75,7 +75,10 @@ export function resolveRenderTarget(id: TemplateId): RenderTarget | null {
  * every athlete's finished video stale and offer them a re-render they never
  * asked for. What identifies the cut is the template and the options.
  */
-export function renderPropsHash(template: TemplateId, options: RenderOptions): string {
+export function renderPropsHash(
+  template: TemplateId,
+  options: RenderOptions,
+): string {
   const canonical = JSON.stringify({
     template,
     // Spelled out rather than serialised wholesale, so adding a field to
@@ -126,7 +129,10 @@ export async function startLambdaRender(
     // How long one frame may hold `delayRender` open. Map frames wait on tiles
     // over the network and need far more than the 30s default.
     timeoutInMilliseconds: profile.delayRenderTimeoutInMilliseconds,
-    downloadBehavior: { type: "download", fileName: `${slugify(run.name)}.mp4` },
+    downloadBehavior: {
+      type: "download",
+      fileName: `${slugify(run.name)}.mp4`,
+    },
   });
   return { renderId, bucketName };
 }

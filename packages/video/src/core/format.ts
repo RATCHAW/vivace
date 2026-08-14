@@ -36,7 +36,11 @@ export function formatClock(totalSeconds: number): string {
 
 /** Seconds-per-km -> "5:12". Returns "–:––" when pace is unknown. */
 export function formatPace(secondsPerKm: number | null): string {
-  if (secondsPerKm == null || !Number.isFinite(secondsPerKm) || secondsPerKm <= 0) {
+  if (
+    secondsPerKm == null ||
+    !Number.isFinite(secondsPerKm) ||
+    secondsPerKm <= 0
+  ) {
     return "–:––";
   }
   const s = Math.round(secondsPerKm);
@@ -103,7 +107,11 @@ export function formatDay(activity: VideoActivity): string {
 }
 
 /** The split's own label: `1`, `2`, … and `0.4` for a partial one. */
-export function formatSplitLabel(distanceMeters: number, index: number, partial: boolean): string {
+export function formatSplitLabel(
+  distanceMeters: number,
+  index: number,
+  partial: boolean,
+): string {
   if (!partial) return String(index + 1);
   const km = distanceMeters / 1000;
   return km >= 0.1 ? km.toFixed(1) : "0.1";

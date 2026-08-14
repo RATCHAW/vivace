@@ -43,24 +43,32 @@ describe("eligibility", () => {
 
   it("always has an answer for a run that carries nothing", () => {
     const verdicts = templateEligibilities(FIXTURE_K);
-    expect(verdicts.filter((entry) => entry.eligible).map((entry) => entry.id)).toEqual([
-      "minimal-numbers",
-    ]);
+    expect(
+      verdicts.filter((entry) => entry.eligible).map((entry) => entry.id),
+    ).toEqual(["minimal-numbers"]);
     expect(recommendTemplate(FIXTURE_K)).toBe("minimal-numbers");
   });
 
   it("never leaves a run with nothing to render", () => {
     for (const fixture of FIXTURES) {
-      expect(templateEligibility("minimal-numbers", fixture).eligible, fixture.key).toBe(true);
+      expect(
+        templateEligibility("minimal-numbers", fixture).eligible,
+        fixture.key,
+      ).toBe(true);
       const recommended = recommendTemplate(fixture);
-      expect(templateEligibility(recommended, fixture).eligible, fixture.key).toBe(true);
+      expect(
+        templateEligibility(recommended, fixture).eligible,
+        fixture.key,
+      ).toBe(true);
     }
   });
 
   it("gives a reason whenever it says no, and none when it says yes", () => {
     for (const fixture of FIXTURES) {
       for (const entry of templateEligibilities(fixture)) {
-        expect(Boolean(entry.reason), `${fixture.key}/${entry.id}`).toBe(!entry.eligible);
+        expect(Boolean(entry.reason), `${fixture.key}/${entry.id}`).toBe(
+          !entry.eligible,
+        );
       }
     }
   });
@@ -74,9 +82,10 @@ describe("duration", () => {
         // continuous 20s shot, and it keeps its catalogue duration.
         if (template.id === "run-video") continue;
         const frames = estimateDurationInFrames(template.id, fixture);
-        expect(frames / template.fps, `${fixture.key}/${template.id}`).toBeLessThanOrEqual(
-          MAX_STORY_SECONDS,
-        );
+        expect(
+          frames / template.fps,
+          `${fixture.key}/${template.id}`,
+        ).toBeLessThanOrEqual(MAX_STORY_SECONDS);
         expect(frames, `${fixture.key}/${template.id}`).toBeGreaterThan(0);
       }
     }

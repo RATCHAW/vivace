@@ -30,7 +30,10 @@ export const runRender = pgTable(
   {
     userId: text("user_id").notNull(),
     activityId: bigint("activity_id", { mode: "number" }).notNull(),
-    template: text("template").$type<TemplateId>().notNull().default("run-video"),
+    template: text("template")
+      .$type<TemplateId>()
+      .notNull()
+      .default("run-video"),
     /** Remotion Lambda's id for the render, needed to poll progress. */
     renderId: text("render_id").notNull(),
     /** The S3 bucket Remotion rendered into. */

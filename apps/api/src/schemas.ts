@@ -5,7 +5,12 @@
 //
 // `z` must come from @hono/zod-openapi — it is Zod extended with `.openapi()`.
 import { z } from "@hono/zod-openapi";
-import { DEFAULT_TEMPLATE_ID, DEFAULT_THEME, TEMPLATE_IDS, THEME_NAMES } from "@repo/video";
+import {
+  DEFAULT_TEMPLATE_ID,
+  DEFAULT_THEME,
+  TEMPLATE_IDS,
+  THEME_NAMES,
+} from "@repo/video";
 
 export const HealthSchema = z
   .object({
@@ -73,7 +78,9 @@ export const RunSchema = z
     total_elevation_gain: z.number(),
     sport_type: z.string().openapi({ example: "Run" }),
     /** The athlete's wall clock at the start (ISO, Z-suffixed by Strava). */
-    start_date_local: z.iso.datetime().openapi({ example: "2026-08-09T07:12:00Z" }),
+    start_date_local: z.iso
+      .datetime()
+      .openapi({ example: "2026-08-09T07:12:00Z" }),
     /** Meters per second. */
     average_speed: z.number(),
     /** Beats per minute, or null when recorded without a heart-rate monitor. */
@@ -173,7 +180,9 @@ export const RunRenderSchema = z
     activity_id: z.number().int().openapi({ example: 987654321 }),
     /** Which cut this is. Rendering another template leaves this one alone. */
     template: VideoTemplateSchema,
-    status: z.enum(["rendering", "done", "error"]).openapi({ example: "rendering" }),
+    status: z
+      .enum(["rendering", "done", "error"])
+      .openapi({ example: "rendering" }),
     /** The options this render was started with — see `RunRenderOptions`. A
      *  stored render whose options no longer match what the athlete has chosen
      *  is a different video, and the browser offers a re-render rather than the
@@ -183,7 +192,8 @@ export const RunRenderSchema = z
     /** Overall Lambda render progress, 0–1. */
     progress: z.number().min(0).max(1).openapi({ example: 0.42 }),
     output_url: z.string().nullable().openapi({
-      example: "https://remotionlambda-useast1-abcdef.s3.us-east-1.amazonaws.com/renders/abc/out.mp4",
+      example:
+        "https://remotionlambda-useast1-abcdef.s3.us-east-1.amazonaws.com/renders/abc/out.mp4",
     }),
     error: z.string().nullable(),
     created_at: z.iso.datetime(),
@@ -206,7 +216,10 @@ export type RunRenderState = z.infer<typeof RunRenderStateSchema>;
 export const CoachThreadSchema = z
   .object({
     id: z.string().openapi({ example: "8f2c1e34-9a1b-4f6d-8f0e-3b6a1c9d2e77" }),
-    title: z.string().nullable().openapi({ example: "Half marathon in October" }),
+    title: z
+      .string()
+      .nullable()
+      .openapi({ example: "Half marathon in October" }),
     created_at: z.iso.datetime(),
     updated_at: z.iso.datetime(),
   })

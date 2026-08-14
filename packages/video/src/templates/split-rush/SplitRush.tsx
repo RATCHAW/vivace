@@ -61,7 +61,11 @@ export type SplitRushProps = {
  * closes it. No GPS anywhere in it, which is the point: a treadmill run has no
  * route to draw and this is the film it gets.
  */
-export function SplitRush({ activity, streams, theme: themeName }: SplitRushProps) {
+export function SplitRush({
+  activity,
+  streams,
+  theme: themeName,
+}: SplitRushProps) {
   const frame = useCurrentFrame();
   const { fps, durationInFrames } = useVideoConfig();
   const theme = getTheme(themeName);
@@ -81,10 +85,14 @@ export function SplitRush({ activity, streams, theme: themeName }: SplitRushProp
   const opening = title ? 1 - ramp(frame, title.to - handover, handover) : 1;
   const header = title ? ramp(frame, title.to - handover / 2, handover) : 1;
 
-  const closing = verdict ? ramp(frame, verdict.from, secondsToFrames(0.5, fps)) : 0;
+  const closing = verdict
+    ? ramp(frame, verdict.from, secondsToFrames(0.5, fps))
+    : 0;
   // The chart recedes when the heroes come forward — a card standing on live
   // data reads as a bug, and the beat is meant to be a zoom, not an overlay.
-  const receded = heroes ? 0.82 * ramp(frame, heroes.from, secondsToFrames(0.5, fps)) : 0;
+  const receded = heroes
+    ? 0.82 * ramp(frame, heroes.from, secondsToFrames(0.5, fps))
+    : 0;
   const rowsOpacity = (1 - closing) * (1 - receded);
 
   const isolateProgress = isolate ? beatProgress(frame, isolate) : 0;
@@ -92,10 +100,18 @@ export function SplitRush({ activity, streams, theme: themeName }: SplitRushProp
   return (
     <Stage theme={theme} seed={hashSeed(activity.id, "split-rush")}>
       {opening > 0 && (
-        <TitleCard activity={activity} theme={theme} opacity={opening} frame={frame} fps={fps} />
+        <TitleCard
+          activity={activity}
+          theme={theme}
+          opacity={opening}
+          frame={frame}
+          fps={fps}
+        />
       )}
 
-      {header > 0 && <Header activity={activity} theme={theme} opacity={header} />}
+      {header > 0 && (
+        <Header activity={activity} theme={theme} opacity={header} />
+      )}
 
       {rowsOpacity > 0 && (
         <AbsoluteFill style={{ opacity: rowsOpacity }}>
@@ -108,22 +124,43 @@ export function SplitRush({ activity, streams, theme: themeName }: SplitRushProp
               frame={frame}
               fps={fps}
               isolate={isolateProgress}
-              isolated={isolate != null && split.index === plan.encoding.fastestIndex}
+              isolated={
+                isolate != null && split.index === plan.encoding.fastestIndex
+              }
             />
           ))}
         </AbsoluteFill>
       )}
 
-      {isolate != null && isolateProgress > 0 && plan.encoding.fastestIndex >= 0 && (
-        <IsolateLabel plan={plan} theme={theme} opacity={isolateProgress * rowsOpacity} />
-      )}
+      {isolate != null &&
+        isolateProgress > 0 &&
+        plan.encoding.fastestIndex >= 0 && (
+          <IsolateLabel
+            plan={plan}
+            theme={theme}
+            opacity={isolateProgress * rowsOpacity}
+          />
+        )}
 
       {heroes != null && plan.heroes.length > 0 && (
-        <Heroes plan={plan} theme={theme} frame={frame} fps={fps} opacity={1 - closing} />
+        <Heroes
+          plan={plan}
+          theme={theme}
+          frame={frame}
+          fps={fps}
+          opacity={1 - closing}
+        />
       )}
 
       {closing > 0 && (
-        <Closing activity={activity} plan={plan} theme={theme} opacity={closing} frame={frame} fps={fps} />
+        <Closing
+          activity={activity}
+          plan={plan}
+          theme={theme}
+          opacity={closing}
+          frame={frame}
+          fps={fps}
+        />
       )}
     </Stage>
   );
@@ -224,7 +261,14 @@ function Header({
           {activity.name}
         </div>
       </div>
-      <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexShrink: 0 }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "baseline",
+          gap: 10,
+          flexShrink: 0,
+        }}
+      >
         <span style={{ ...NUMERAL_STYLE, fontSize: 76, color: theme.ink }}>
           {formatKm(activity.distance)}
         </span>
@@ -267,14 +311,20 @@ function SplitBar({
   // Rolled up from a little short of the value, so the digits spin and settle
   // instead of appearing. Tabular figures are what keep it from twitching.
   const roll = easeOutCubic(ramp(frame, entry, secondsToFrames(0.4, fps)));
-  const pace = countUpValue(split.paceSecondsPerKm, roll, Math.max(0, split.paceSecondsPerKm - 28));
+  const pace = countUpValue(
+    split.paceSecondsPerKm,
+    roll,
+    Math.max(0, split.paceSecondsPerKm - 28),
+  );
 
   // The isolate beat lifts the fastest row to the middle of the band, and every
   // other row leaves. Dimming them instead would leave the isolated row standing
   // on top of the ones it travelled through; and the row itself is deliberately
   // not scaled — a full-measure row scaled up pushes its own pace off the frame.
   const band = plan.rows[0].top + (plan.rows.length * row.height) / 2;
-  const lift = isolated ? (band - row.top - row.height / 2) * easeOutCubic(isolate) : 0;
+  const lift = isolated
+    ? (band - row.top - row.height / 2) * easeOutCubic(isolate)
+    : 0;
   const dim = isolated ? 1 : 1 - easeOutCubic(isolate);
   if (dim <= 0) return null;
 
@@ -397,7 +447,10 @@ function Heroes({
 }) {
   const beat = findBeat(plan.beats, "heroes");
   if (!beat) return null;
-  const step = Math.max(1, Math.floor((beat.to - beat.from) / plan.heroes.length));
+  const step = Math.max(
+    1,
+    Math.floor((beat.to - beat.from) / plan.heroes.length),
+  );
   const labels = ["Fastest", "Final", "Biggest move"];
 
   return (
@@ -418,7 +471,9 @@ function Heroes({
       }}
     >
       {plan.heroes.map((split, index) => {
-        const enter = easeOutCubic(ramp(frame, beat.from + index * step, secondsToFrames(0.45, fps)));
+        const enter = easeOutCubic(
+          ramp(frame, beat.from + index * step, secondsToFrames(0.45, fps)),
+        );
         if (enter <= 0) return null;
         return (
           <div
@@ -439,7 +494,9 @@ function Heroes({
               <MetricLabel theme={theme} size={24}>
                 {labels[index] ?? "Split"}
               </MetricLabel>
-              <span style={{ fontSize: 34, fontWeight: 500, color: theme.inkMuted }}>
+              <span
+                style={{ fontSize: 34, fontWeight: 500, color: theme.inkMuted }}
+              >
                 Kilometre {split.index + 1}
               </span>
             </div>
@@ -474,7 +531,9 @@ function Closing({
   const beat = findBeat(plan.beats, "verdict");
   const from = beat?.from ?? 0;
   const enter = easeOutCubic(ramp(frame, from, secondsToFrames(0.6, fps)));
-  const totals = easeOutCubic(ramp(frame, from + secondsToFrames(0.35, fps), secondsToFrames(0.6, fps)));
+  const totals = easeOutCubic(
+    ramp(frame, from + secondsToFrames(0.35, fps), secondsToFrames(0.6, fps)),
+  );
   const pace = averagePace(activity);
   const headlineSize = fitFontSize(plan.verdict.headline, SAFE_WIDTH, 104, 0);
 
@@ -517,12 +576,38 @@ function Closing({
         </div>
       </div>
 
-      <div style={{ marginTop: 84, opacity: totals, transform: `translateY(${(1 - totals) * 20}px)` }}>
+      <div
+        style={{
+          marginTop: 84,
+          opacity: totals,
+          transform: `translateY(${(1 - totals) * 20}px)`,
+        }}
+      >
         <Rule theme={theme} margin="0 0 40px" />
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 24 }}>
-          <MetricValue theme={theme} label="Distance" value={formatKm(activity.distance)} unit="km" />
-          <MetricValue theme={theme} label="Time" value={formatClock(activity.moving_time)} />
-          <MetricValue theme={theme} label="Avg pace" value={formatPace(pace)} unit="/km" />
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr 1fr",
+            gap: 24,
+          }}
+        >
+          <MetricValue
+            theme={theme}
+            label="Distance"
+            value={formatKm(activity.distance)}
+            unit="km"
+          />
+          <MetricValue
+            theme={theme}
+            label="Time"
+            value={formatClock(activity.moving_time)}
+          />
+          <MetricValue
+            theme={theme}
+            label="Avg pace"
+            value={formatPace(pace)}
+            unit="/km"
+          />
         </div>
       </div>
     </div>

@@ -1,5 +1,10 @@
 import Link from "next/link";
-import { LOCALES, LOCALE_LABELS, LOCALE_SHORT, type Locale } from "@/i18n/config";
+import {
+  LOCALES,
+  LOCALE_LABELS,
+  LOCALE_SHORT,
+  type Locale,
+} from "@/i18n/config";
 import { fill, type Copy } from "@/i18n/dictionaries";
 import { cn } from "@/lib/utils";
 

@@ -43,5 +43,7 @@ export const INTL_LOCALES: Record<Locale, string> = {
 export const LOCALE_STORAGE_KEY = "vivace_locale";
 
 export function isLocale(value: unknown): value is Locale {
-  return typeof value === "string" && (LOCALES as readonly string[]).includes(value);
+  return (
+    typeof value === "string" && (LOCALES as readonly string[]).includes(value)
+  );
 }

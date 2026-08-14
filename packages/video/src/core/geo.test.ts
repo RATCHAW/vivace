@@ -25,13 +25,23 @@ describe("cleanRoute", () => {
   it("keeps the jump across a dropout, because the athlete really went there", () => {
     // Twenty seconds of silence and then a fix 200 m on: that is a tunnel, not
     // a spike, and deleting it would delete the run.
-    const points = [...line(10), [51.4520, -2.58], ...line(5).map((p) => [p[0] + 0.002, p[1]])];
+    const points = [
+      ...line(10),
+      [51.452, -2.58],
+      ...line(5).map((p) => [p[0] + 0.002, p[1]]),
+    ];
     const time = points.map((_, i) => (i === 10 ? 200 : i < 10 ? i : i + 200));
-    expect(cleanRoute(points, time).length).toBeGreaterThanOrEqual(points.length - 1);
+    expect(cleanRoute(points, time).length).toBeGreaterThanOrEqual(
+      points.length - 1,
+    );
   });
 
   it("throws out coordinates that aren't ones", () => {
-    const points: LatLng[] = [[51.45, -2.58], [Number.NaN, -2.58], [51.4501, -2.58]];
+    const points: LatLng[] = [
+      [51.45, -2.58],
+      [Number.NaN, -2.58],
+      [51.4501, -2.58],
+    ];
     expect(cleanRoute(points)).toHaveLength(2);
   });
 
@@ -45,7 +55,9 @@ describe("simplifyRoute", () => {
     const points = line(200);
     const simplified = simplifyRoute(points, 2);
     expect(simplified[0]).toEqual(points[0]);
-    expect(simplified[simplified.length - 1]).toEqual(points[points.length - 1]);
+    expect(simplified[simplified.length - 1]).toEqual(
+      points[points.length - 1],
+    );
     // A straight line simplifies to its two ends.
     expect(simplified).toHaveLength(2);
   });
@@ -78,16 +90,30 @@ describe("simplifyRoute", () => {
 
 describe("measurement", () => {
   it("measures a metre as a metre", () => {
-    expect(distanceMeters([51.45, -2.58], [51.45 + 1 / 111_320, -2.58])).toBeCloseTo(1, 2);
+    expect(
+      distanceMeters([51.45, -2.58], [51.45 + 1 / 111_320, -2.58]),
+    ).toBeCloseTo(1, 2);
   });
 
   it("sums a projected path", () => {
-    expect(pathLength([[0, 0], [3, 4], [3, 8]])).toBe(9);
+    expect(
+      pathLength([
+        [0, 0],
+        [3, 4],
+        [3, 8],
+      ]),
+    ).toBe(9);
   });
 
   it("scales the stroke to the box the route fills", () => {
-    const tight = routeStrokeWidth([[500, 900], [520, 920]]);
-    const wide = routeStrokeWidth([[100, 300], [900, 1000]]);
+    const tight = routeStrokeWidth([
+      [500, 900],
+      [520, 920],
+    ]);
+    const wide = routeStrokeWidth([
+      [100, 300],
+      [900, 1000],
+    ]);
     expect(tight).toBeLessThanOrEqual(wide);
     expect(tight).toBeGreaterThanOrEqual(10);
     expect(wide).toBeLessThanOrEqual(22);

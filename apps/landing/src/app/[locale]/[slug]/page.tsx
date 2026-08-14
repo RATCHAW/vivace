@@ -61,12 +61,11 @@ export default async function ContentPage({
 
   return (
     <>
-      <SiteHeader
-        copy={copy}
-        locale={locale}
-        languagePaths={languagePaths}
-      />
-      <main id="top" className="band-light bg-background text-foreground px-6 py-20 sm:px-8 sm:py-28">
+      <SiteHeader copy={copy} locale={locale} languagePaths={languagePaths} />
+      <main
+        id="top"
+        className="band-light bg-background text-foreground px-6 py-20 sm:px-8 sm:py-28"
+      >
         <article className="mx-auto w-full max-w-[820px]">
           <header className="border-border flex flex-col gap-6 border-b pb-12 sm:pb-16">
             <MonoLabel className="text-brand">{page.eyebrow}</MonoLabel>
@@ -124,11 +123,7 @@ export default async function ContentPage({
           </a>
         </article>
       </main>
-      <SiteFooter
-        copy={copy}
-        locale={locale}
-        languagePaths={languagePaths}
-      />
+      <SiteFooter copy={copy} locale={locale} languagePaths={languagePaths} />
     </>
   );
 }

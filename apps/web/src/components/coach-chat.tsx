@@ -8,7 +8,12 @@ import {
   type UIMessage,
 } from "ai";
 import { useTranslation } from "react-i18next";
-import { CheckIcon, CopyIcon, RefreshCcwIcon, SparklesIcon } from "lucide-react";
+import {
+  CheckIcon,
+  CopyIcon,
+  RefreshCcwIcon,
+  SparklesIcon,
+} from "lucide-react";
 import { toast } from "sonner";
 import { useFormatters } from "@/i18n/format";
 import type { TranslationKey } from "@/i18n";
@@ -135,7 +140,11 @@ function isToolName(value: string): value is ToolName {
 /** The run attached to a message, if the athlete attached one. */
 function mentionOf(message: UIMessage): RunMention | null {
   const metadata = message.metadata;
-  if (typeof metadata !== "object" || metadata === null || !("run" in metadata)) {
+  if (
+    typeof metadata !== "object" ||
+    metadata === null ||
+    !("run" in metadata)
+  ) {
     return null;
   }
   const run = (metadata as { run?: RunMention }).run;
@@ -269,7 +278,9 @@ function Sources({
 
   return (
     <div className="flex flex-wrap items-center gap-1.5">
-      <MonoLabel className="text-mono-badge mr-1">{t("coach.sources")}</MonoLabel>
+      <MonoLabel className="text-mono-badge mr-1">
+        {t("coach.sources")}
+      </MonoLabel>
       {runs.map((run) => (
         <Button
           key={run.id}
@@ -370,7 +381,9 @@ export function CoachChat({
   const accept = useMutation({
     ...acceptCoachPlanMutation(),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: getCoachBriefingQueryKey() });
+      await queryClient.invalidateQueries({
+        queryKey: getCoachBriefingQueryKey(),
+      });
       toast.success(t("coach.planAccepted"));
     },
     onError: (err) => toast.error(err.error),
@@ -535,12 +548,17 @@ export function CoachChat({
 
                   if (isToolUIPart(part)) {
                     const name = getToolName(part);
-                    const title = isToolName(name) ? t(`coach.tools.${name}`) : name;
+                    const title = isToolName(name)
+                      ? t(`coach.tools.${name}`)
+                      : name;
 
                     if (part.state === "output-error") {
                       return (
                         <p className="text-caption text-destructive" key={key}>
-                          {t("coach.toolFailed", { title, error: part.errorText })}
+                          {t("coach.toolFailed", {
+                            title,
+                            error: part.errorText,
+                          })}
                         </p>
                       );
                     }
@@ -552,7 +570,11 @@ export function CoachChat({
                     const card = asCoachCard(part.output);
                     if (card) {
                       return (
-                        <CoachCardView actions={actions} card={card} key={key} />
+                        <CoachCardView
+                          actions={actions}
+                          card={card}
+                          key={key}
+                        />
                       );
                     }
 

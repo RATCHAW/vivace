@@ -172,11 +172,13 @@ export const en = {
     theme: {
       charcoal: {
         label: "Charcoal",
-        description: "White type on black, cobalt illustration. The house look.",
+        description:
+          "White type on black, cobalt illustration. The house look.",
       },
       cream: {
         label: "Cream",
-        description: "Ink on paper. The one that looks like a print, not a screen.",
+        description:
+          "Ink on paper. The one that looks like a print, not a screen.",
       },
       accent: {
         label: "Cobalt",
@@ -326,7 +328,8 @@ export const en = {
     headlineToday: "{{name}}, today",
     yourTarget: "Your target",
     goalPace: "Goal pace",
-    gapToFind: "{{gap}} to find{{window}}, off {{name}} in {{time}} on {{date}}.",
+    gapToFind:
+      "{{gap}} to find{{window}}, off {{name}} in {{time}} on {{date}}.",
     gapWindow_one: " in {{count}} week",
     gapWindow_other: " in {{count}} weeks",
     aheadOfTarget: "You are {{gap}} ahead of target already.",

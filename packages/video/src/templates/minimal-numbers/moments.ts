@@ -123,7 +123,10 @@ export function chooseMoments(activity: VideoActivity): NumberMoment[] {
     });
   }
 
-  return moments.map((moment, index) => ({ ...moment, anchor: ANCHORS[index % ANCHORS.length] }));
+  return moments.map((moment, index) => ({
+    ...moment,
+    anchor: ANCHORS[index % ANCHORS.length],
+  }));
 }
 
 /** Variable by design: a run with three numbers is a shorter film than a run
@@ -175,9 +178,21 @@ export function momentBox(anchor: MomentAnchor): {
   switch (anchor) {
     case "left":
       // Baseline-ish: low in the frame, hard against the gutter.
-      return { top: LOGO_TOP - 80 - height, height, left: PAGE_INSET, width, align: "flex-start" };
+      return {
+        top: LOGO_TOP - 80 - height,
+        height,
+        left: PAGE_INSET,
+        width,
+        align: "flex-start",
+      };
     case "right":
-      return { top: SAFE_TOP + 60, height, left: PAGE_INSET, width, align: "flex-end" };
+      return {
+        top: SAFE_TOP + 60,
+        height,
+        left: PAGE_INSET,
+        width,
+        align: "flex-end",
+      };
     default:
       return {
         top: Math.round((SAFE_TOP + LOGO_TOP - height) / 2),

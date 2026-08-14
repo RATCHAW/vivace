@@ -75,7 +75,9 @@ describe("message catalogues", () => {
     const drifted = [...english]
       .filter(([key, text]) => {
         const other = french.get(key);
-        return other && placeholders(other).join() !== placeholders(text).join();
+        return (
+          other && placeholders(other).join() !== placeholders(text).join()
+        );
       })
       .map(([key]) => key);
     expect(drifted).toEqual([]);
@@ -88,7 +90,9 @@ describe("message catalogues", () => {
    * rather than discovering in production.
    */
   it("cover every template and theme in the video catalogue", () => {
-    expect(Object.keys(en.video.template).sort()).toEqual([...TEMPLATE_IDS].sort());
+    expect(Object.keys(en.video.template).sort()).toEqual(
+      [...TEMPLATE_IDS].sort(),
+    );
     expect(Object.keys(en.video.theme).sort()).toEqual([...THEME_NAMES].sort());
   });
 });
@@ -96,13 +100,19 @@ describe("message catalogues", () => {
 describe("date formatting", () => {
   it("follows the locale", () => {
     // Deliberately the same instant, read two ways.
-    expect(formatters("en-GB").runDate("2026-08-05T18:30:00Z")).toContain("2026");
-    expect(formatters("fr-FR").runDate("2026-08-05T18:30:00Z")).toContain("août");
+    expect(formatters("en-GB").runDate("2026-08-05T18:30:00Z")).toContain(
+      "2026",
+    );
+    expect(formatters("fr-FR").runDate("2026-08-05T18:30:00Z")).toContain(
+      "août",
+    );
   });
 
   it("reads a run's day in UTC, not the machine's timezone", () => {
     // `start_date_local` carries the athlete's wall clock with a Z suffix; read
     // locally, a run at 23:30 on New Year's Eve lands in the wrong year.
-    expect(formatters("en-GB").runDate("2025-12-31T23:30:00Z")).toContain("2025");
+    expect(formatters("en-GB").runDate("2025-12-31T23:30:00Z")).toContain(
+      "2025",
+    );
   });
 });

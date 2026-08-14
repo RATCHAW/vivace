@@ -25,7 +25,11 @@ export function SiteHeader({
 
   return (
     <header className="bg-background sticky top-0 z-20 flex h-16 items-center gap-4 border-b px-6 sm:gap-6 sm:px-8 lg:gap-10">
-      <a href={homeHref} className="shrink-0" aria-label={copy.header.backToTop}>
+      <a
+        href={homeHref}
+        className="shrink-0"
+        aria-label={copy.header.backToTop}
+      >
         <Wordmark />
       </a>
 

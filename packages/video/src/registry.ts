@@ -194,7 +194,8 @@ export function getProfile(template: VideoTemplate): RenderProfile {
  * derived in one place rather than spelled twice.
  */
 
-const envSuffix = (value: string) => value.toUpperCase().replace(/[^A-Z0-9]+/g, "_");
+const envSuffix = (value: string) =>
+  value.toUpperCase().replace(/[^A-Z0-9]+/g, "_");
 
 /**
  * Where a *specific* template's bundle lives, overriding the shared site.

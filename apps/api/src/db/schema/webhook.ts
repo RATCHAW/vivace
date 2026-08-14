@@ -1,5 +1,11 @@
 // The idempotency ledger for Strava's webhook deliveries.
-import { bigint, pgTable, primaryKey, text, timestamp } from "drizzle-orm/pg-core";
+import {
+  bigint,
+  pgTable,
+  primaryKey,
+  text,
+  timestamp,
+} from "drizzle-orm/pg-core";
 
 export const stravaWebhookEvent = pgTable(
   "strava_webhook_event",

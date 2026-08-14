@@ -36,7 +36,10 @@ function createClient(): PostHog | null {
   // Ingestion failures are PostHog's problem, not the request's — but a silent
   // one means a dashboard quietly stops filling in.
   client.on("error", (err: unknown) => {
-    logger.warn({ event: "posthog.request_failed", err }, "PostHog rejected a batch");
+    logger.warn(
+      { event: "posthog.request_failed", err },
+      "PostHog rejected a batch",
+    );
   });
 
   logger.info({ event: "posthog.enabled", host }, "PostHog analytics enabled");
@@ -59,7 +62,11 @@ interface UserEvent {
  * One thing an athlete did. Prefer `track()` in analytics.ts, which records it
  * in the logs at the same time.
  */
-export function captureUserEvent({ distinctId, event, properties }: UserEvent): void {
+export function captureUserEvent({
+  distinctId,
+  event,
+  properties,
+}: UserEvent): void {
   client?.capture({ distinctId, event, properties });
 }
 
@@ -103,7 +110,10 @@ export async function isFeatureEnabledFor(
     const value = flags.getFlag(flag);
     return value === undefined ? fallback : value !== false;
   } catch (err) {
-    logger.warn({ event: "posthog.flag_failed", flag, err }, "Could not read a flag");
+    logger.warn(
+      { event: "posthog.flag_failed", flag, err },
+      "Could not read a flag",
+    );
     return fallback;
   }
 }
@@ -163,7 +173,10 @@ export function captureCoachGeneration(generation: CoachGeneration): void {
     error: generation.error,
     properties: { $ai_span_name: "coach turn", ...generation.properties },
   }).catch((err: unknown) => {
-    logger.warn({ event: "posthog.ai_capture_failed", err }, "LLM event not sent");
+    logger.warn(
+      { event: "posthog.ai_capture_failed", err },
+      "LLM event not sent",
+    );
   });
 }
 

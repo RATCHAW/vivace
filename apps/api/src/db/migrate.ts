@@ -19,7 +19,9 @@ import { db, pool } from "./index.js";
 /** Committed alongside the schema they were generated from, and copied into the
  *  image by `COPY apps/api apps/api` — the migrator reads them at runtime, so
  *  drizzle-kit itself is never needed in production. */
-const MIGRATIONS_FOLDER = fileURLToPath(new URL("../../drizzle", import.meta.url));
+const MIGRATIONS_FOLDER = fileURLToPath(
+  new URL("../../drizzle", import.meta.url),
+);
 
 /** Any positive int64. Shared by every process that migrates this database, and
  *  meaningless to anything else. */
@@ -44,7 +46,10 @@ function readJournal(): Journal {
  * the migration applied normally.
  */
 async function predatesDrizzle(): Promise<boolean> {
-  const { rows } = await pool.query<{ drizzle: string | null; user: string | null }>(
+  const { rows } = await pool.query<{
+    drizzle: string | null;
+    user: string | null;
+  }>(
     `SELECT to_regclass('drizzle.__drizzle_migrations')::text AS drizzle,
             to_regclass('public.user')::text AS "user"`,
   );
@@ -73,7 +78,10 @@ const LATE_COLUMNS: [table: string, column: string][] = [
 
 /** Refuses to adopt a database that isn't actually at 0000. */
 async function assertAtBaseline(): Promise<void> {
-  const { rows } = await pool.query<{ table_name: string; column_name: string }>(
+  const { rows } = await pool.query<{
+    table_name: string;
+    column_name: string;
+  }>(
     `SELECT table_name, column_name FROM information_schema.columns
       WHERE table_schema = 'public'`,
   );
@@ -107,7 +115,10 @@ async function assertAtBaseline(): Promise<void> {
  */
 async function stampBaseline(): Promise<string> {
   const [first] = readJournal().entries;
-  const contents = readFileSync(`${MIGRATIONS_FOLDER}/${first.tag}.sql`, "utf8");
+  const contents = readFileSync(
+    `${MIGRATIONS_FOLDER}/${first.tag}.sql`,
+    "utf8",
+  );
   const hash = createHash("sha256").update(contents).digest("hex");
 
   await db.execute(sql`CREATE SCHEMA IF NOT EXISTS "drizzle"`);
@@ -179,7 +190,10 @@ export async function runMigrations(): Promise<void> {
     // Logged for the specific event name, rethrown because the handler that
     // `installProcessLogging` puts on the process is what flushes Loki and
     // PostHog before exiting non-zero. Exiting here would drop both.
-    logger.fatal({ event: "db.migration_failed", err }, "Schema migration failed");
+    logger.fatal(
+      { event: "db.migration_failed", err },
+      "Schema migration failed",
+    );
     throw err;
   } finally {
     await lock
@@ -187,7 +201,10 @@ export async function runMigrations(): Promise<void> {
       // Releasing matters less than returning the connection: the lock dies with
       // the session either way, and a throw here would mask the real error.
       .catch((err: unknown) => {
-        logger.warn({ event: "db.migration_unlock_failed", err }, "Lock not released");
+        logger.warn(
+          { event: "db.migration_unlock_failed", err },
+          "Lock not released",
+        );
       });
     lock.release();
   }

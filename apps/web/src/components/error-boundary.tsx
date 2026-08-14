@@ -41,7 +41,10 @@ interface ErrorBoundaryState {
  * reports it to nothing but a class component's `componentDidCatch`. Without
  * this the user sees a white screen and Grafana sees nothing at all.
  */
-export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+export class ErrorBoundary extends Component<
+  ErrorBoundaryProps,
+  ErrorBoundaryState
+> {
   state: ErrorBoundaryState = { failed: false };
 
   static getDerivedStateFromError(): ErrorBoundaryState {

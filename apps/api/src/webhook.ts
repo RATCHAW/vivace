@@ -94,7 +94,9 @@ export function verifyWebhookSignature(
   return signatures.some((candidate) => {
     if (!/^[0-9a-f]{64}$/i.test(candidate)) return false;
     const actual = Buffer.from(candidate, "hex");
-    return actual.length === expected.length && timingSafeEqual(actual, expected);
+    return (
+      actual.length === expected.length && timingSafeEqual(actual, expected)
+    );
   });
 }
 
@@ -119,7 +121,9 @@ export async function viewSubscriptions(): Promise<StravaSubscription[]> {
   const query = new URLSearchParams(credentials());
   const response = await fetch(`${SUBSCRIPTIONS_URL}?${query}`);
   if (!response.ok) {
-    throw new Error(`Strava returned ${response.status}: ${await response.text()}`);
+    throw new Error(
+      `Strava returned ${response.status}: ${await response.text()}`,
+    );
   }
   return (await response.json()) as StravaSubscription[];
 }
@@ -143,7 +147,9 @@ export async function createSubscription(
     }),
   });
   if (!response.ok) {
-    throw new Error(`Strava returned ${response.status}: ${await response.text()}`);
+    throw new Error(
+      `Strava returned ${response.status}: ${await response.text()}`,
+    );
   }
   return (await response.json()) as StravaSubscription;
 }
@@ -155,7 +161,9 @@ export async function deleteSubscription(id: number): Promise<void> {
   });
   // 204 on success, per the docs.
   if (!response.ok) {
-    throw new Error(`Strava returned ${response.status}: ${await response.text()}`);
+    throw new Error(
+      `Strava returned ${response.status}: ${await response.text()}`,
+    );
   }
 }
 
@@ -198,19 +206,27 @@ export async function pruneEvents(): Promise<void> {
         ),
       );
   } catch (err) {
-    logger.warn({ event: "webhook.prune_failed", err }, "Could not prune webhook events");
+    logger.warn(
+      { event: "webhook.prune_failed", err },
+      "Could not prune webhook events",
+    );
   }
 }
 
 /** The user behind a Strava athlete id, or null if nobody here has connected it. */
-export async function userForAthlete(athleteId: number): Promise<string | null> {
+export async function userForAthlete(
+  athleteId: number,
+): Promise<string | null> {
   // `accountId` is what `getUserInfo` returned for the provider, which for
   // Strava is the athlete id as a string (see auth.ts).
   const [row] = await db
     .select({ userId: account.userId })
     .from(account)
     .where(
-      and(eq(account.providerId, "strava"), eq(account.accountId, String(athleteId))),
+      and(
+        eq(account.providerId, "strava"),
+        eq(account.accountId, String(athleteId)),
+      ),
     )
     .limit(1);
   return row?.userId ?? null;

@@ -11,7 +11,12 @@ import { describe, expect, it } from "vitest";
 import { auth } from "../auth.js";
 import { account, session, user, verification } from "./schema/auth.js";
 
-const AUTH_TABLES: Record<string, PgTable> = { user, session, account, verification };
+const AUTH_TABLES: Record<string, PgTable> = {
+  user,
+  session,
+  account,
+  verification,
+};
 
 /**
  * What is actually in the production database.
@@ -24,7 +29,15 @@ const AUTH_TABLES: Record<string, PgTable> = { user, session, account, verificat
  * rather than a production incident.
  */
 const LIVE_COLUMNS: Record<string, string[]> = {
-  user: ["id", "name", "email", "emailVerified", "image", "createdAt", "updatedAt"],
+  user: [
+    "id",
+    "name",
+    "email",
+    "emailVerified",
+    "image",
+    "createdAt",
+    "updatedAt",
+  ],
   session: [
     "id",
     "expiresAt",
@@ -80,14 +93,18 @@ describe("better-auth tables", () => {
 
     for (const [model, definition] of Object.entries(expected)) {
       const table = AUTH_TABLES[model];
-      expect(table, `no Drizzle table for better-auth model "${model}"`).toBeDefined();
+      expect(
+        table,
+        `no Drizzle table for better-auth model "${model}"`,
+      ).toBeDefined();
       expect(getTableName(table)).toBe(model);
 
       const keys = new Set(Object.keys(getTableColumns(table)));
       for (const field of Object.keys(definition.fields)) {
-        expect(keys, `${model}.${field} is missing from the Drizzle schema`).toContain(
-          field,
-        );
+        expect(
+          keys,
+          `${model}.${field} is missing from the Drizzle schema`,
+        ).toContain(field);
       }
     }
   });

@@ -59,7 +59,9 @@ function Stat({
       <span className="text-display-md tabular-nums">
         {value}
         {unit && (
-          <span className="text-body-md text-muted-foreground ml-1.5">{unit}</span>
+          <span className="text-body-md text-muted-foreground ml-1.5">
+            {unit}
+          </span>
         )}
       </span>
     </div>
@@ -107,7 +109,9 @@ export function Home() {
   const { t } = useTranslation();
   const format = useFormatters();
   const { data: session } = authClient.useSession();
-  const { data: athlete, error: athleteError } = useQuery(getStravaAthleteOptions());
+  const { data: athlete, error: athleteError } = useQuery(
+    getStravaAthleteOptions(),
+  );
   const { data: runs, error: runsError } = useQuery(getRunsOptions());
 
   const name = session?.user.name ?? "";
@@ -143,7 +147,9 @@ export function Home() {
           </div>
 
           {/* {component.button-primary} — the loudest pixel on the canvas */}
-          <Button render={<Link to="/runs" />}>{t("home.watchYourRuns")}</Button>
+          <Button render={<Link to="/runs" />}>
+            {t("home.watchYourRuns")}
+          </Button>
         </section>
 
         <section
@@ -176,7 +182,10 @@ export function Home() {
               </>
             ) : (
               Array.from({ length: 4 }, (_, i) => (
-                <div key={i} className="bg-background flex flex-col gap-2.5 p-7">
+                <div
+                  key={i}
+                  className="bg-background flex flex-col gap-2.5 p-7"
+                >
                   <Skeleton className="h-3 w-24" />
                   <Skeleton className="h-9 w-28" />
                 </div>
@@ -240,12 +249,16 @@ export function Home() {
                       className="hover:bg-muted/40 focus-visible:ring-ring/50 flex items-center justify-between gap-6 py-4.5 outline-none focus-visible:ring-3"
                     >
                       <span className="flex min-w-0 flex-col gap-1.5">
-                        <span className="text-body-md font-semibold">{run.name}</span>
+                        <span className="text-body-md font-semibold">
+                          {run.name}
+                        </span>
                         <span className="text-caption text-muted-foreground truncate">
                           {runSummary(run, format)}
                         </span>
                       </span>
-                      <MonoLabel className="shrink-0">{t("home.replay")}</MonoLabel>
+                      <MonoLabel className="shrink-0">
+                        {t("home.replay")}
+                      </MonoLabel>
                     </Link>
                   ))}
                 </div>
@@ -285,14 +298,18 @@ export function Home() {
                   <dl className="divide-y divide-border border-t">
                     <Fact label={t("home.factAthleteId")}>{athlete.id}</Fact>
                     {athlete.username && (
-                      <Fact label={t("home.factUsername")}>{athlete.username}</Fact>
+                      <Fact label={t("home.factUsername")}>
+                        {athlete.username}
+                      </Fact>
                     )}
                     {athlete.sex && (
                       <Fact label={t("home.factSex")}>{athlete.sex}</Fact>
                     )}
                     {/* `kg` is an SI symbol, not a word — it does not translate. */}
                     {athlete.weight != null && athlete.weight > 0 && (
-                      <Fact label={t("home.factWeight")}>{athlete.weight} kg</Fact>
+                      <Fact label={t("home.factWeight")}>
+                        {athlete.weight} kg
+                      </Fact>
                     )}
                     <Fact label={t("home.factSubscription")}>
                       {athlete.summit || athlete.premium ? (

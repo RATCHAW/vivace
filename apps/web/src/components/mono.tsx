@@ -23,7 +23,10 @@ export function MonoLabel({
 }
 
 /** The stamp on a surface that exists but does not work yet. */
-export function SoonBadge({ className, ...props }: React.ComponentProps<"span">) {
+export function SoonBadge({
+  className,
+  ...props
+}: React.ComponentProps<"span">) {
   const { t } = useTranslation();
 
   return (

@@ -3,7 +3,12 @@
 // download instead of a re-render — and a run can hold one of each template at
 // the same time, so choosing another cut doesn't throw away the last video.
 import type { AwsRegion } from "@remotion/lambda/client";
-import { DEFAULT_THEME, isThemeName, type TemplateId, type ThemeName } from "@repo/video";
+import {
+  DEFAULT_THEME,
+  isThemeName,
+  type TemplateId,
+  type ThemeName,
+} from "@repo/video";
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "./db/index.js";
 import { runRender } from "./db/schema/render.js";
@@ -96,7 +101,10 @@ export async function saveStartedRender(input: {
     progress: 0,
     outputUrl: null,
     error: null,
-    options: { show_avatar: input.options.showAvatar, theme: input.options.theme },
+    options: {
+      show_avatar: input.options.showAvatar,
+      theme: input.options.theme,
+    },
     propsHash: input.propsHash,
   };
 

@@ -139,7 +139,11 @@ export function ReplayPhone({ copy }: { copy: ReplayCopy }) {
             <Metric label={copy.distance} value={RUN_SUMMARY.distance} large />
             <Metric label={copy.time} value={RUN_SUMMARY.time} large />
             <Metric label={copy.pace} value={RUN_SUMMARY.pace} large />
-            <Metric label={copy.elevation} value={RUN_SUMMARY.elevation} large />
+            <Metric
+              label={copy.elevation}
+              value={RUN_SUMMARY.elevation}
+              large
+            />
           </div>
           <div className="mt-7 flex items-center gap-2 border-t pt-4.5">
             <span className="bg-brand size-2 rounded-full" />
@@ -149,19 +153,18 @@ export function ReplayPhone({ copy }: { copy: ReplayCopy }) {
 
         {/* Chapter bars — the same three-part cut on every replay. */}
         <div aria-hidden className="absolute inset-x-5 top-3.5 flex gap-1.5">
-          {[frame.chapters.title, frame.chapters.route, frame.chapters.summary].map(
-            (width, i) => (
-              <span
-                key={i}
-                className="bg-foreground/20 h-[3px] flex-1 overflow-hidden rounded-full"
-              >
-                <span
-                  className="bg-foreground block h-full"
-                  style={{ width }}
-                />
-              </span>
-            ),
-          )}
+          {[
+            frame.chapters.title,
+            frame.chapters.route,
+            frame.chapters.summary,
+          ].map((width, i) => (
+            <span
+              key={i}
+              className="bg-foreground/20 h-[3px] flex-1 overflow-hidden rounded-full"
+            >
+              <span className="bg-foreground block h-full" style={{ width }} />
+            </span>
+          ))}
         </div>
       </div>
 

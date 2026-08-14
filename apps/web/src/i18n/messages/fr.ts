@@ -203,7 +203,8 @@ export const fr: Translated<Messages> = {
     progressLabel: "Progression de la préparation de la vidéo",
     downloadVideo: "Télécharger la vidéo",
     failedTitle: "Impossible de préparer cette vidéo",
-    paused: "Les téléchargements vidéo sont en pause pour le moment. Revenez d’ici peu.",
+    paused:
+      "Les téléchargements vidéo sont en pause pour le moment. Revenez d’ici peu.",
     lastRendered: "Votre dernière vidéo a été créée {{options}}.",
     retry: "Réessayer",
     downloadLast: "Télécharger la dernière vidéo",
@@ -303,7 +304,10 @@ export const fr: Translated<Messages> = {
         name: "/charge",
         desc: "Vérifier ma montée en volume et mon ratio de charge",
       },
-      goal: { name: "/objectif", desc: "Définir ou changer la course objectif" },
+      goal: {
+        name: "/objectif",
+        desc: "Définir ou changer la course objectif",
+      },
     },
   },
 

@@ -105,7 +105,8 @@ describe("sampleIndex", () => {
 
 describe("avatarSource", () => {
   it("takes an athlete's picture", () => {
-    const url = "https://dgalywyr863hv.cloudfront.net/pictures/athletes/1/large.jpg";
+    const url =
+      "https://dgalywyr863hv.cloudfront.net/pictures/athletes/1/large.jpg";
     expect(avatarSource(url)).toBe(url);
   });
 
@@ -185,7 +186,9 @@ describe("metricsAtProgress smoothing", () => {
   const spikeIndex = sampleIndex(sampleCount, 0.5);
 
   const withSpike = (steady: number, spike: number) =>
-    Array.from({ length: sampleCount }, (_, i) => (i === spikeIndex ? spike : steady));
+    Array.from({ length: sampleCount }, (_, i) =>
+      i === spikeIndex ? spike : steady,
+    );
 
   const streams: VideoStreams = {
     time: { data: Array.from({ length: sampleCount }, (_, i) => i) },
@@ -236,7 +239,9 @@ describe("projectRoute", () => {
   });
 
   it("is empty-safe", () => {
-    expect(projectRoute([], 1080, 1920, { top: 0, right: 0, bottom: 0, left: 0 })).toEqual([]);
+    expect(
+      projectRoute([], 1080, 1920, { top: 0, right: 0, bottom: 0, left: 0 }),
+    ).toEqual([]);
   });
 });
 
@@ -273,7 +278,10 @@ describe("buildCameraTrack", () => {
   /** Points of `route` that are drawn at `progress` — the trace plus the runner
    *  dot at its head — that fall outside the safe box under `camera`. */
   const escapees = (progress: number) => {
-    const camera = cameraAtProgress(buildCameraTrack(route, viewport), progress);
+    const camera = cameraAtProgress(
+      buildCameraTrack(route, viewport),
+      progress,
+    );
     if (!camera) throw new Error("no camera");
     return route
       .slice(0, sampleIndex(route.length, progress) + 1)
@@ -293,8 +301,9 @@ describe("buildCameraTrack", () => {
 
     // Every frame of the draw, not just the keyframes: what the video reads is
     // interpolated between two of them.
-    const offenders = Array.from({ length: DRAW_END - DRAW_START + 1 }, (_, i) =>
-      escapees(i / (DRAW_END - DRAW_START)),
+    const offenders = Array.from(
+      { length: DRAW_END - DRAW_START + 1 },
+      (_, i) => escapees(i / (DRAW_END - DRAW_START)),
     ).flat();
     expect(offenders).toEqual([]);
   });
@@ -348,7 +357,9 @@ describe("buildCameraTrack", () => {
 
   it("only ever widens the shot", () => {
     const track = buildCameraTrack(route, viewport);
-    const tightened = track.filter((camera, i) => i > 0 && camera.zoom > track[i - 1].zoom);
+    const tightened = track.filter(
+      (camera, i) => i > 0 && camera.zoom > track[i - 1].zoom,
+    );
     expect(tightened).toEqual([]);
   });
 
@@ -364,10 +375,14 @@ describe("buildCameraTrack", () => {
       const to = frames[i];
       if (!from || !to) throw new Error("no camera");
       expect(Math.abs(to.zoom - from.zoom)).toBeLessThan(0.125);
-      const [x, y] = projectPoint([from.center[1], from.center[0]], to, viewport);
-      expect(Math.hypot(x - VIDEO_WIDTH / 2, y - VIDEO_HEIGHT / 2)).toBeLessThan(
-        VIDEO_WIDTH / 10,
+      const [x, y] = projectPoint(
+        [from.center[1], from.center[0]],
+        to,
+        viewport,
       );
+      expect(
+        Math.hypot(x - VIDEO_WIDTH / 2, y - VIDEO_HEIGHT / 2),
+      ).toBeLessThan(VIDEO_WIDTH / 10);
     }
   });
 

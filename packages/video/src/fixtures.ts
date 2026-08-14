@@ -56,7 +56,9 @@ function routePoint(
   const wobble = (random() - 0.5) * 5;
   return [
     lat0 + (Math.sin(angle) * radius * squash + wobble) / 111_320,
-    lng0 + (Math.cos(angle) * radius + wobble) / (111_320 * Math.cos((lat0 * Math.PI) / 180)),
+    lng0 +
+      (Math.cos(angle) * radius + wobble) /
+        (111_320 * Math.cos((lat0 * Math.PI) / 180)),
   ];
 }
 
@@ -68,7 +70,8 @@ function buildRun(spec: RunSpec): Fixture {
   const radius = spec.distanceMeters / (2 * Math.PI);
 
   const speeds: number[] = [];
-  for (let i = 0; i < samples; i += 1) speeds.push(base * spec.shape(i / (samples - 1)));
+  for (let i = 0; i < samples; i += 1)
+    speeds.push(base * spec.shape(i / (samples - 1)));
   // Normalise so the streams add up to the distance on the activity: a fixture
   // whose streams disagree with its totals tests the wrong thing.
   const total = speeds.reduce((sum, speed) => sum + speed, 0);
@@ -96,7 +99,9 @@ function buildRun(spec: RunSpec): Fixture {
     distance.push(Math.min(covered, spec.distanceMeters));
     velocity.push(speed);
     if (spec.averageHeartrate != null) {
-      heartrate.push(spec.averageHeartrate + Math.sin(i / 90) * 9 + (random() - 0.5) * 3);
+      heartrate.push(
+        spec.averageHeartrate + Math.sin(i / 90) * 9 + (random() - 0.5) * 3,
+      );
     }
     if (spec.route) {
       const fraction = covered / spec.distanceMeters;
@@ -104,7 +109,9 @@ function buildRun(spec: RunSpec): Fixture {
       // One fix bounced off a building: 300 m away and back again in a second.
       const spiked = spec.damaged && i === Math.floor(samples / 3);
       latlng.push(spiked ? [point[0] + 0.0027, point[1] - 0.0027] : point);
-      altitude.push(60 + (spec.elevationGain / 2) * (1 - Math.cos(fraction * Math.PI * 4)));
+      altitude.push(
+        60 + (spec.elevationGain / 2) * (1 - Math.cos(fraction * Math.PI * 4)),
+      );
     }
   }
 
@@ -118,7 +125,8 @@ function buildRun(spec: RunSpec): Fixture {
     start_date_local: spec.startDate,
     average_speed: base,
     average_heartrate: spec.averageHeartrate,
-    max_heartrate: spec.averageHeartrate == null ? null : spec.averageHeartrate + 22,
+    max_heartrate:
+      spec.averageHeartrate == null ? null : spec.averageHeartrate + 22,
     workout_type: "default",
   };
 
@@ -126,14 +134,21 @@ function buildRun(spec: RunSpec): Fixture {
     time: { data: time },
     distance: { data: distance },
     velocity_smooth: { data: velocity },
-    ...(spec.route ? { latlng: { data: latlng }, altitude: { data: altitude } } : {}),
-    ...(spec.averageHeartrate != null ? { heartrate: { data: heartrate } } : {}),
+    ...(spec.route
+      ? { latlng: { data: latlng }, altitude: { data: altitude } }
+      : {}),
+    ...(spec.averageHeartrate != null
+      ? { heartrate: { data: heartrate } }
+      : {}),
   };
 
   return { key: "", name: spec.name, activity, streams };
 }
 
-const fixture = (key: string, spec: RunSpec): Fixture => ({ ...buildRun(spec), key });
+const fixture = (key: string, spec: RunSpec): Fixture => ({
+  ...buildRun(spec),
+  key,
+});
 
 /** Flat: a treadmill holding one speed, and the degenerate case for every
  *  template that encodes a difference between splits. */

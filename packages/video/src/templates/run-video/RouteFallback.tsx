@@ -55,9 +55,23 @@ export function RouteFallback({
           strokeLinecap="round"
           strokeLinejoin="round"
         />
-        <circle cx={startX} cy={startY} r={9} fill="#000000" stroke="#ffffff" strokeWidth={4} />
+        <circle
+          cx={startX}
+          cy={startY}
+          r={9}
+          fill="#000000"
+          stroke="#ffffff"
+          strokeWidth={4}
+        />
         {!avatarUrl && (
-          <circle cx={runnerX} cy={runnerY} r={13} fill="#ffffff" stroke={ROUTE_COLOR} strokeWidth={7} />
+          <circle
+            cx={runnerX}
+            cy={runnerY}
+            r={13}
+            fill="#ffffff"
+            stroke={ROUTE_COLOR}
+            strokeWidth={7}
+          />
         )}
       </svg>
       {/* Over the SVG rather than a <foreignObject> in it: the puck is a plain

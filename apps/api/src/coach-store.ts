@@ -101,7 +101,10 @@ export async function getPlan(
     })
     .from(coachPlan)
     .where(
-      and(eq(coachPlan.userId, userId), eq(coachPlan.weekStarting, weekStarting)),
+      and(
+        eq(coachPlan.userId, userId),
+        eq(coachPlan.weekStarting, weekStarting),
+      ),
     );
   return row ?? null;
 }

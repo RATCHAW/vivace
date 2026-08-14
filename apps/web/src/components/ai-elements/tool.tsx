@@ -89,7 +89,7 @@ export const ToolHeader = ({
       className={cn(
         "group/tool hover:bg-muted/40 flex w-full items-center justify-between gap-4 rounded-sm px-4 py-3 outline-none",
         "focus-visible:ring-ring/50 focus-visible:ring-3 focus-visible:ring-inset",
-        className
+        className,
       )}
       {...props}
     >
@@ -112,7 +112,7 @@ export const ToolContent = ({ className, ...props }: ToolContentProps) => (
     className={cn(
       "flex flex-col gap-4 px-4 pt-1 pb-4 outline-none",
       "data-closed:animate-out data-closed:fade-out-0 data-open:animate-in data-open:fade-in-0",
-      className
+      className,
     )}
     {...props}
   />
@@ -134,7 +134,10 @@ export type ToolInputProps = ComponentProps<"div"> & {
 };
 
 export const ToolInput = ({ className, input, ...props }: ToolInputProps) => (
-  <div className={cn("flex flex-col gap-2 overflow-hidden", className)} {...props}>
+  <div
+    className={cn("flex flex-col gap-2 overflow-hidden", className)}
+    {...props}
+  >
     <h4 className="text-mono-label text-muted-foreground font-mono uppercase">
       Parameters
     </h4>

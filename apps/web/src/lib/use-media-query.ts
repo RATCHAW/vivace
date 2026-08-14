@@ -31,7 +31,9 @@ export function useMediaQuery(query: string): boolean {
 }
 
 function supported(): boolean {
-  return typeof window !== "undefined" && typeof window.matchMedia === "function";
+  return (
+    typeof window !== "undefined" && typeof window.matchMedia === "function"
+  );
 }
 
 function noop(): () => void {

@@ -121,9 +121,21 @@ export const en = {
     body: "We built the replay for running first because it’s the hardest to make beautiful. The same treatment lands for the rest of your Strava activities as we go.",
     live: "Live",
     items: [
-      { name: "Run", body: "Route, splits, heart rate, elevation.", live: true },
-      { name: "Ride", body: "Speed, climbs, power where you have it.", live: false },
-      { name: "Weights", body: "Sets, load moved, session volume.", live: false },
+      {
+        name: "Run",
+        body: "Route, splits, heart rate, elevation.",
+        live: true,
+      },
+      {
+        name: "Ride",
+        body: "Speed, climbs, power where you have it.",
+        live: false,
+      },
+      {
+        name: "Weights",
+        body: "Sets, load moved, session volume.",
+        live: false,
+      },
       {
         name: "Swim & hike",
         body: "Laps, pace per 100 m, trail profile.",

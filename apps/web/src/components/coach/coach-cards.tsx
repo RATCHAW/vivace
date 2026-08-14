@@ -66,7 +66,11 @@ export interface VolumeCard {
     ramp_pct: number | null;
   }[];
   load: { acute_km: number; chronic_km: number; ratio: number } | null;
-  easy_intensity: { share: number; easy_runs: number; zone3_floor: number } | null;
+  easy_intensity: {
+    share: number;
+    easy_runs: number;
+    zone3_floor: number;
+  } | null;
 }
 
 export interface PredictionCard {
@@ -105,11 +109,7 @@ export interface PlanCard {
 }
 
 export type CoachCard =
-  | DebriefCard
-  | SplitsCard
-  | VolumeCard
-  | PredictionCard
-  | PlanCard;
+  DebriefCard | SplitsCard | VolumeCard | PredictionCard | PlanCard;
 
 /**
  * A tool result, if it is one of ours.
@@ -261,13 +261,17 @@ export function RunDebrief({
         <div className="flex min-w-0 flex-1 flex-col gap-4">
           <div className="flex flex-col gap-1.5">
             <span className="text-body-md font-semibold">{card.title}</span>
-            <span className="text-caption text-muted-foreground">{card.line}</span>
+            <span className="text-caption text-muted-foreground">
+              {card.line}
+            </span>
           </div>
           <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {card.stats.map((stat) => (
               <div className="flex flex-col gap-1" key={stat.label}>
                 <dt>
-                  <MonoLabel className="text-mono-badge">{stat.label}</MonoLabel>
+                  <MonoLabel className="text-mono-badge">
+                    {stat.label}
+                  </MonoLabel>
                 </dt>
                 <dd className="text-body-md font-semibold tabular-nums">
                   {stat.value}
@@ -301,7 +305,12 @@ export function RunDebrief({
 /** A split at least this much slower than the quickest one reads as a fade. */
 const FADE_SECONDS = 12;
 
-export function RunSplits({ card }: { card: SplitsCard; actions: CardActions }) {
+export function RunSplits({
+  card,
+}: {
+  card: SplitsCard;
+  actions: CardActions;
+}) {
   const { t } = useTranslation();
   const paces = card.splits.map((split) => split.seconds_per_km);
   const fastest = Math.min(...paces);
@@ -339,12 +348,16 @@ export function RunSplits({ card }: { card: SplitsCard; actions: CardActions }) 
           <span className="text-stone flex items-center gap-3.5">
             <span className="flex items-center gap-1.5">
               <span className="bg-brand size-2 rounded-[2px]" />
-              <MonoLabel className="text-mono-badge">{t("cards.pace")}</MonoLabel>
+              <MonoLabel className="text-mono-badge">
+                {t("cards.pace")}
+              </MonoLabel>
             </span>
             {hrPath && (
               <span className="flex items-center gap-1.5">
                 <span className="bg-chart-3 h-0.5 w-2" />
-                <MonoLabel className="text-mono-badge">{t("cards.hr")}</MonoLabel>
+                <MonoLabel className="text-mono-badge">
+                  {t("cards.hr")}
+                </MonoLabel>
               </span>
             )}
           </span>
@@ -430,7 +443,12 @@ export function RunSplits({ card }: { card: SplitsCard; actions: CardActions }) 
 /** A week that climbs more than this is the classic too-much-too-soon jump. */
 const RAMP_LIMIT = 10;
 
-export function TrainingVolume({ card }: { card: VolumeCard; actions: CardActions }) {
+export function TrainingVolume({
+  card,
+}: {
+  card: VolumeCard;
+  actions: CardActions;
+}) {
   const { t } = useTranslation();
   const format = useFormatters();
   // Oldest on the left: a ramp reads left to right.
@@ -452,11 +470,16 @@ export function TrainingVolume({ card }: { card: VolumeCard; actions: CardAction
 
       <div className="flex h-[190px] items-end gap-3">
         {weeks.map((week) => (
-          <div className="flex h-full flex-1 flex-col gap-2" key={week.week_starting}>
+          <div
+            className="flex h-full flex-1 flex-col gap-2"
+            key={week.week_starting}
+          >
             <span
               className={cn(
                 "text-mono-badge text-center font-mono",
-                (week.ramp_pct ?? 0) >= 25 ? "text-chart-3" : "text-transparent",
+                (week.ramp_pct ?? 0) >= 25
+                  ? "text-chart-3"
+                  : "text-transparent",
               )}
             >
               {week.ramp_pct !== null && week.ramp_pct >= 25
@@ -637,8 +660,7 @@ export function WeekPlan({
   const dayNames = messages.days.long;
   // The card is stored in the transcript, so `accepted` is only true of the
   // week as it stood when the tool ran. The live answer is the briefing's.
-  const accepted =
-    actions.acceptedWeek === card.week_starting || card.accepted;
+  const accepted = actions.acceptedWeek === card.week_starting || card.accepted;
 
   // The buttons name real days rather than a fixed "Swap Tuesday": the first
   // quality session that isn't the long run, and wherever the long run landed.
@@ -709,7 +731,9 @@ export function WeekPlan({
         {quality && (
           <Button
             onClick={() =>
-              actions.onAsk(t("cards.askSwapDay", { day: dayNames[quality.day] }))
+              actions.onAsk(
+                t("cards.askSwapDay", { day: dayNames[quality.day] }),
+              )
             }
             size="sm"
             variant="subtle"
@@ -720,7 +744,9 @@ export function WeekPlan({
         {longRun && (
           <Button
             onClick={() =>
-              actions.onAsk(t("cards.askMoveLongRun", { day: dayNames[moveTo] }))
+              actions.onAsk(
+                t("cards.askMoveLongRun", { day: dayNames[moveTo] }),
+              )
             }
             size="sm"
             variant="subtle"

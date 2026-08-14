@@ -14,7 +14,12 @@ import type {
 } from "./schemas.js";
 import { getContext, getPlan } from "./coach-store.js";
 import { findDebrief } from "./chat-store.js";
-import { fetchRunStreams, fetchRuns, fetchShoes, StravaApiError } from "./strava.js";
+import {
+  fetchRunStreams,
+  fetchRuns,
+  fetchShoes,
+  StravaApiError,
+} from "./strava.js";
 import {
   clock,
   daysBetween,
@@ -102,7 +107,9 @@ export async function readTraining(
   let drift: TrainingReadout["drift"] = null;
   if (recentLong) {
     try {
-      const percent = decoupling(await fetchRunStreams(accessToken, recentLong.id));
+      const percent = decoupling(
+        await fetchRunStreams(accessToken, recentLong.id),
+      );
       if (percent !== null) drift = { percent, run: recentLong };
     } catch (err) {
       // A missing stream is not a reason to fail the whole screen, but it is
@@ -116,7 +123,10 @@ export async function readTraining(
     shoes = (await fetchShoes(accessToken))
       .filter((shoe) => shoe.distance >= 400_000)
       .sort((a, b) => b.distance - a.distance)
-      .map((shoe) => ({ name: shoe.name, km: Math.round(shoe.distance / 1000) }));
+      .map((shoe) => ({
+        name: shoe.name,
+        km: Math.round(shoe.distance / 1000),
+      }));
   } catch (err) {
     if (!(err instanceof StravaApiError)) throw err;
   }
@@ -205,7 +215,10 @@ export function toSignals(readout: TrainingReadout): CoachSignal[] {
 }
 
 /** Weeks between today and the goal race, rounded up. */
-export function weeksToRace(context: CoachContext, today: string): number | null {
+export function weeksToRace(
+  context: CoachContext,
+  today: string,
+): number | null {
   if (!context.race_date) return null;
   const days = daysBetween(today, context.race_date);
   return days < 0 ? null : Math.ceil(days / 7);
@@ -343,6 +356,7 @@ export function describeGoal(context: CoachContext, today: string): string {
   const parts = [context.race_name];
   if (context.race_date) parts.push(context.race_date);
   if (weeks !== null) parts.push(`${weeks} weeks out`);
-  if (context.target_seconds) parts.push(`target ${clock(context.target_seconds)}`);
+  if (context.target_seconds)
+    parts.push(`target ${clock(context.target_seconds)}`);
   return parts.join(" · ");
 }

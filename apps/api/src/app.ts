@@ -127,13 +127,20 @@ export const openAPIConfig = {
   tags: [
     { name: "Meta", description: "Liveness and documentation" },
     { name: "Athlete", description: "The signed-in athlete's Strava profile" },
-    { name: "Runs", description: "The signed-in athlete's runs and their streams" },
+    {
+      name: "Runs",
+      description: "The signed-in athlete's runs and their streams",
+    },
     { name: "Coach", description: "Conversations with the AI running coach" },
     {
       name: "Webhooks",
-      description: "Strava push subscription callbacks — called by Strava, not the browser",
+      description:
+        "Strava push subscription callbacks — called by Strava, not the browser",
     },
-    { name: "Telemetry", description: "Browser events and errors, forwarded to Loki" },
+    {
+      name: "Telemetry",
+      description: "Browser events and errors, forwarded to Loki",
+    },
   ],
 };
 
@@ -257,7 +264,10 @@ async function stravaAccessToken(
       body: { providerId: "strava", userId },
     });
     if (!accessToken) {
-      c.get("log").warn({ event: "auth.strava_token_missing" }, "No Strava token");
+      c.get("log").warn(
+        { event: "auth.strava_token_missing" },
+        "No Strava token",
+      );
       return null;
     }
     return accessToken;
@@ -292,16 +302,28 @@ async function stravaTokenFor(userId: string): Promise<string | null> {
 }
 
 /** One place to record an upstream Strava failure before it becomes a 4xx/5xx. */
-function logStravaFailure(c: Context<AppEnv>, err: unknown, action: string): void {
+function logStravaFailure(
+  c: Context<AppEnv>,
+  err: unknown,
+  action: string,
+): void {
   if (err instanceof StravaApiError) {
     const missingScope = err.status === 401 || err.status === 403;
     c.get("log").warn(
-      { event: "strava.request_failed", action, status: err.status, missingScope },
+      {
+        event: "strava.request_failed",
+        action,
+        status: err.status,
+        missingScope,
+      },
       `Strava rejected ${action}`,
     );
     return;
   }
-  c.get("log").error({ event: "strava.request_failed", action, err }, `${action} failed`);
+  c.get("log").error(
+    { event: "strava.request_failed", action, err },
+    `${action} failed`,
+  );
 }
 
 const healthRoute = createRoute({
@@ -357,7 +379,8 @@ app.openapi(athleteRoute, async (c) => {
     return c.json(await fetchAthlete(accessToken), 200);
   } catch (err) {
     logStravaFailure(c, err, "fetch athlete");
-    if (err instanceof StravaApiError) return c.json({ error: err.message }, 502);
+    if (err instanceof StravaApiError)
+      return c.json({ error: err.message }, 502);
     throw err;
   }
 });
@@ -618,10 +641,13 @@ app.openapi(startRunRenderRoute, async (c) => {
   const template = body?.template ?? DEFAULT_TEMPLATE_ID;
   // A template that draws no runner has nothing to put a face on, so the option
   // is dropped here rather than stored as an answer that changed nothing.
-  const showAvatar = (body?.show_avatar ?? false) && getTemplate(template).supportsAvatar;
+  const showAvatar =
+    (body?.show_avatar ?? false) && getTemplate(template).supportsAvatar;
   // Same rule for the look: a template whose plate isn't ours to re-tint stores
   // the default rather than an answer that changed nothing.
-  const theme = getTemplate(template).supportsTheme ? (body?.theme ?? DEFAULT_THEME) : DEFAULT_THEME;
+  const theme = getTemplate(template).supportsTheme
+    ? (body?.theme ?? DEFAULT_THEME)
+    : DEFAULT_THEME;
   const options = { showAvatar, theme };
 
   const target = resolveRenderTarget(template);
@@ -637,7 +663,10 @@ app.openapi(startRunRenderRoute, async (c) => {
   // it gets a kill switch. Defaults to on: with PostHog absent, or the flag
   // never created, this is the behaviour the app shipped with.
   if (!(await isFeatureEnabledFor(RENDER_FLAG, session.user.id, true))) {
-    log.warn({ event: "render.flag_off", flag: RENDER_FLAG }, "Rendering is switched off");
+    log.warn(
+      { event: "render.flag_off", flag: RENDER_FLAG },
+      "Rendering is switched off",
+    );
     return c.json({ error: RENDER_DISABLED }, 503);
   }
 
@@ -645,7 +674,11 @@ app.openapi(startRunRenderRoute, async (c) => {
   // unless it was made with different options, which makes it a different video.
   const propsHash = renderPropsHash(template, options);
   const existing = await getRunRender(session.user.id, activityId, template);
-  if (existing && existing.status !== "error" && existing.propsHash === propsHash) {
+  if (
+    existing &&
+    existing.status !== "error" &&
+    existing.propsHash === propsHash
+  ) {
     track(
       c,
       "render.reused",
@@ -710,7 +743,8 @@ app.openapi(startRunRenderRoute, async (c) => {
     }
     // Lambda refused the render (bad serve URL, missing AWS permissions, a
     // composition the deployed bundle doesn't hold, …).
-    const message = err instanceof Error ? err.message : "Failed to start the render";
+    const message =
+      err instanceof Error ? err.message : "Failed to start the render";
     trackError(
       c,
       "render.start_failed",
@@ -802,7 +836,12 @@ app.openapi(runRenderProgressRoute, async (c) => {
           renderId: row.renderId,
           bucketName: row.bucketName,
         });
-        const updated = await updateRunRender(userId, activityId, template, progress);
+        const updated = await updateRunRender(
+          userId,
+          activityId,
+          template,
+          progress,
+        );
         await stream.writeSSE({ data: JSON.stringify(toRunRender(updated)) });
         if (updated.status !== "rendering") {
           const finished = {
@@ -811,7 +850,8 @@ app.openapi(runRenderProgressRoute, async (c) => {
             template,
             renderId: updated.renderId,
             status: updated.status,
-            durationMs: updated.updatedAt.getTime() - updated.createdAt.getTime(),
+            durationMs:
+              updated.updatedAt.getTime() - updated.createdAt.getTime(),
             error: updated.error,
           };
           if (updated.status === "error") {
@@ -855,7 +895,8 @@ const listCoachThreadsRoute = createRoute({
   operationId: "listCoachThreads",
   tags: ["Coach"],
   summary: "List the athlete's coach conversations",
-  description: "Most recently used first. A thread with no messages has a null title.",
+  description:
+    "Most recently used first. A thread with no messages has a null title.",
   security: [{ sessionCookie: [] }],
   responses: {
     200: {
@@ -1211,7 +1252,10 @@ app.openapi(coachChatRoute, async (c) => {
   const log = c.get("log");
   const config = getCoachConfig();
   if (!config) {
-    log.warn({ event: "coach.not_configured" }, "No model API key is configured");
+    log.warn(
+      { event: "coach.not_configured" },
+      "No model API key is configured",
+    );
     return c.json({ error: COACH_NOT_CONFIGURED }, 503);
   }
 
@@ -1297,14 +1341,25 @@ app.openapi(coachChatRoute, async (c) => {
     generateMessageId: createIdGenerator({ prefix: "msg", size: 16 }),
     onEnd: async ({ responseMessage }) => {
       await saveMessage(thread.id, responseMessage);
-      track(c, "coach.turn_finished", { threadId: thread.id }, "Coach answered");
+      track(
+        c,
+        "coach.turn_finished",
+        { threadId: thread.id },
+        "Coach answered",
+      );
     },
     onError: (error) => {
       // The default swallows everything as "An error occurred." — a coach that
       // can't reach its model should say why, to the athlete and to Grafana.
       // The stream is already open, so this never becomes a 5xx: without a log
       // line a failing model is invisible on the server.
-      trackError(c, "coach.turn_failed", error, { threadId: thread.id }, "Coach failed");
+      trackError(
+        c,
+        "coach.turn_failed",
+        error,
+        { threadId: thread.id },
+        "Coach failed",
+      );
       return error instanceof Error
         ? error.message
         : "The coach could not answer that.";
@@ -1324,14 +1379,16 @@ const webhookValidationRoute = createRoute({
   summary: "Answer Strava's subscription challenge",
   description:
     "Strava calls this while `POST /push_subscriptions` is in flight and " +
-    "expects `{ \"hub.challenge\": … }` back within two seconds. The challenge " +
+    'expects `{ "hub.challenge": … }` back within two seconds. The challenge ' +
     "is only echoed when `hub.verify_token` matches the server's " +
     "STRAVA_WEBHOOK_VERIFY_TOKEN, so somebody else's subscription cannot point " +
     "at this callback.",
   request: {
     query: z.object({
       "hub.mode": z.string().openapi({ example: "subscribe" }),
-      "hub.challenge": z.string().openapi({ example: "15f7d1a91c1f40f8a748fd134752feb3" }),
+      "hub.challenge": z
+        .string()
+        .openapi({ example: "15f7d1a91c1f40f8a748fd134752feb3" }),
       "hub.verify_token": z.string(),
     }),
   },
@@ -1364,7 +1421,10 @@ app.openapi(webhookValidationRoute, (c) => {
     return c.json({ error: "Webhooks are not configured on this server" }, 403);
   }
 
-  if (query["hub.mode"] !== "subscribe" || query["hub.verify_token"] !== expected) {
+  if (
+    query["hub.mode"] !== "subscribe" ||
+    query["hub.verify_token"] !== expected
+  ) {
     log.warn(
       { event: "webhook.validation_rejected", mode: query["hub.mode"] },
       "Rejected a subscription challenge",
@@ -1372,7 +1432,10 @@ app.openapi(webhookValidationRoute, (c) => {
     return c.json({ error: "Bad verify token" }, 403);
   }
 
-  log.info({ event: "webhook.validated" }, "Answered Strava's subscription challenge");
+  log.info(
+    { event: "webhook.validated" },
+    "Answered Strava's subscription challenge",
+  );
   return c.json({ "hub.challenge": query["hub.challenge"] }, 200);
 });
 
@@ -1387,7 +1450,7 @@ const webhookEventRoute = createRoute({
     "immediately and processed afterwards: Strava requires a 200 " +
     "within two seconds and retries up to three times otherwise, which is far " +
     "less time than reading an activity and writing a debrief takes. A new run " +
-    "becomes a post-run debrief in the athlete's \"Post-run debriefs\" thread; " +
+    'becomes a post-run debrief in the athlete\'s "Post-run debriefs" thread; ' +
     "everything else is recorded and ignored.",
   request: {
     body: {
@@ -1398,7 +1461,9 @@ const webhookEventRoute = createRoute({
   responses: {
     200: {
       description: "Authenticated and acknowledged.",
-      content: { "application/json": { schema: z.object({ received: z.literal(true) }) } },
+      content: {
+        "application/json": { schema: z.object({ received: z.literal(true) }) },
+      },
     },
     403: {
       description: "The delivery signature was absent, invalid, or stale.",
@@ -1445,7 +1510,10 @@ app.use(WEBHOOK_PATH, async (c, next) => {
       secret,
     )
   ) {
-    log.warn({ event: "webhook.signature_rejected" }, "Rejected a Strava webhook event");
+    log.warn(
+      { event: "webhook.signature_rejected" },
+      "Rejected a Strava webhook event",
+    );
     return c.json({ error: "Invalid webhook signature" }, 403);
   }
 
@@ -1459,7 +1527,10 @@ app.use(WEBHOOK_PATH, async (c, next) => {
  * has gone, so a failure here can only ever be a log line.
  */
 async function processStravaEvent(event: StravaEvent): Promise<void> {
-  const log = logger.child({ event_source: "strava_webhook", objectId: event.object_id });
+  const log = logger.child({
+    event_source: "strava_webhook",
+    objectId: event.object_id,
+  });
 
   const userId = await userForAthlete(event.owner_id);
   if (!userId) {
@@ -1473,7 +1544,10 @@ async function processStravaEvent(event: StravaEvent): Promise<void> {
   if (event.object_type === "athlete") {
     // The only athlete event Strava sends is a deauthorisation.
     if (event.updates.authorized === "false") {
-      log.warn({ event: "webhook.deauthorized", userId }, "Athlete revoked access");
+      log.warn(
+        { event: "webhook.deauthorized", userId },
+        "Athlete revoked access",
+      );
     }
     return;
   }
@@ -1487,13 +1561,19 @@ async function processStravaEvent(event: StravaEvent): Promise<void> {
   }
 
   if (await findDebrief(userId, event.object_id)) {
-    log.info({ event: "webhook.already_debriefed", userId }, "Run already debriefed");
+    log.info(
+      { event: "webhook.already_debriefed", userId },
+      "Run already debriefed",
+    );
     return;
   }
 
   const accessToken = await stravaTokenFor(userId);
   if (!accessToken) {
-    log.warn({ event: "webhook.no_token", userId }, "No Strava token for this athlete");
+    log.warn(
+      { event: "webhook.no_token", userId },
+      "No Strava token for this athlete",
+    );
     return;
   }
 
@@ -1525,7 +1605,11 @@ app.openapi(webhookEventRoute, async (c) => {
       .then(() => pruneEvents())
       .catch((err: unknown) => {
         logger.error(
-          { event: "webhook.processing_failed", objectId: event.object_id, err },
+          {
+            event: "webhook.processing_failed",
+            objectId: event.object_id,
+            err,
+          },
           "Failed to process a Strava event",
         );
       });

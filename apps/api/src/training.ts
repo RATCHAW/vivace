@@ -52,7 +52,8 @@ export function addDays(date: string, days: number): string {
 /** Whole days from `from` to `to`; negative when `to` is earlier. */
 export function daysBetween(from: string, to: string): number {
   const ms =
-    new Date(`${to}T00:00:00Z`).getTime() - new Date(`${from}T00:00:00Z`).getTime();
+    new Date(`${to}T00:00:00Z`).getTime() -
+    new Date(`${from}T00:00:00Z`).getTime();
   return Math.round(ms / 86_400_000);
 }
 
@@ -176,10 +177,11 @@ export function routePath(
   if (points.length < 2) return null;
 
   const step = Math.ceil(points.length / ROUTE_MAX_POINTS);
-  const sampled = points.filter((_, i) => i % step === 0 || i === points.length - 1);
+  const sampled = points.filter(
+    (_, i) => i % step === 0 || i === points.length - 1,
+  );
 
-  const meanLat =
-    sampled.reduce((sum, [lat]) => sum + lat, 0) / sampled.length;
+  const meanLat = sampled.reduce((sum, [lat]) => sum + lat, 0) / sampled.length;
   const scale = Math.cos((meanLat * Math.PI) / 180);
   const flat = sampled.map(([lat, lng]) => [lng * scale, lat] as const);
 
@@ -233,7 +235,10 @@ export function weeklyVolume(
   weeks: number,
   today: string,
 ): TrainingWeek[] {
-  const totals = new Map<string, { runs: number; metres: number; seconds: number }>();
+  const totals = new Map<
+    string,
+    { runs: number; metres: number; seconds: number }
+  >();
   for (const run of runs) {
     const key = weekStart(localDate(run));
     const week = totals.get(key) ?? { runs: 0, metres: 0, seconds: 0 };
@@ -248,7 +253,11 @@ export function weeklyVolume(
   const ordered: TrainingWeek[] = [];
   for (let i = weeks - 1; i >= 0; i--) {
     const week_starting = addDays(thisWeek, -7 * i);
-    const week = totals.get(week_starting) ?? { runs: 0, metres: 0, seconds: 0 };
+    const week = totals.get(week_starting) ?? {
+      runs: 0,
+      metres: 0,
+      seconds: 0,
+    };
     const previous = ordered.at(-1);
     const km = Number((week.metres / 1000).toFixed(1));
     ordered.push({
@@ -362,7 +371,9 @@ export function easyIntensity(runs: Run[]): EasyIntensity | null {
   );
   if (easy.length === 0) return null;
 
-  const hard = easy.filter((run) => (run.average_heartrate ?? 0) >= zone3_floor);
+  const hard = easy.filter(
+    (run) => (run.average_heartrate ?? 0) >= zone3_floor,
+  );
   return {
     hr_max,
     zone3_floor,
@@ -490,9 +501,11 @@ export function predictRaces(efforts: BestEffort[]): RacePrediction[] {
     let winner: { seconds: number; from: BestEffort } | null = null;
     for (const effort of best) {
       const stretch = race.metres / effort.distance;
-      if (stretch > RIEGEL_MAX_STRETCH || stretch < 1 / RIEGEL_MAX_STRETCH) continue;
+      if (stretch > RIEGEL_MAX_STRETCH || stretch < 1 / RIEGEL_MAX_STRETCH)
+        continue;
       const seconds = riegel(effort.elapsed_time, effort.distance, race.metres);
-      if (!winner || seconds < winner.seconds) winner = { seconds, from: effort };
+      if (!winner || seconds < winner.seconds)
+        winner = { seconds, from: effort };
     }
     if (!winner) continue;
     predictions.push({
@@ -583,7 +596,9 @@ export function planProgress(
   const todayOffset = daysBetween(week_starting, today);
   return {
     week_starting,
-    planned_km: Number(days.reduce((sum, d) => sum + d.planned_km, 0).toFixed(1)),
+    planned_km: Number(
+      days.reduce((sum, d) => sum + d.planned_km, 0).toFixed(1),
+    ),
     actual_km: Number(days.reduce((sum, d) => sum + d.actual_km, 0).toFixed(1)),
     days,
     remaining: days.filter(

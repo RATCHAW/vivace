@@ -158,7 +158,9 @@ export function Runs() {
                     aria-pressed={selected?.id === run.id}
                     className={cn(
                       "focus-visible:ring-ring/50 flex w-full items-center gap-5 border-b px-7 py-5 text-left outline-none last:border-b-0 focus-visible:ring-3 focus-visible:ring-inset",
-                      selected?.id === run.id ? "bg-muted" : "hover:bg-muted/40",
+                      selected?.id === run.id
+                        ? "bg-muted"
+                        : "hover:bg-muted/40",
                     )}
                   >
                     {/* The cobalt tick is the only stamp in the list, so the
@@ -170,11 +172,14 @@ export function Runs() {
                       )}
                     />
                     <span className="flex min-w-0 flex-col gap-1.5">
-                      <span className="text-body-md font-semibold">{run.name}</span>
+                      <span className="text-body-md font-semibold">
+                        {run.name}
+                      </span>
                       <span className="text-caption text-muted-foreground truncate">
                         {format.runDate(run.start_date_local)} ·{" "}
                         {formatClock(run.moving_time)} ·{" "}
-                        {formatPace(averagePaceSeconds(run))} {t("common.perKm")}
+                        {formatPace(averagePaceSeconds(run))}{" "}
+                        {t("common.perKm")}
                       </span>
                     </span>
                     <span className="ml-auto flex shrink-0 items-baseline gap-1 tabular-nums">

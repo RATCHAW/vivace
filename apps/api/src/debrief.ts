@@ -12,8 +12,16 @@ import { generateText } from "ai";
 import { createIdGenerator, type UIMessage } from "ai";
 import { logger } from "./logger.js";
 import { captureCoachGeneration, captureUserEvent } from "./posthog.js";
-import { buildRunDebriefCard, getCoachConfig, coachSystemPrompt } from "./coach.js";
-import { findOrCreateThread, recordDebrief, saveMessage } from "./chat-store.js";
+import {
+  buildRunDebriefCard,
+  getCoachConfig,
+  coachSystemPrompt,
+} from "./coach.js";
+import {
+  findOrCreateThread,
+  recordDebrief,
+  saveMessage,
+} from "./chat-store.js";
 import { fetchRuns } from "./strava.js";
 import { todayLocal } from "./briefing.js";
 import { localDate } from "./training.js";
@@ -113,11 +121,17 @@ export async function postRunDebrief(
         input: prompt,
         output: text,
         finishReason,
-        properties: { $ai_span_name: "post-run debrief", activity_id: activityId },
+        properties: {
+          $ai_span_name: "post-run debrief",
+          activity_id: activityId,
+        },
       });
     } catch (err) {
       // A model that is down should cost the athlete the prose, not the card.
-      log.error({ event: "debrief.model_failed", err }, "Could not write the debrief");
+      log.error(
+        { event: "debrief.model_failed", err },
+        "Could not write the debrief",
+      );
       captureCoachGeneration({
         distinctId: userId,
         modelId: config.modelId,
@@ -125,7 +139,10 @@ export async function postRunDebrief(
         input: prompt,
         output: null,
         error: err,
-        properties: { $ai_span_name: "post-run debrief", activity_id: activityId },
+        properties: {
+          $ai_span_name: "post-run debrief",
+          activity_id: activityId,
+        },
       });
     }
   }
@@ -162,7 +179,10 @@ export async function postRunDebrief(
     model: config?.modelId ?? null,
     written: config !== null,
   };
-  log.info({ event: "debrief.posted", ...properties }, "Posted a post-run debrief");
+  log.info(
+    { event: "debrief.posted", ...properties },
+    "Posted a post-run debrief",
+  );
   captureUserEvent({ distinctId: userId, event: "debrief.posted", properties });
 
   return thread.id;

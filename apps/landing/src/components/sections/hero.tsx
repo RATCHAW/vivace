@@ -14,7 +14,10 @@ export function Hero({ copy, locale }: { copy: Copy; locale: Locale }) {
   const t = copy.hero;
 
   return (
-    <section id="top" className="scroll-mt-16 px-6 pt-20 pb-16 sm:px-8 sm:pt-30 sm:pb-24">
+    <section
+      id="top"
+      className="scroll-mt-16 px-6 pt-20 pb-16 sm:px-8 sm:pt-30 sm:pb-24"
+    >
       <div className="mx-auto grid w-full max-w-[1200px] items-center gap-16 lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-18">
         <div className="flex flex-col gap-8">
           <span className="bg-card text-body-sm text-muted-foreground inline-flex h-9 items-center gap-2.5 self-start rounded-full px-4 font-semibold">

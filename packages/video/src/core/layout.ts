@@ -86,7 +86,11 @@ function advanceEm(char: string): number {
 }
 
 /** Roughly how wide `text` renders at `fontSize`, tracking included. */
-export function estimateTextWidth(text: string, fontSize: number, tracking = 0): number {
+export function estimateTextWidth(
+  text: string,
+  fontSize: number,
+  tracking = 0,
+): number {
   let em = 0;
   for (const char of text) em += advanceEm(char) + tracking;
   return em * fontSize;

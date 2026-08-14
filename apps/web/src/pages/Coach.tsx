@@ -130,7 +130,10 @@ export function Coach() {
           />
         </aside>
 
-        <section aria-label={t("coach.section")} className="flex min-h-0 flex-col">
+        <section
+          aria-label={t("coach.section")}
+          className="flex min-h-0 flex-col"
+        >
           <header className="border-border flex h-[68px] shrink-0 items-center gap-4 border-b px-6">
             <div className="flex min-w-0 flex-col gap-0.5">
               <span className="text-body-md truncate font-semibold">
@@ -145,7 +148,9 @@ export function Coach() {
             </div>
             <Button
               className="ml-auto"
-              onClick={() => setRangeIndex((index) => (index + 1) % RANGES.length)}
+              onClick={() =>
+                setRangeIndex((index) => (index + 1) % RANGES.length)
+              }
               size="sm"
               variant="subtle"
             >

@@ -1,7 +1,7 @@
-import { Button as ButtonPrimitive } from "@base-ui/react/button"
-import { cva, type VariantProps } from "class-variance-authority"
+import { Button as ButtonPrimitive } from "@base-ui/react/button";
+import { cva, type VariantProps } from "class-variance-authority";
 
-import { cn } from "@/lib/utils"
+import { cn } from "@/lib/utils";
 
 // DESIGN.md: every button is a pill ({rounded.full}) and ships at a minimum of
 // 48px tall. Labels are Inter {typography.button-md} (16/600, +0.24px tracking);
@@ -41,7 +41,8 @@ const buttonVariants = cva(
         lg: "h-14 gap-2.5 px-8 text-heading-sm font-medium has-data-[icon=inline-end]:pr-6 has-data-[icon=inline-start]:pl-6 [&_svg:not([class*='size-'])]:size-6",
         icon: "size-12",
         "icon-xs": "size-8 [&_svg:not([class*='size-'])]:size-3.5",
-        "icon-sm": "size-9 min-h-11 sm:min-h-9 [&_svg:not([class*='size-'])]:size-4",
+        "icon-sm":
+          "size-9 min-h-11 sm:min-h-9 [&_svg:not([class*='size-'])]:size-4",
         "icon-lg": "size-14 [&_svg:not([class*='size-'])]:size-6",
       },
     },
@@ -49,8 +50,8 @@ const buttonVariants = cva(
       variant: "default",
       size: "default",
     },
-  }
-)
+  },
+);
 
 function Button({
   className,
@@ -64,7 +65,7 @@ function Button({
       className={cn(buttonVariants({ variant, size, className }))}
       {...props}
     />
-  )
+  );
 }
 
 /**
@@ -90,7 +91,7 @@ function ButtonLink({
     >
       {children}
     </Button>
-  )
+  );
 }
 
-export { Button, ButtonLink, buttonVariants }
+export { Button, ButtonLink, buttonVariants };

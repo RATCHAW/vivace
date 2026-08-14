@@ -5,7 +5,12 @@
 // apps/api/src/briefing.ts. Nothing is computed twice: a signal shown here and
 // the same signal quoted in an answer are literally the same object.
 import { useTranslation } from "react-i18next";
-import type { CoachBriefing, CoachSignal, CoachTone, PlanProgress } from "@/api";
+import type {
+  CoachBriefing,
+  CoachSignal,
+  CoachTone,
+  PlanProgress,
+} from "@/api";
 import { useMessages } from "@/i18n";
 import { useFormatters } from "@/i18n/format";
 import { MonoLabel } from "@/components/mono";
@@ -98,7 +103,9 @@ function GoalRace({
     >
       <div className="border-border flex flex-col gap-3.5 rounded-md border p-5">
         <div className="flex flex-col gap-1.5">
-          <span className="text-body-md font-semibold">{context.race_name}</span>
+          <span className="text-body-md font-semibold">
+            {context.race_name}
+          </span>
           <span className="text-caption text-stone">
             {context.race_date
               ? format.raceDay(context.race_date)
@@ -111,7 +118,9 @@ function GoalRace({
         <dl className="border-border flex gap-5 border-t pt-3.5">
           <div className="flex flex-col gap-1.5">
             <dt>
-              <MonoLabel className="text-mono-badge">{t("rail.toGo")}</MonoLabel>
+              <MonoLabel className="text-mono-badge">
+                {t("rail.toGo")}
+              </MonoLabel>
             </dt>
             <dd className="text-heading-sm font-semibold tabular-nums">
               {weeks !== null
@@ -121,7 +130,9 @@ function GoalRace({
           </div>
           <div className="flex flex-col gap-1.5">
             <dt>
-              <MonoLabel className="text-mono-badge">{t("rail.target")}</MonoLabel>
+              <MonoLabel className="text-mono-badge">
+                {t("rail.target")}
+              </MonoLabel>
             </dt>
             <dd className="text-heading-sm font-semibold tabular-nums">
               {context.target_seconds
@@ -131,7 +142,9 @@ function GoalRace({
           </div>
           <div className="flex flex-col gap-1.5">
             <dt>
-              <MonoLabel className="text-mono-badge">{t("rail.longDay")}</MonoLabel>
+              <MonoLabel className="text-mono-badge">
+                {t("rail.longDay")}
+              </MonoLabel>
             </dt>
             <dd className="text-heading-sm font-semibold">
               {context.long_run_day !== null
@@ -173,7 +186,10 @@ function ThisWeek({
     );
   }
 
-  const peak = Math.max(...plan.days.map((day) => Math.max(day.planned_km, day.actual_km)), 1);
+  const peak = Math.max(
+    ...plan.days.map((day) => Math.max(day.planned_km, day.actual_km)),
+    1,
+  );
 
   return (
     <RailSection title={t("rail.thisWeek")}>

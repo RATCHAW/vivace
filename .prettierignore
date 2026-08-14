@@ -1,0 +1,37 @@
+# Generated and committed — see the API contract table in CLAUDE.md. `pnpm
+# generate` writes these with its own formatter, so Prettier reformatting them
+# would make every regeneration a diff and `format:check` fail right after it.
+apps/api/openapi.json
+apps/web/src/api/generated/
+packages/strava-api/src/generated/
+packages/strava-api/openapi/strava-swagger.json
+
+# drizzle-kit's output: the migration SQL and the snapshot it diffs the next one
+# against. `pnpm db:generate` rewrites both, and the snapshot is a record of what
+# was applied — not a file to restyle. drizzle.config.ts is source, and is not
+# excluded.
+apps/api/drizzle/
+
+# Vendored agent skills, pinned by content hash in skills-lock.json. Formatting
+# one byte of these would invalidate the lock against upstream.
+.agents/
+.claude/
+
+# Markdown, deliberately. The prose here is hand-wrapped and the tables are
+# hand-aligned, but the real reason is that Prettier's Markdown printer changed
+# what a sentence *meant*: in CLAUDE.md the continuation line of "`run_render`'s
+# key is user + activity + template" starts with "+ template", which it parsed
+# as a list bullet and rewrote to "- template". Formatting prose buys nothing
+# here and costs that.
+*.md
+
+# Build output and tool state.
+dist/
+.next/
+.turbo/
+next-env.d.ts
+*.tsbuildinfo
+.husky/_/
+
+# pnpm owns the formatting of its own lockfile.
+pnpm-lock.yaml

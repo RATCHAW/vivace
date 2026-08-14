@@ -28,7 +28,10 @@ function runQuery<T>(options: {
   queryFn?: (context: never) => T | Promise<T>;
 }): Promise<T> {
   return Promise.resolve(
-    options.queryFn!({ queryKey: options.queryKey, signal: undefined } as never),
+    options.queryFn!({
+      queryKey: options.queryKey,
+      signal: undefined,
+    } as never),
   );
 }
 

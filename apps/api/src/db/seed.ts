@@ -54,11 +54,17 @@ const ALL_TABLES = {
 };
 
 function refuseInProduction(): void {
-  if (process.env.NODE_ENV === "production" || process.env.APP_ENV === "production") {
+  if (
+    process.env.NODE_ENV === "production" ||
+    process.env.APP_ENV === "production"
+  ) {
     throw new Error("Refusing to seed: NODE_ENV/APP_ENV says production");
   }
   const url = process.env.DATABASE_URL ?? "";
-  if (url && !/@(localhost|127\.0\.0\.1|db|host\.docker\.internal)[:/]/.test(url)) {
+  if (
+    url &&
+    !/@(localhost|127\.0\.0\.1|db|host\.docker\.internal)[:/]/.test(url)
+  ) {
     throw new Error(
       `Refusing to seed: DATABASE_URL is not a local database (${url.replace(/:[^:@]*@/, ":***@")})`,
     );
@@ -90,7 +96,9 @@ export async function seedDatabase(): Promise<void> {
     },
   }));
 
-  const userIds = (await db.select({ id: user.id }).from(user)).map((row) => row.id);
+  const userIds = (await db.select({ id: user.id }).from(user)).map(
+    (row) => row.id,
+  );
 
   await seed(
     db,

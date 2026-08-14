@@ -52,7 +52,11 @@ let existingDebrief: { thread_id: string; message_id: string } | null = null;
 
 vi.mock("./debrief.js", () => ({
   DEBRIEF_THREAD_TITLE: "Post-run debriefs",
-  postRunDebrief: async (userId: string, _token: string, activityId: number) => {
+  postRunDebrief: async (
+    userId: string,
+    _token: string,
+    activityId: number,
+  ) => {
     debriefed.push({ userId, activityId });
     return "thread-1";
   },
@@ -67,7 +71,8 @@ const { app } = await import("./app.js");
 
 /** The work behind the ack is deliberately not awaited by the handler. */
 async function settle() {
-  for (let i = 0; i < 5; i++) await new Promise((resolve) => setImmediate(resolve));
+  for (let i = 0; i < 5; i++)
+    await new Promise((resolve) => setImmediate(resolve));
 }
 
 function event(over: Partial<StravaEvent> = {}) {
@@ -89,7 +94,9 @@ function post(
   timestamp = Math.floor(Date.now() / 1000),
 ) {
   const rawBody = JSON.stringify(body);
-  const headers: Record<string, string> = { "content-type": "application/json" };
+  const headers: Record<string, string> = {
+    "content-type": "application/json",
+  };
   if (signature !== "missing") {
     const digest =
       signature === "valid"

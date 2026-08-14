@@ -35,10 +35,7 @@ import {
   AttachmentRemove,
   Attachments,
 } from "@/components/ai-elements/attachments";
-import {
-  Suggestion,
-  Suggestions,
-} from "@/components/ai-elements/suggestion";
+import { Suggestion, Suggestions } from "@/components/ai-elements/suggestion";
 import { MonoLabel } from "@/components/mono";
 import { formatPace } from "@repo/video";
 import { cn } from "@/lib/utils";
@@ -61,7 +58,10 @@ const PICKER_RUNS = 8;
  */
 const SLASH_COMMANDS = [
   { key: "composer.commands.week", ask: "coach.suggestions.planWeek" },
-  { key: "composer.commands.review", ask: "coach.suggestions.readLongRunSplits" },
+  {
+    key: "composer.commands.review",
+    ask: "coach.suggestions.readLongRunSplits",
+  },
   { key: "composer.commands.race", ask: "coach.followUps.raceToday" },
   { key: "composer.commands.load", ask: "coach.followUps.rampingTooFast" },
   { key: "composer.commands.goal", ask: "rail.askChangeGoal" },
@@ -83,7 +83,11 @@ export function runLabel(run: Run, format: Formatters): string {
 }
 
 export function toMention(run: Run): RunMention {
-  return { id: run.id, name: run.name, date: run.start_date_local.slice(0, 10) };
+  return {
+    id: run.id,
+    name: run.name,
+    date: run.start_date_local.slice(0, 10),
+  };
 }
 
 /**
@@ -94,7 +98,8 @@ export function toMention(run: Run): RunMention {
  */
 export function useMentionLabel(): (mention: RunMention) => string {
   const format = useFormatters();
-  return (mention) => `${mention.name} · ${format.shortDate(`${mention.date}T00:00:00Z`)}`;
+  return (mention) =>
+    `${mention.name} · ${format.shortDate(`${mention.date}T00:00:00Z`)}`;
 }
 
 /** The attachments queued in the composer, above the textarea. */
@@ -172,7 +177,10 @@ export function CoachComposer({
       {commands.length > 0 && (
         <ul className="border-border bg-card overflow-hidden rounded-md border">
           {commands.map((command) => (
-            <li className="border-border border-t first:border-t-0" key={command.name}>
+            <li
+              className="border-border border-t first:border-t-0"
+              key={command.name}
+            >
               <button
                 className="hover:bg-muted focus-visible:ring-ring/50 flex w-full items-center gap-3.5 px-4 py-2.5 text-left outline-none focus-visible:ring-3 focus-visible:ring-inset"
                 onClick={() => {
@@ -198,7 +206,10 @@ export function CoachComposer({
           {runs?.length ? (
             <ul>
               {runs.slice(0, PICKER_RUNS).map((run) => (
-                <li className="border-border border-t first:border-t-0" key={run.id}>
+                <li
+                  className="border-border border-t first:border-t-0"
+                  key={run.id}
+                >
                   <button
                     className="hover:bg-muted focus-visible:ring-ring/50 flex w-full items-center gap-3.5 px-4 py-2.5 text-left outline-none focus-visible:ring-3 focus-visible:ring-inset"
                     onClick={() => {
@@ -285,10 +296,14 @@ export function CoachComposer({
               variant="ghost"
             >
               <AtSignIcon />
-              <span className="sr-only sm:not-sr-only">{t("composer.runShort")}</span>
+              <span className="sr-only sm:not-sr-only">
+                {t("composer.runShort")}
+              </span>
             </PromptInputButton>
             <PromptInputActionMenu>
-              <PromptInputActionMenuTrigger tooltip={t("composer.attachFile")} />
+              <PromptInputActionMenuTrigger
+                tooltip={t("composer.attachFile")}
+              />
               <PromptInputActionMenuContent>
                 <PromptInputActionAddAttachments />
               </PromptInputActionMenuContent>

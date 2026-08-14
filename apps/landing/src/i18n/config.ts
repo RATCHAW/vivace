@@ -39,7 +39,9 @@ export const LOCALE_COOKIE = "vivace_locale";
 export const LOCALE_COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
 
 export function isLocale(value: unknown): value is Locale {
-  return typeof value === "string" && (LOCALES as readonly string[]).includes(value);
+  return (
+    typeof value === "string" && (LOCALES as readonly string[]).includes(value)
+  );
 }
 
 /**
@@ -65,7 +67,9 @@ export function negotiateLocale(
  * be a bug rather than a policy. Quality values are honoured — a browser that
  * says `en;q=0.9, fr;q=1.0` prefers French.
  */
-export function parseAcceptLanguage(header: string | null | undefined): Locale | null {
+export function parseAcceptLanguage(
+  header: string | null | undefined,
+): Locale | null {
   if (!header) return null;
 
   const ranked = header
@@ -76,7 +80,10 @@ export function parseAcceptLanguage(header: string | null | undefined): Locale |
         .map((param) => param.trim())
         .find((param) => param.startsWith("q="));
       const quality = q ? Number.parseFloat(q.slice(2)) : 1;
-      return { tag: tag.trim().toLowerCase(), quality: Number.isNaN(quality) ? 0 : quality };
+      return {
+        tag: tag.trim().toLowerCase(),
+        quality: Number.isNaN(quality) ? 0 : quality,
+      };
     })
     .filter((entry) => entry.tag && entry.quality > 0)
     // A stable sort keeps header order for equal weights, which is what the

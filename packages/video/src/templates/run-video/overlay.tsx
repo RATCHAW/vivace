@@ -27,7 +27,8 @@ const ON_DARK_FAINT = "rgba(255,255,255,0.64)";
 const RULE = "rgba(255,255,255,0.16)";
 
 const SANS = "'Inter Variable', Inter, system-ui, sans-serif";
-const MONO = "'JetBrains Mono Variable', ui-monospace, SFMono-Regular, monospace";
+const MONO =
+  "'JetBrains Mono Variable', ui-monospace, SFMono-Regular, monospace";
 
 // Type ramp for the 1080×1920 story canvas. Sized for a phone held at arm's
 // length: nothing informational below 30px.
@@ -194,7 +195,13 @@ export function RouteOverlay({
 
         <Rule margin="44px 0" />
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 32 }}>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr 1fr",
+            gap: 32,
+          }}
+        >
           <MetricTile label="TIME" value={formatClock(live.elapsedSeconds)} />
           <MetricTile
             label="PACE"

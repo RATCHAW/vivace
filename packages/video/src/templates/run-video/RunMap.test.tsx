@@ -82,7 +82,8 @@ const { RunMap } = await import("./RunMap");
 
 const WIDTH = 1080;
 const HEIGHT = 1920;
-const AVATAR = "https://dgalywyr863hv.cloudfront.net/pictures/athletes/1/large.jpg";
+const AVATAR =
+  "https://dgalywyr863hv.cloudfront.net/pictures/athletes/1/large.jpg";
 
 // A short route that turns, so following it is not the same as pointing at it.
 const POINTS = [
@@ -121,7 +122,10 @@ function strandedFrames(
     });
     const camera = map.cameras[map.cameras.length - 1];
     const runner = POINTS[sampleIndex(POINTS.length, progress)];
-    const [x, y] = projectPoint(runner, camera, { width: WIDTH, height: HEIGHT });
+    const [x, y] = projectPoint(runner, camera, {
+      width: WIDTH,
+      height: HEIGHT,
+    });
     return (
       x < ROUTE_PADDING.left + clearance - 1 ||
       x > WIDTH - ROUTE_PADDING.right - clearance + 1 ||
@@ -206,22 +210,33 @@ describe("RunMap in the Player", () => {
     });
 
     // Two runners on one map: the Mapbox dot goes out as the puck comes in.
-    expect(map.layout["runner-marker-dot"]).toMatchObject({ visibility: "none" });
+    expect(map.layout["runner-marker-dot"]).toMatchObject({
+      visibility: "none",
+    });
 
     // The puck is a DOM layer, so it has to be projected onto the plate with
     // the same camera Mapbox was just jumped to — otherwise it drifts off the
     // head of the trace it is supposed to be leading.
     const camera = map.cameras[map.cameras.length - 1];
     const runner = POINTS[sampleIndex(POINTS.length, 0.5)];
-    const [x, y] = projectPoint(runner, camera, { width: WIDTH, height: HEIGHT });
+    const [x, y] = projectPoint(runner, camera, {
+      width: WIDTH,
+      height: HEIGHT,
+    });
     const avatar = container.querySelector("img");
     expect(avatar?.src).toBe(AVATAR);
-    expect(Math.round(parseFloat(avatar?.style.left ?? "NaN"))).toBe(Math.round(x));
-    expect(Math.round(parseFloat(avatar?.style.top ?? "NaN"))).toBe(Math.round(y));
+    expect(Math.round(parseFloat(avatar?.style.left ?? "NaN"))).toBe(
+      Math.round(x),
+    );
+    expect(Math.round(parseFloat(avatar?.style.top ?? "NaN"))).toBe(
+      Math.round(y),
+    );
 
     // A puck framed like a dot would have the athlete's face cropped by the
     // edge of the frame, so the camera owes it a wider berth.
-    expect(strandedFrames(rerender, map, AVATAR, RUNNER_AVATAR_CLEARANCE)).toEqual([]);
+    expect(
+      strandedFrames(rerender, map, AVATAR, RUNNER_AVATAR_CLEARANCE),
+    ).toEqual([]);
   });
 
   it("does not gate playback on the map going idle", () => {

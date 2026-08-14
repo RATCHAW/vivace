@@ -68,7 +68,12 @@ vi.mock("./chat-store.js", async (importOriginal) => {
 function mockModel(text: string[]) {
   const chunks: LanguageModelV4StreamPart[] = [
     { type: "stream-start", warnings: [] },
-    { type: "response-metadata", id: "id-0", modelId: "mock", timestamp: new Date(0) },
+    {
+      type: "response-metadata",
+      id: "id-0",
+      modelId: "mock",
+      timestamp: new Date(0),
+    },
     { type: "text-start", id: "1" },
     ...text.map((delta) => ({ type: "text-delta" as const, id: "1", delta })),
     { type: "text-end", id: "1" },
@@ -111,7 +116,10 @@ describe("POST /api/coach/chat", () => {
     accessToken = "strava-token";
     stored = [];
     title = null;
-    config = { model: mockModel(["Build volume ", "before speed."]), modelId: "mock" };
+    config = {
+      model: mockModel(["Build volume ", "before speed."]),
+      modelId: "mock",
+    };
   });
 
   it("streams the reply and persists both sides of the turn", async () => {
@@ -132,8 +140,13 @@ describe("POST /api/coach/chat", () => {
     expect(body).toContain('"delta":"Build volume "');
     expect(body).toContain('"delta":"before speed."');
 
-    expect(stored.map((message) => message.role)).toEqual(["user", "assistant"]);
-    expect(JSON.stringify(stored[1].parts)).toContain("Build volume before speed.");
+    expect(stored.map((message) => message.role)).toEqual([
+      "user",
+      "assistant",
+    ]);
+    expect(JSON.stringify(stored[1].parts)).toContain(
+      "Build volume before speed.",
+    );
   });
 
   it("names the thread after the first message, and only the first", async () => {
@@ -161,8 +174,16 @@ describe("POST /api/coach/chat", () => {
 
   it("drops the answer being regenerated, and keeps the question", async () => {
     stored = [
-      { id: "user-1", role: "user", parts: [{ type: "text", text: "Where do I start?" }] },
-      { id: "msg-1", role: "assistant", parts: [{ type: "text", text: "Rest." }] },
+      {
+        id: "user-1",
+        role: "user",
+        parts: [{ type: "text", text: "Where do I start?" }],
+      },
+      {
+        id: "msg-1",
+        role: "assistant",
+        parts: [{ type: "text", text: "Rest." }],
+      },
     ];
 
     // The UI regenerates *an assistant message*, which is the id that travels.
@@ -175,7 +196,9 @@ describe("POST /api/coach/chat", () => {
 
     expect(stored).toHaveLength(2);
     expect(stored[0].id).toBe("user-1");
-    expect(JSON.stringify(stored[1].parts)).toContain("Build volume before speed.");
+    expect(JSON.stringify(stored[1].parts)).toContain(
+      "Build volume before speed.",
+    );
     expect(JSON.stringify(stored)).not.toContain("Rest.");
   });
 
@@ -188,7 +211,11 @@ describe("POST /api/coach/chat", () => {
   it("404s on someone else's conversation", async () => {
     const res = await chat({
       thread_id: "99999999-2222-3333-4444-555555555555",
-      message: { id: "user-1", role: "user", parts: [{ type: "text", text: "Hi" }] },
+      message: {
+        id: "user-1",
+        role: "user",
+        parts: [{ type: "text", text: "Hi" }],
+      },
     });
     expect(res.status).toBe(404);
   });
@@ -197,7 +224,11 @@ describe("POST /api/coach/chat", () => {
     config = null;
     const res = await chat({
       thread_id: THREAD_ID,
-      message: { id: "user-1", role: "user", parts: [{ type: "text", text: "Hi" }] },
+      message: {
+        id: "user-1",
+        role: "user",
+        parts: [{ type: "text", text: "Hi" }],
+      },
     });
     expect(res.status).toBe(503);
     expect((await res.json()).error).toContain("GOOGLE_GENERATIVE_AI_API_KEY");
@@ -207,7 +238,11 @@ describe("POST /api/coach/chat", () => {
     accessToken = undefined;
     const res = await chat({
       thread_id: THREAD_ID,
-      message: { id: "user-1", role: "user", parts: [{ type: "text", text: "Hi" }] },
+      message: {
+        id: "user-1",
+        role: "user",
+        parts: [{ type: "text", text: "Hi" }],
+      },
     });
     expect(res.status).toBe(401);
   });

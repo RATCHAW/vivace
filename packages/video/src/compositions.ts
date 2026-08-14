@@ -14,8 +14,14 @@ import { RunVideo } from "./templates/run-video/RunVideo";
 import { SplitRush } from "./templates/split-rush/SplitRush";
 
 export { RunVideo, type RunVideoProps } from "./templates/run-video/RunVideo";
-export { SplitRush, type SplitRushProps } from "./templates/split-rush/SplitRush";
-export { LivingPoster, type LivingPosterProps } from "./templates/living-poster/LivingPoster";
+export {
+  SplitRush,
+  type SplitRushProps,
+} from "./templates/split-rush/SplitRush";
+export {
+  LivingPoster,
+  type LivingPosterProps,
+} from "./templates/living-poster/LivingPoster";
 export {
   MinimalNumbers,
   type MinimalNumbersProps,

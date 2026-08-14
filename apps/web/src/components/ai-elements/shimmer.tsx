@@ -39,21 +39,25 @@ const ShimmerComponent = ({
   spread = 2,
 }: TextShimmerProps) => {
   const MotionComponent = getMotionComponent(
-    Component as keyof JSX.IntrinsicElements
+    Component as keyof JSX.IntrinsicElements,
   );
 
   const dynamicSpread = useMemo(
     () => (children?.length ?? 0) * spread,
-    [children, spread]
+    [children, spread],
   );
 
   return (
+    // Stable across renders: motionComponentCache hands back the same component
+    // for a given element, which is the remount this rule guards against — it
+    // just cannot see through the Map to know that.
+    // eslint-disable-next-line react-hooks/static-components
     <MotionComponent
       animate={{ backgroundPosition: "0% center" }}
       className={cn(
         "relative inline-block bg-[length:250%_100%,auto] bg-clip-text text-transparent",
         "[--bg:linear-gradient(90deg,#0000_calc(50%-var(--spread)),var(--color-background),#0000_calc(50%+var(--spread)))] [background-repeat:no-repeat,padding-box]",
-        className
+        className,
       )}
       initial={{ backgroundPosition: "100% center" }}
       style={

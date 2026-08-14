@@ -1,7 +1,14 @@
 import type { ReactNode } from "react";
 import { AbsoluteFill } from "remotion";
 import { VivaceMark } from "../brand/vivace-mark";
-import { FONT_MONO, FONT_SANS, LABEL_TRACKING, LOGO_TOP, PAGE_INSET, TYPE } from "./layout";
+import {
+  FONT_MONO,
+  FONT_SANS,
+  LABEL_TRACKING,
+  LOGO_TOP,
+  PAGE_INSET,
+  TYPE,
+} from "./layout";
 import type { Theme } from "./theme";
 
 /**
@@ -79,7 +86,13 @@ function Grain({ theme, seed }: { theme: Theme; seed: number }) {
  * The same lockup as `<Wordmark>` in the app: the mark in the theme's brand ink,
  * the name in the theme's ink.
  */
-export function Lockup({ theme, opacity = 1 }: { theme: Theme; opacity?: number }) {
+export function Lockup({
+  theme,
+  opacity = 1,
+}: {
+  theme: Theme;
+  opacity?: number;
+}) {
   return (
     <div
       style={{
@@ -95,7 +108,14 @@ export function Lockup({ theme, opacity = 1 }: { theme: Theme; opacity?: number 
       }}
     >
       <VivaceMark style={{ width: 40, height: 40, color: theme.markInk }} />
-      <span style={{ fontSize: 40, fontWeight: 600, lineHeight: 1, letterSpacing: "-0.01em" }}>
+      <span
+        style={{
+          fontSize: 40,
+          fontWeight: 600,
+          lineHeight: 1,
+          letterSpacing: "-0.01em",
+        }}
+      >
         vivace
       </span>
     </div>
@@ -134,6 +154,12 @@ export function MetricLabel({
 }
 
 /** A hairline rule. Elevation is canvas luminance and rules — never a shadow. */
-export function Rule({ theme, margin = 0 }: { theme: Theme; margin?: number | string }) {
+export function Rule({
+  theme,
+  margin = 0,
+}: {
+  theme: Theme;
+  margin?: number | string;
+}) {
   return <div style={{ height: 1, backgroundColor: theme.hairline, margin }} />;
 }

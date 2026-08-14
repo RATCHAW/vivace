@@ -133,7 +133,9 @@ describe("toSplits", () => {
 
   it("has no splits for a run recorded without streams", () => {
     expect(toSplits({})).toEqual([]);
-    expect(toSplits({ distance: { data: [] }, time: { data: [] } })).toEqual([]);
+    expect(toSplits({ distance: { data: [] }, time: { data: [] } })).toEqual(
+      [],
+    );
   });
 });
 
@@ -212,7 +214,10 @@ describe("loadRatio", () => {
   });
 
   it("climbs out of the safe band when the week spikes", () => {
-    const ratio = loadRatio([...daily(7, 10), ...daily(21, 5, 7)], "2026-08-13");
+    const ratio = loadRatio(
+      [...daily(7, 10), ...daily(21, 5, 7)],
+      "2026-08-13",
+    );
     expect(ratio?.acute_km).toBe(70);
     expect(ratio?.ratio).toBeGreaterThan(1.3);
   });
@@ -276,7 +281,11 @@ describe("decoupling", () => {
 });
 
 describe("predictRaces", () => {
-  const effort = (name: string, distance: number, seconds: number): BestEffort => ({
+  const effort = (
+    name: string,
+    distance: number,
+    seconds: number,
+  ): BestEffort => ({
     name,
     distance,
     elapsed_time: seconds,
@@ -290,9 +299,16 @@ describe("predictRaces", () => {
       effort("5k", 5000, 1274),
       effort("10k", 10000, 2642),
     ]);
-    expect(predictions.map((p) => p.name)).toEqual(["5K", "10K", "Half marathon"]);
+    expect(predictions.map((p) => p.name)).toEqual([
+      "5K",
+      "10K",
+      "Half marathon",
+    ]);
     // The 10k is the stronger run, so it sets the 10k and half predictions.
-    expect(predictions[1]).toMatchObject({ seconds: 2642, from: { name: "10k" } });
+    expect(predictions[1]).toMatchObject({
+      seconds: 2642,
+      from: { name: "10k" },
+    });
     expect(predictions[2].from.name).toBe("10k");
     expect(predictions[2].seconds).toBeGreaterThan(5700);
     expect(predictions[2].seconds).toBeLessThan(5950);
@@ -355,14 +371,26 @@ describe("planProgress", () => {
 describe("toSignals", () => {
   const readout = {
     load: { acute_km: 70, chronic_km: 53.4, ratio: 1.31 },
-    easy: { hr_max: 190, zone3_floor: 146, easy_runs: 12, hard_easy_runs: 5, share: 0.417 },
+    easy: {
+      hr_max: 190,
+      zone3_floor: 146,
+      easy_runs: 12,
+      hard_easy_runs: 5,
+      share: 0.417,
+    },
     drift: { percent: 6.2, run: run("2026-08-03", 15) },
     shoes: [{ name: "Vaporfly 3", km: 712 }],
     ramp_pct: 44,
   };
 
   it("reads every measurement it was given", () => {
-    expect(toSignals(readout).map((signal) => [signal.id, signal.value, signal.tone])).toEqual([
+    expect(
+      toSignals(readout).map((signal) => [
+        signal.id,
+        signal.value,
+        signal.tone,
+      ]),
+    ).toEqual([
       ["acwr", "1.31", "alert"],
       ["easy-intensity", "42%", "alert"],
       ["decoupling", "6.2%", "warn"],
@@ -412,19 +440,36 @@ describe("toQueue", () => {
   };
 
   it("opens with the run that just landed", () => {
-    const queue = toQueue(quiet, [run("2026-08-12", 8)], noContext, "2026-08-13");
-    expect(queue[0]).toMatchObject({ id: "debrief", run_id: expect.any(Number) });
+    const queue = toQueue(
+      quiet,
+      [run("2026-08-12", 8)],
+      noContext,
+      "2026-08-13",
+    );
+    expect(queue[0]).toMatchObject({
+      id: "debrief",
+      run_id: expect.any(Number),
+    });
     expect(queue[0].when).toContain("YESTERDAY");
   });
 
   it("does not offer to debrief a run from a fortnight ago", () => {
-    const queue = toQueue(quiet, [run("2026-07-28", 8)], noContext, "2026-08-13");
+    const queue = toQueue(
+      quiet,
+      [run("2026-07-28", 8)],
+      noContext,
+      "2026-08-13",
+    );
     expect(queue.map((item) => item.id)).not.toContain("debrief");
   });
 
   it("raises a volume spike", () => {
     const queue = toQueue(
-      { ...quiet, ramp_pct: 44, load: { acute_km: 70, chronic_km: 53, ratio: 1.32 } },
+      {
+        ...quiet,
+        ramp_pct: 44,
+        load: { acute_km: 70, chronic_km: 53, ratio: 1.32 },
+      },
       [],
       noContext,
       "2026-08-13",
@@ -470,7 +515,9 @@ describe("weeksToRace", () => {
 
   it("has nothing to count once the race has been run", () => {
     expect(weeksToRace(context, "2026-10-19")).toBeNull();
-    expect(weeksToRace({ ...context, race_date: null }, "2026-08-13")).toBeNull();
+    expect(
+      weeksToRace({ ...context, race_date: null }, "2026-08-13"),
+    ).toBeNull();
   });
 });
 
@@ -501,7 +548,11 @@ describe("titleFrom", () => {
         id: "m1",
         role: "user",
         parts: [
-          { type: "file", mediaType: "image/png", url: "data:image/png;base64,x" },
+          {
+            type: "file",
+            mediaType: "image/png",
+            url: "data:image/png;base64,x",
+          },
         ],
       }),
     ).toBeNull();

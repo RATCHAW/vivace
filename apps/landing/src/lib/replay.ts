@@ -65,10 +65,7 @@ export function buildRoute(): Route {
 
   return {
     d: points
-      .map(
-        (p, i) =>
-          (i ? "L" : "M") + p[0].toFixed(1) + " " + p[1].toFixed(1),
-      )
+      .map((p, i) => (i ? "L" : "M") + p[0].toFixed(1) + " " + p[1].toFixed(1))
       .join(" "),
     points,
     cumulative,
