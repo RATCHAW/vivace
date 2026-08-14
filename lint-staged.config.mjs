@@ -1,12 +1,11 @@
 import path from "node:path";
 
-// There is no linter or formatter in this repository, so the pre-commit gate is
-// the check that already defines "done" — `typecheck` — narrowed to the
-// workspaces the commit actually touches. Turbo caches the result, so a second
-// commit against the same package costs nothing.
+// The pre-commit gate, in the order a fix should happen: format the staged
+// files, lint them, then typecheck the workspaces they belong to.
 //
-// lint-staged stashes unstaged work first, which is what makes this honest: tsc
-// sees the tree that is about to be committed, not the one on disk.
+// lint-staged stashes unstaged work first, which is what makes this honest —
+// every command sees the tree that is about to be committed, not the one on
+// disk — and it re-stages whatever `--write`/`--fix` changed.
 const WORKSPACES = [
   ["apps/api", "@repo/api"],
   ["apps/landing", "@repo/landing"],
@@ -15,6 +14,9 @@ const WORKSPACES = [
   ["packages/video", "@repo/video"],
 ];
 
+// `turbo run typecheck` is per package, not per file, so the staged paths are
+// mapped back to the workspaces that own them and only those are checked.
+// Turbo caches the result, so a second commit against the same package is free.
 const typecheckAffected = (files) => {
   const staged = files.map((file) => path.relative(process.cwd(), file));
 
@@ -28,5 +30,15 @@ const typecheckAffected = (files) => {
 };
 
 export default {
+  // Everything Prettier understands and has not been told to ignore. Without
+  // `--ignore-unknown` a staged `.env.example` or Dockerfile would fail the
+  // hook rather than be skipped.
+  "*": "prettier --write --ignore-unknown",
+
+  // `--max-warnings=0` because a warning nobody has to fix is one nobody does.
+  // `--no-warn-ignored` keeps a staged file that eslint.config.mjs ignores
+  // (a generated client, a vendored skill) from failing the run.
+  "**/*.{ts,tsx,mjs,js}": ["eslint --fix --max-warnings=0 --no-warn-ignored"],
+
   "**/*.{ts,tsx}": typecheckAffected,
 };

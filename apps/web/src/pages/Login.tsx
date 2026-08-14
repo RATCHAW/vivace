@@ -53,7 +53,14 @@ export function Login() {
     // remains a safe manual retry instead of immediately redirecting again.
     url.searchParams.delete("provider");
     window.history.replaceState(window.history.state, "", url);
+    // Deliberately mount-only, and deliberately not a dependency: this consumes
+    // a one-shot URL param handed over by the landing page. Re-running it when
+    // `signInWithStrava` changed identity would start a second OAuth redirect.
+    // The rule sees a possible synchronous setState; the only setState in here
+    // is on the error path, after an await.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void signInWithStrava();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
@@ -82,7 +89,9 @@ export function Login() {
               <StravaIcon className="text-strava" />
               {t("login.continueWithStrava")}
             </Button>
-            <span className="text-caption text-stone">{t("login.footnote")}</span>
+            <span className="text-caption text-stone">
+              {t("login.footnote")}
+            </span>
           </div>
 
           {error && (

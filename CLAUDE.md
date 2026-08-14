@@ -321,16 +321,36 @@ rendering models, and the same rule about the module graph applies here as to
 
 ## Checks
 
-`pnpm typecheck && pnpm test && pnpm build` must pass before a change is done.
+`pnpm lint && pnpm format:check && pnpm typecheck && pnpm test && pnpm build`
+must pass before a change is done. CI runs exactly that list.
 
-Two husky hooks catch a subset of that earlier, installed by the root `prepare`
+Two husky hooks catch a subset of it earlier, installed by the root `prepare`
 script on `pnpm install`:
 
-- **`pre-commit` runs `pnpm lint-staged`**, which typechecks *only* the
-  workspaces owning the staged `.ts`/`.tsx` files. It is a fast gate, not CI —
-  it never runs tests or builds, so it passing does not mean the change is done.
+- **`pre-commit` runs `pnpm lint-staged`** — `prettier --write`, then
+  `eslint --fix --max-warnings=0`, then `turbo run typecheck` for *only* the
+  workspaces owning the staged files. The first two re-stage what they rewrite,
+  so a formatting-only problem fixes itself. It is a fast gate, not CI: no tests,
+  no builds, and it only sees staged files.
 - **`commit-msg` runs `pnpm commitlint --edit $1`.** Commit messages are
   Conventional Commits; there is deliberately no scope allow-list.
-- **Nothing formats your code.** This repository has no linter or formatter, and
-  the hooks add none — `lint-staged` is a task runner here. Don't introduce
-  Prettier to satisfy the name; the source is hand-wrapped on purpose.
+
+Lint and format rules that will bite if you don't know them:
+
+- **One root config each** (`eslint.config.mjs`, `prettier.config.mjs`) for all
+  five workspaces. Don't add a per-workspace lint toolchain.
+  `eslint-config-prettier` is last, so ESLint never argues about formatting.
+- **Markdown is not formatted.** `*.md` is in `.prettierignore` because
+  Prettier's Markdown printer rewrote `+ template` — the wrapped continuation of
+  "`run_render`'s key is user + activity + template" — into a `-` list bullet.
+  It changes what sentences say. Leave it off.
+- **Generated artifacts and `.agents/`/`.claude/` are excluded from both tools.**
+  The first are rewritten by `pnpm generate`; the second are pinned by hash in
+  `skills-lock.json`.
+- **`no-console` is an error under `src/`** (tests and `scripts/` excepted),
+  which is the logging rule above made mechanical.
+- **Type-aware rules only cover `src/` and `scripts/`.** Adding one elsewhere
+  means the project service has no tsconfig for the file and errors.
+- **`no-misused-promises` deliberately skips void-return positions** (JSX
+  attributes, properties, variables) — an async `onClick` is idiomatic, not a
+  bug. Don't "fix" the config when you see one.

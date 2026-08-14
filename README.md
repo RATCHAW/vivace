@@ -644,6 +644,8 @@ pnpm dev        # run api + web + landing in watch mode (turbo)
 pnpm build      # run every build task in the monorepo
 pnpm test       # run all vitest suites
 pnpm typecheck  # tsc --noEmit everywhere
+pnpm lint       # eslint across every workspace (pnpm lint:fix to autofix)
+pnpm format     # prettier --write (pnpm format:check to only report)
 pnpm generate   # regenerate the OpenAPI document and both generated clients
 pnpm spec:pull  # re-download and bundle Strava's Swagger spec
 pnpm db:up      # start Postgres only (docker compose)
@@ -658,6 +660,44 @@ pnpm --filter @repo/web test
 pnpm --filter @repo/landing dev   # landing page only, on :3001
 ```
 
+## Linting and formatting
+
+One ESLint flat config (`eslint.config.mjs`) and one Prettier config
+(`prettier.config.mjs`) at the root cover all five workspaces — no workspace has
+its own lint toolchain. `eslint-config-prettier` is last in the ESLint config, so
+the two tools can never disagree about a line break.
+
+Prettier runs on its defaults; the repository was already 80 columns, semicolons,
+double quotes and trailing commas, which is Prettier's output exactly.
+
+What is deliberately **not** formatted or linted, and why:
+
+| Excluded | Reason |
+| --- | --- |
+| `apps/api/openapi.json`, both `src/generated/` trees, `strava-swagger.json` | Written by `pnpm generate` with its own formatter. Reformatting them would make every regeneration a diff. |
+| `.agents/`, `.claude/` | Vendored agent skills, pinned by content hash in `skills-lock.json`. Editing a byte invalidates the lock. |
+| `**/*.md` | Prettier's Markdown printer rewrote the continuation line `+ template` (in `run_render`'s key, `user + activity + template`) into a list bullet, `- template`. Formatting prose is not worth changing what it says. |
+
+Three ESLint choices are worth knowing about:
+
+- **Type-aware rules are scoped to `src/` and `scripts/`** — the directories a
+  workspace tsconfig actually claims. They cost a TypeScript program, and they
+  earn it: `no-floating-promises` and `await-thenable` catch the unawaited
+  promise in a Hono handler that no syntactic rule can see.
+- **`no-misused-promises` does not check void-return positions.**
+  `onClick={async () => …}` is how React is written, react-router's `navigate`
+  returns an ignored promise, and `FormEventHandler` is typed `=> void`. Those
+  positions flag the framework's shape, not a bug. Conditions, spreads and
+  arguments are still checked.
+- **`no-console` is an error in `src/`.** It encodes the logging rule in
+  CLAUDE.md — pino in the API, the batching `@/lib/logger` in the browser. There
+  were zero violations when it was switched on. Scripts and tests are exempt.
+
+`eslint-plugin-react-refresh` was tried and dropped: it wants component files to
+export nothing but components, and this codebase colocates helpers and hooks with
+the components that use them, in both vendored registry files and its own. Its
+only payoff is faster HMR.
+
 ## Git hooks
 
 `pnpm install` runs `husky` through the root `prepare` script, which points
@@ -665,18 +705,25 @@ pnpm --filter @repo/landing dev   # landing page only, on :3001
 
 | Hook | Runs | Rejects |
 | --- | --- | --- |
-| `pre-commit` | `pnpm lint-staged` | a staged `.ts`/`.tsx` file whose workspace no longer typechecks |
+| `pre-commit` | `pnpm lint-staged` | a staged file that is misformatted, fails ESLint, or breaks its workspace's typecheck |
 | `commit-msg` | `pnpm commitlint --edit $1` | a message that is not a [Conventional Commit](https://www.conventionalcommits.org) |
 
-`lint-staged.config.mjs` maps each staged file back to the workspace that owns it
-and runs `turbo run typecheck` for those workspaces only, so touching
-`apps/landing` never typechecks the API. Turbo caches the result; an unchanged
-package costs nothing on the next commit. lint-staged stashes unstaged work
-first, so `tsc` sees the tree that is about to be committed rather than the one
-on disk.
+`lint-staged.config.mjs` runs three things over the staged files, in the order a
+fix should happen: `prettier --write`, then `eslint --fix --max-warnings=0`, then
+`turbo run typecheck`. The first two rewrite files in place and lint-staged
+re-stages the result, so a formatting-only problem fixes itself and the commit
+goes through.
+
+Typecheck is per package rather than per file, so the staged paths are mapped
+back to the workspaces that own them — touching `apps/landing` never typechecks
+the API. Turbo caches the result; an unchanged package costs nothing on the next
+commit. lint-staged stashes unstaged work first, so every command sees the tree
+that is about to be committed rather than the one on disk.
 
 The hooks are a fast gate, not a replacement for CI — they do not run tests or
-builds. `pnpm typecheck && pnpm test && pnpm build` is still what "done" means.
+builds, and they only ever see *staged* files. CI re-runs `format:check` and
+`lint` across the whole tree for that reason.
+`pnpm typecheck && pnpm test && pnpm build` is still what "done" means.
 
 ```sh
 git commit --no-verify   # skip both hooks

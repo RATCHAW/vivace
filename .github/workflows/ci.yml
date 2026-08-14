@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   validate:
-    name: Typecheck, test, and build
+    name: Lint, typecheck, test, and build
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -34,6 +34,14 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      # The pre-commit hook runs these on staged files only, and --no-verify
+      # exists — so the whole tree is checked here rather than assumed.
+      - name: Check formatting
+        run: pnpm format:check
+
+      - name: Lint
+        run: pnpm lint
 
       - name: Typecheck
         run: pnpm typecheck
