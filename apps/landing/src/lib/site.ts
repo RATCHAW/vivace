@@ -19,14 +19,14 @@ const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "http://localhost:5173").repl
 /**
  * Strava is the only way in — the app redirects straight to OAuth from here.
  *
- * The language travels on the URL. `apps/web` has its own copy of the
- * catalogue and its own detector, and `?lang=` is the first thing that
- * detector looks at, so somebody who read this page in French does not arrive
- * at an English sign-in screen. It is written to their localStorage there, so
- * this only has to be right once.
+ * The language and sign-in intent travel on the URL. `apps/web` has its own
+ * copy of the catalogue and its own detector, and `?lang=` is the first thing
+ * that detector looks at, so somebody who read this page in French does not
+ * arrive at an English sign-in screen. `provider=strava` tells that screen to
+ * continue straight to OAuth instead of asking for the same click again.
  */
 export function signInUrl(locale: Locale): string {
-  return `${appUrl}/login?lang=${locale}`;
+  return `${appUrl}/login?lang=${locale}&provider=strava`;
 }
 
 /**

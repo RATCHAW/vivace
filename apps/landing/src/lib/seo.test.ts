@@ -4,7 +4,15 @@ import sitemap from "@/app/sitemap";
 import { LOCALES } from "@/i18n/config";
 import { CONTENT_PAGE_KEYS } from "@/i18n/content-pages";
 import { createPageMetadata, homePagePaths } from "./metadata";
-import { resolveSiteUrl, siteUrl } from "./site";
+import { resolveSiteUrl, signInUrl, siteUrl } from "./site";
+
+describe("app handoff", () => {
+  it("carries the language and starts Strava sign-in", () => {
+    expect(signInUrl("fr")).toBe(
+      "http://localhost:5173/login?lang=fr&provider=strava",
+    );
+  });
+});
 
 describe("SEO discovery", () => {
   it("defaults to the final production origin", () => {
