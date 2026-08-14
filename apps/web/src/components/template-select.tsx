@@ -26,27 +26,15 @@ import {
  *
  * That reason is the *only* second line here. The templates describe themselves
  * well enough by name, and a sentence under each of four rows turns a choice
- * into a page to read — the film above answers the question better anyway,
- * which is what `onPreview` is for: whichever row is highlighted plays, and
- * closing the list without picking one puts the chosen template back.
- *
- * Highlight, not hover. Base UI drives this list with a non-virtual
- * `useListNavigation`, so a row takes real DOM focus whether it was reached
- * with the pointer or with the arrow keys, and one `onFocus` covers both. A
- * row that can't be chosen is never previewed: the pointer can't reach a
- * disabled item, but the keyboard deliberately can, so it is guarded here.
+ * into a page to read.
  */
 export function TemplateSelect({
   template,
   onChange,
-  onPreview,
   input,
 }: {
   template: TemplateId;
   onChange: (next: TemplateId) => void;
-  /** The template the athlete is currently considering, or null for none —
-   *  see the note on previewing above. */
-  onPreview: (next: TemplateId | null) => void;
   /** The run and its streams — what decides which templates it can be cut with.
    *  Null while the streams are loading, or when they couldn't be read. */
   input: TemplateInput | null;
@@ -64,11 +52,6 @@ export function TemplateSelect({
     <Select
       value={template}
       onValueChange={(next) => onChange(next as TemplateId)}
-      // Closing is the only way a preview ends — including after a pick, where
-      // the value has already changed and the film lands on it either way.
-      onOpenChange={(open) => {
-        if (!open) onPreview(null);
-      }}
     >
       <SelectTrigger aria-label={t("videoOptions.templateSelect")} className="w-full">
         <SelectValue>{labels.templateLabel(template)}</SelectValue>
@@ -86,7 +69,6 @@ export function TemplateSelect({
               key={entry.id}
               value={entry.id}
               disabled={!entry.eligible}
-              onFocus={entry.eligible ? () => onPreview(entry.id) : undefined}
               className={cn(reason && "items-start py-2.5")}
             >
               <span className="flex flex-col gap-1">
