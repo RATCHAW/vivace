@@ -17,6 +17,7 @@ export {
   templateEligibilities,
   templateEligibility,
   type Eligibility,
+  type EligibilityReason,
   type TemplateInput,
 } from "./eligibility";
 export { estimateDurationInFrames, MAX_STORY_SECONDS } from "./duration";

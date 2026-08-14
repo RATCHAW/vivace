@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Player, type PlayerRef } from "@remotion/player";
 import { toast } from "sonner";
 import {
@@ -55,6 +56,7 @@ export function RunPlayer({
   expanded: boolean;
   onToggleExpanded: () => void;
 }) {
+  const { t } = useTranslation();
   const { fps, width, height } = getTemplate(template);
   // The length of the film is a property of the *run*: a marathon's Split Rush
   // is longer than a parkrun's. Lambda gets the same number from the same
@@ -100,13 +102,15 @@ export function RunPlayer({
         return;
       }
       await navigator.clipboard.writeText(url);
-      toast.success("Link copied", { description: "Anyone signed in can open this run." });
+      toast.success(t("player.linkCopied"), {
+        description: t("player.linkCopiedBody"),
+      });
     } catch (error) {
       // A dismissed share sheet rejects too — only surface real failures.
       if (error instanceof DOMException && error.name === "AbortError") return;
-      toast.error("Could not share this run");
+      toast.error(t("player.shareFailed"));
     }
-  }, [activity.id, activity.name]);
+  }, [activity.id, activity.name, t]);
 
   return (
     // Fills whatever width it is given; the page owns the theatre-mode measure.
@@ -130,7 +134,7 @@ export function RunPlayer({
       <div className="flex items-center gap-3.5">
         <Button
           size="icon"
-          aria-label={playing ? "Pause replay" : "Play replay"}
+          aria-label={playing ? t("player.pause") : t("player.play")}
           onClick={() => player.current?.toggle()}
         >
           {playing ? <PauseIcon /> : <PlayIcon />}
@@ -141,7 +145,7 @@ export function RunPlayer({
         </MonoLabel>
 
         <Slider
-          aria-label="Seek"
+          aria-label={t("player.seek")}
           className="min-w-0 flex-1"
           min={0}
           max={durationInFrames - 1}
@@ -156,7 +160,7 @@ export function RunPlayer({
         <Button
           size="icon"
           variant="subtle"
-          aria-label={expanded ? "Leave theatre mode" : "Enter theatre mode"}
+          aria-label={expanded ? t("player.leaveTheatre") : t("player.enterTheatre")}
           aria-pressed={expanded}
           onClick={onToggleExpanded}
         >
@@ -178,11 +182,11 @@ export function RunPlayer({
           variant="subtle"
         >
           <SparklesIcon />
-          Ask the coach
+          {t("player.askCoach")}
         </Button>
         <Button size="sm" variant="subtle" onClick={share}>
           <Share2Icon />
-          Share
+          {t("player.share")}
         </Button>
       </div>
     </div>

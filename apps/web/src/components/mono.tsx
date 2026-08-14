@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 
@@ -23,6 +24,8 @@ export function MonoLabel({
 
 /** The stamp on a surface that exists but does not work yet. */
 export function SoonBadge({ className, ...props }: React.ComponentProps<"span">) {
+  const { t } = useTranslation();
+
   return (
     <Badge
       variant="ghost"
@@ -32,7 +35,7 @@ export function SoonBadge({ className, ...props }: React.ComponentProps<"span">)
       )}
       {...props}
     >
-      Soon
+      {t("soon")}
     </Badge>
   );
 }

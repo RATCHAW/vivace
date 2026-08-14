@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { PlusIcon, Trash2Icon } from "lucide-react";
 import { toast } from "sonner";
+import { useFormatters, type Formatters } from "@/i18n/format";
 import {
   createCoachThreadMutation,
   deleteCoachThreadMutation,
@@ -13,15 +15,15 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
 /** Conversations older than today are dated; today's are just "Today". */
-function threadDate(thread: CoachThread): string {
+function threadDate(
+  thread: CoachThread,
+  format: Formatters,
+  today: string,
+): string {
   const updated = new Date(thread.updated_at);
-  const isToday = updated.toDateString() === new Date().toDateString();
-  return isToday
-    ? "Today"
-    : new Intl.DateTimeFormat("en-US", {
-        month: "short",
-        day: "numeric",
-      }).format(updated);
+  return updated.toDateString() === new Date().toDateString()
+    ? today
+    : format.threadDate(thread.updated_at);
 }
 
 export interface CoachThreadsProps {
@@ -36,6 +38,8 @@ export interface CoachThreadsProps {
  * the same way a run replay can.
  */
 export function CoachThreads({ selectedId, onSelect }: CoachThreadsProps) {
+  const { t } = useTranslation();
+  const format = useFormatters();
   const queryClient = useQueryClient();
   const { data: threads, error } = useQuery(listCoachThreadsOptions());
 
@@ -72,7 +76,7 @@ export function CoachThreads({ selectedId, onSelect }: CoachThreadsProps) {
         variant="outline"
       >
         <PlusIcon />
-        New conversation
+        {t("threads.newConversation")}
       </Button>
 
       {error && (
@@ -88,13 +92,14 @@ export function CoachThreads({ selectedId, onSelect }: CoachThreadsProps) {
       )}
 
       {threads?.length === 0 && (
-        <p className="text-body-sm text-muted-foreground">
-          Nothing yet. Ask the coach something and it will show up here.
-        </p>
+        <p className="text-body-sm text-muted-foreground">{t("threads.empty")}</p>
       )}
 
       {threads && threads.length > 0 && (
-        <nav aria-label="Conversations" className="min-h-0 flex-1 overflow-y-auto">
+        <nav
+          aria-label={t("threads.listLabel")}
+          className="min-h-0 flex-1 overflow-y-auto"
+        >
           <ul className="flex flex-col gap-0.5">
             {threads.map((thread) => (
               <li className="group/thread relative" key={thread.id}>
@@ -110,14 +115,16 @@ export function CoachThreads({ selectedId, onSelect }: CoachThreadsProps) {
                   type="button"
                 >
                   <span className="text-body-sm truncate font-semibold">
-                    {thread.title ?? "New conversation"}
+                    {thread.title ?? t("threads.newConversation")}
                   </span>
                   <span className="text-caption text-stone">
-                    {threadDate(thread)}
+                    {threadDate(thread, format, t("threads.today"))}
                   </span>
                 </button>
                 <Button
-                  aria-label={`Delete ${thread.title ?? "conversation"}`}
+                  aria-label={t("threads.delete", {
+                    title: thread.title ?? t("threads.untitled"),
+                  })}
                   className="absolute top-2.5 right-1.5 opacity-0 transition-opacity group-hover/thread:opacity-100 focus-visible:opacity-100"
                   onClick={() => remove.mutate({ path: { id: thread.id } })}
                   size="icon-sm"

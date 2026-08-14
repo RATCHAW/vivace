@@ -1,9 +1,11 @@
 import { type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 // Fully typed off the API's OpenAPI document — see apps/web/src/api.
 import { getRunsOptions, getStravaAthleteOptions, type Run } from "@/api";
 import { authClient } from "@/lib/auth-client";
+import { useFormatters, type Formatters } from "@/i18n/format";
 import { AppHeader } from "@/components/app-header";
 import { MonoLabel, SoonBadge } from "@/components/mono";
 import { StravaIcon } from "@/components/icons";
@@ -20,8 +22,14 @@ import { formatClock, formatPace } from "@repo/video";
  *  the strip says so rather than quietly reporting a short total. */
 const RUNS_PAGE_SIZE = 100;
 
-/** Sports the replay treatment is coming to. Not yet wired to anything. */
-const FUTURE_SPORTS = ["Ride", "Weights", "Swim", "Hike"];
+/** Sports the replay treatment is coming to. Not yet wired to anything —
+ *  catalogue keys rather than words, because `t` isn't in scope up here. */
+const FUTURE_SPORTS = [
+  "sports.ride",
+  "sports.weights",
+  "sports.swim",
+  "sports.hike",
+] as const;
 
 // DESIGN.md: hairline rules carry the row rhythm — no shadows, no zebra fills.
 function Fact({ label, children }: { label: string; children: ReactNode }) {
@@ -88,20 +96,16 @@ function seasonTotals(runs: Run[]): Season {
   };
 }
 
-function runSummary(run: Run): string {
-  const date = new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    timeZone: "UTC",
-  }).format(new Date(run.start_date_local));
+function runSummary(run: Run, format: Formatters): string {
   const pace = run.average_speed > 0 ? 1000 / run.average_speed : null;
-  return `${date} · ${(run.distance / 1000).toFixed(2)} km · ${formatClock(
-    run.moving_time,
-  )} · ${formatPace(pace)} /km`;
+  return `${format.runDate(run.start_date_local)} · ${(
+    run.distance / 1000
+  ).toFixed(2)} km · ${formatClock(run.moving_time)} · ${formatPace(pace)} /km`;
 }
 
 export function Home() {
+  const { t } = useTranslation();
+  const format = useFormatters();
   const { data: session } = authClient.useSession();
   const { data: athlete, error: athleteError } = useQuery(getStravaAthleteOptions());
   const { data: runs, error: runsError } = useQuery(getRunsOptions());
@@ -129,32 +133,45 @@ export function Home() {
               <h1 className="font-heading text-display-lg">{name}</h1>
               <div className="text-body-sm text-muted-foreground flex items-center gap-2.5">
                 <StravaIcon className="text-strava size-3.5" />
-                <span>Connected to Strava{location && ` · ${location}`}</span>
+                <span>
+                  {location
+                    ? t("home.connectedToStravaIn", { location })
+                    : t("home.connectedToStrava")}
+                </span>
               </div>
             </div>
           </div>
 
           {/* {component.button-primary} — the loudest pixel on the canvas */}
-          <Button render={<Link to="/runs" />}>Watch your runs</Button>
+          <Button render={<Link to="/runs" />}>{t("home.watchYourRuns")}</Button>
         </section>
 
-        <section aria-label={`${season?.year ?? "Season"} totals`}>
+        <section
+          aria-label={
+            season
+              ? t("home.seasonTotals", { year: season.year })
+              : t("home.seasonTotalsFallback")
+          }
+        >
           {/* A 1px grid gap over the border colour draws the hairlines between
               cells; no cell owns a rule of its own. */}
           <div className="grid grid-cols-2 gap-px overflow-hidden rounded-lg bg-border ring-1 ring-border md:grid-cols-4">
             {season ? (
               <>
                 <Stat
-                  label={`Distance · ${season.year}`}
+                  label={t("home.statDistance", { year: season.year })}
                   value={season.km.toFixed(1)}
-                  unit="km"
+                  unit={t("common.km")}
                 />
-                <Stat label="Runs" value={season.count} />
-                <Stat label="Moving time" value={formatClock(season.seconds)} />
+                <Stat label={t("home.statRuns")} value={season.count} />
                 <Stat
-                  label="Avg pace"
+                  label={t("home.statMovingTime")}
+                  value={formatClock(season.seconds)}
+                />
+                <Stat
+                  label={t("home.statAvgPace")}
                   value={formatPace(season.paceSecondsPerKm)}
-                  unit="/km"
+                  unit={t("common.perKm")}
                 />
               </>
             ) : (
@@ -168,7 +185,7 @@ export function Home() {
           </div>
           {season?.truncated && (
             <p className="text-caption text-stone mt-3">
-              Totals cover the {RUNS_PAGE_SIZE} most recent runs Strava returns.
+              {t("home.truncated", { count: RUNS_PAGE_SIZE })}
             </p>
           )}
         </section>
@@ -177,20 +194,22 @@ export function Home() {
           <Card>
             <CardContent className="flex flex-col gap-6">
               <div className="flex items-baseline justify-between gap-4">
-                <CardTitle className="text-heading-md">Latest activities</CardTitle>
+                <CardTitle className="text-heading-md">
+                  {t("home.latestActivities")}
+                </CardTitle>
                 <Button
                   variant="link"
                   size="sm"
                   className="text-muted-foreground hover:text-foreground px-0 no-underline"
                   render={<Link to="/runs" />}
                 >
-                  See all →
+                  {t("home.seeAll")}
                 </Button>
               </div>
 
               {runsError && (
                 <Alert variant="destructive">
-                  <AlertTitle>Could not load your runs</AlertTitle>
+                  <AlertTitle>{t("home.runsErrorTitle")}</AlertTitle>
                   <AlertDescription>{runsError.error}</AlertDescription>
                 </Alert>
               )}
@@ -208,7 +227,7 @@ export function Home() {
 
               {runs && runs.length === 0 && (
                 <p className="text-body-sm text-muted-foreground border-t py-8 text-center">
-                  No runs yet — go log one on Strava and come back.
+                  {t("home.noRuns")}
                 </p>
               )}
 
@@ -223,10 +242,10 @@ export function Home() {
                       <span className="flex min-w-0 flex-col gap-1.5">
                         <span className="text-body-md font-semibold">{run.name}</span>
                         <span className="text-caption text-muted-foreground truncate">
-                          {runSummary(run)}
+                          {runSummary(run, format)}
                         </span>
                       </span>
-                      <MonoLabel className="shrink-0">Replay →</MonoLabel>
+                      <MonoLabel className="shrink-0">{t("home.replay")}</MonoLabel>
                     </Link>
                   ))}
                 </div>
@@ -237,11 +256,13 @@ export function Home() {
           <div className="flex flex-col gap-8">
             <Card className="bg-background">
               <CardContent>
-                <CardTitle className="text-heading-sm mb-4">From Strava</CardTitle>
+                <CardTitle className="text-heading-sm mb-4">
+                  {t("home.fromStrava")}
+                </CardTitle>
 
                 {athleteError && (
                   <Alert variant="destructive">
-                    <AlertTitle>Could not load your profile</AlertTitle>
+                    <AlertTitle>{t("home.profileErrorTitle")}</AlertTitle>
                     <AlertDescription>{athleteError.error}</AlertDescription>
                   </Alert>
                 )}
@@ -249,7 +270,7 @@ export function Home() {
                 {!athlete && !athleteError && (
                   <div
                     className="divide-y divide-border border-t"
-                    aria-label="Loading your Strava profile"
+                    aria-label={t("home.loadingProfile")}
                   >
                     {Array.from({ length: 5 }, (_, i) => (
                       <div key={i} className="flex justify-between gap-4 py-3">
@@ -262,27 +283,30 @@ export function Home() {
 
                 {athlete && (
                   <dl className="divide-y divide-border border-t">
-                    <Fact label="Athlete ID">{athlete.id}</Fact>
+                    <Fact label={t("home.factAthleteId")}>{athlete.id}</Fact>
                     {athlete.username && (
-                      <Fact label="Username">{athlete.username}</Fact>
+                      <Fact label={t("home.factUsername")}>{athlete.username}</Fact>
                     )}
-                    {athlete.sex && <Fact label="Sex">{athlete.sex}</Fact>}
+                    {athlete.sex && (
+                      <Fact label={t("home.factSex")}>{athlete.sex}</Fact>
+                    )}
+                    {/* `kg` is an SI symbol, not a word — it does not translate. */}
                     {athlete.weight != null && athlete.weight > 0 && (
-                      <Fact label="Weight">{athlete.weight} kg</Fact>
+                      <Fact label={t("home.factWeight")}>{athlete.weight} kg</Fact>
                     )}
-                    <Fact label="Subscription">
+                    <Fact label={t("home.factSubscription")}>
                       {athlete.summit || athlete.premium ? (
                         // {component.badge-feature} — the single cobalt stamp
                         <Badge className="bg-brand text-brand-foreground">
-                          Strava subscriber
+                          {t("home.stravaSubscriber")}
                         </Badge>
                       ) : (
                         // {component.badge-tag}
-                        <Badge variant="secondary">Free plan</Badge>
+                        <Badge variant="secondary">{t("home.freePlan")}</Badge>
                       )}
                     </Fact>
-                    <Fact label="Member since">
-                      {new Date(athlete.created_at).toLocaleDateString()}
+                    <Fact label={t("home.factMemberSince")}>
+                      {format.longDate(athlete.created_at)}
                     </Fact>
                   </dl>
                 )}
@@ -292,10 +316,11 @@ export function Home() {
             <Card className="bg-background">
               <CardContent className="flex flex-col gap-5">
                 <div className="flex flex-col gap-2">
-                  <CardTitle className="text-heading-sm">More sports</CardTitle>
+                  <CardTitle className="text-heading-sm">
+                    {t("home.moreSports")}
+                  </CardTitle>
                   <p className="text-body-sm text-stone">
-                    Replays are built for runs first. The same film treatment
-                    lands for these next.
+                    {t("home.moreSportsBody")}
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -304,7 +329,7 @@ export function Home() {
                       key={sport}
                       className="bg-muted text-body-sm text-muted-foreground/60 inline-flex h-9 items-center gap-2 rounded-full px-3.5 font-semibold"
                     >
-                      {sport}
+                      {t(sport)}
                       <SoonBadge />
                     </span>
                   ))}

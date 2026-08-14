@@ -7,6 +7,8 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
+import { i18n } from "@/i18n";
+import { useTranslation } from "react-i18next";
 import { BrainIcon, ChevronDownIcon } from "lucide-react";
 import type { ComponentProps, ReactNode } from "react";
 import {
@@ -150,14 +152,17 @@ export type ReasoningTriggerProps = ComponentProps<
   getThinkingMessage?: (isStreaming: boolean, duration?: number) => ReactNode;
 };
 
+// The global instance rather than the hook: this is a plain function called
+// from a render, not a component. The trigger around it subscribes through
+// `useTranslation`, so a language change still repaints this.
 const defaultGetThinkingMessage = (isStreaming: boolean, duration?: number) => {
   if (isStreaming || duration === 0) {
-    return <Shimmer duration={1}>Thinking...</Shimmer>;
+    return <Shimmer duration={1}>{i18n.t("ai.thinking")}</Shimmer>;
   }
   if (duration === undefined) {
-    return <p>Thought for a few seconds</p>;
+    return <p>{i18n.t("ai.thoughtBriefly")}</p>;
   }
-  return <p>Thought for {duration} seconds</p>;
+  return <p>{i18n.t("ai.thoughtFor", { count: duration })}</p>;
 };
 
 export const ReasoningTrigger = memo(
@@ -168,6 +173,10 @@ export const ReasoningTrigger = memo(
     ...props
   }: ReasoningTriggerProps) => {
     const { isStreaming, isOpen, duration } = useReasoning();
+    // The subscription the message function cannot have: this component is
+    // memoised and takes no props, so without it a finished reasoning block
+    // keeps the words it was first rendered with when the language changes.
+    useTranslation();
 
     return (
       <CollapsibleTrigger

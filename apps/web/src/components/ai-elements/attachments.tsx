@@ -7,6 +7,8 @@ import {
   HoverCardTrigger,
 } from "@/components/ui/hover-card";
 import { cn } from "@/lib/utils";
+import { i18n } from "@/i18n";
+import { useTranslation } from "react-i18next";
 import type { FileUIPart, SourceDocumentUIPart } from "ai";
 import {
   FileTextIcon,
@@ -316,12 +318,14 @@ export type AttachmentRemoveProps = ComponentProps<typeof Button> & {
 };
 
 export const AttachmentRemove = ({
-  label = "Remove",
+  label,
   className,
   children,
   ...props
 }: AttachmentRemoveProps) => {
+  const { t } = useTranslation();
   const { onRemove, variant } = useAttachmentContext();
+  const text = label ?? t("ai.removeAttachment");
 
   const handleClick = useCallback(
     (e: React.MouseEvent) => {
@@ -337,7 +341,7 @@ export const AttachmentRemove = ({
 
   return (
     <Button
-      aria-label={label}
+      aria-label={text}
       className={cn(
         variant === "grid" && [
           "bg-background/80 absolute top-1.5 right-1.5 size-6 backdrop-blur-sm",
@@ -360,7 +364,7 @@ export const AttachmentRemove = ({
       {...props}
     >
       {children ?? <XIcon />}
-      <span className="sr-only">{label}</span>
+      <span className="sr-only">{text}</span>
     </Button>
   );
 };
@@ -419,6 +423,6 @@ export const AttachmentEmpty = ({
     )}
     {...props}
   >
-    {children ?? "No attachments"}
+    {children ?? i18n.t("ai.noAttachments")}
   </div>
 );
