@@ -2,35 +2,48 @@ import { StravaIcon } from "@/components/icons";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { Wordmark } from "@/components/wordmark";
 import type { Locale } from "@/i18n/config";
+import { contentPagePath } from "@/i18n/content-pages";
 import { fill, type Copy } from "@/i18n/dictionaries";
 import { signInUrl } from "@/lib/site";
 
-export function SiteFooter({ copy, locale }: { copy: Copy; locale: Locale }) {
+export function SiteFooter({
+  copy,
+  locale,
+  languagePaths,
+}: {
+  copy: Copy;
+  locale: Locale;
+  languagePaths?: Record<Locale, string>;
+}) {
   const t = copy.footer;
+  const homeHref = `/${locale}`;
 
   const columns = [
     {
       heading: t.product.heading,
       links: [
-        { href: "#film", label: t.product.film },
-        { href: "#sports", label: t.product.sports },
-        { href: "#coach", label: t.product.coach },
+        { href: `${homeHref}#film`, label: t.product.film },
+        { href: `${homeHref}#sports`, label: t.product.sports },
+        { href: `${homeHref}#coach`, label: t.product.coach },
       ],
     },
     {
       heading: t.company.heading,
       links: [
-        { href: "#top", label: t.company.about },
-        { href: "#questions", label: t.company.questions },
-        { href: "#top", label: t.company.contact },
+        { href: contentPagePath(locale, "about"), label: t.company.about },
+        { href: `${homeHref}#questions`, label: t.company.questions },
+        { href: contentPagePath(locale, "contact"), label: t.company.contact },
       ],
     },
     {
       heading: t.legal.heading,
       links: [
-        { href: "#top", label: t.legal.privacy },
-        { href: "#top", label: t.legal.terms },
-        { href: "#top", label: t.legal.stravaData },
+        { href: contentPagePath(locale, "privacy"), label: t.legal.privacy },
+        { href: contentPagePath(locale, "terms"), label: t.legal.terms },
+        {
+          href: contentPagePath(locale, "stravaData"),
+          label: t.legal.stravaData,
+        },
       ],
     },
   ];
@@ -52,9 +65,9 @@ export function SiteFooter({ copy, locale }: { copy: Copy; locale: Locale }) {
 
           {columns.map((column) => (
             <div key={column.heading} className="flex flex-col gap-3">
-              <span className="text-body-sm font-semibold">
+              <h2 className="text-body-sm font-semibold">
                 {column.heading}
-              </span>
+              </h2>
               {column.links.map((link) => (
                 <a
                   key={link.label}
@@ -75,7 +88,12 @@ export function SiteFooter({ copy, locale }: { copy: Copy; locale: Locale }) {
           <div className="flex flex-wrap items-center gap-6">
             {/* Repeated from the header: somebody who reads to the bottom in the
                 wrong language shouldn't have to scroll back up to say so. */}
-            <LanguageSwitcher active={locale} copy={copy} className="-ml-2.5" />
+            <LanguageSwitcher
+              active={locale}
+              copy={copy}
+              paths={languagePaths}
+              className="-ml-2.5"
+            />
             <span className="text-caption text-stone inline-flex items-center gap-2">
               <StravaIcon className="text-strava size-3.5" />
               {t.poweredByStrava}

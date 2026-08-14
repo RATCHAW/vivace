@@ -44,6 +44,7 @@
     --color-card: var(--card);
     --color-foreground: var(--foreground);
     --color-background: var(--background);
+    --color-stone: var(--stone);
 
     /* The cobalt-violet brand stamp. Deliberately NOT --primary: DESIGN.md
        reserves it for featured surfaces and the wordmark, at most one per
@@ -129,11 +130,6 @@
     --text-mono-badge--line-height: 1.2;
     --text-mono-badge--letter-spacing: 0.1em;
 
-    /* {colors.stone} — metadata and subtle captions. The only third-level text
-       colour legible on both canvases, which is why it sits here rather than in
-       the band token blocks. */
-    --color-stone: #8d969e;
-
     /* Strava's OAuth brand colour. Outside the DESIGN.md palette by necessity —
        it belongs to Strava, not to us. Used on the provider mark only, never as
        a button surface (DESIGN.md: accents are not button surfaces). */
@@ -166,6 +162,7 @@
     --brand-foreground: #ffffff;                /* on-primary */
     --brand-bright: #4f55f1;                    /* primary-bright */
     --brand-deep: #3a40c4;                      /* primary-deep */
+    --stone: #8d969e;                           /* metadata on dark */
     --radius: 20px;                             /* rounded.lg — card radius */
     /* {colors.divider-soft} — the sub-hairline used once, under the footer. */
     --divider-soft: rgba(255,255,255,0.06);
@@ -192,6 +189,7 @@
     --border: #e2e2e7;                  /* hairline-light */
     --input: #e2e2e7;                   /* hairline-light */
     --ring: #494fdf;                    /* primary — transient focus only */
+    --stone: #66717a;                   /* metadata, WCAG AA on white */
 }
 
 @layer base {

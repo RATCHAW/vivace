@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <title>Vivace — Strava runs, made to share</title>
+  <rect width="1200" height="630" fill="#000"/>
+  <path d="M0 126H1200M0 252H1200M0 378H1200M0 504H1200M200 0V630M400 0V630M600 0V630M800 0V630M1000 0V630" stroke="#fff" stroke-opacity=".055"/>
+
+  <g transform="translate(64 56)">
+    <rect width="52" height="52" rx="11.44" fill="#494fdf"/>
+    <g transform="translate(26 26) scale(1.56) translate(-12 -12)">
+      <path d="M6.208 2.077 22 14.415 3.419 21.923 2 18.412 20.611 14.22 3.876 5.061Z" fill="#fff"/>
+    </g>
+    <text x="70" y="39" fill="#fff" font-family="Inter, Arial, sans-serif" font-size="30" font-weight="650" letter-spacing="-1">vivace</text>
+  </g>
+
+  <text x="64" y="236" fill="#8d969e" font-family="JetBrains Mono, Menlo, monospace" font-size="18" font-weight="600" letter-spacing="2.8">YOUR RUN · REPLAYED</text>
+  <text x="64" y="310" fill="#fff" font-family="Inter, Arial, sans-serif" font-size="68" font-weight="560" letter-spacing="-2.2">Strava runs,</text>
+  <text x="64" y="384" fill="#fff" font-family="Inter, Arial, sans-serif" font-size="68" font-weight="560" letter-spacing="-2.2">made to share.</text>
+  <text x="67" y="448" fill="#b7bdc2" font-family="Inter, Arial, sans-serif" font-size="24">Route · pace · heart rate · 9:16 MP4</text>
+
+  <g transform="translate(725 79)">
+    <rect width="411" height="472" rx="48" fill="#16181a" stroke="#fff" stroke-opacity=".14"/>
+    <path d="M119 85C76 124 85 178 133 192C182 206 157 258 204 271C255 285 223 337 278 360C305 371 324 390 328 418" fill="none" stroke="#4f55f1" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="119" cy="85" r="10" fill="#fff"/>
+    <circle cx="328" cy="418" r="14" fill="#4f55f1" stroke="#fff" stroke-width="6"/>
+    <g fill="#fff" font-family="Inter, Arial, sans-serif">
+      <text x="39" y="408" font-size="15" font-weight="650" opacity=".6">DISTANCE</text>
+      <text x="39" y="443" font-size="30" font-weight="600">10.24 km</text>
+    </g>
+    <g fill="#fff" font-family="Inter, Arial, sans-serif">
+      <text x="255" y="69" font-size="15" font-weight="650" opacity=".6">PACE</text>
+      <text x="255" y="104" font-size="30" font-weight="600">5:12 /km</text>
+    </g>
+  </g>
+</svg>

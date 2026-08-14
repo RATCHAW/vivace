@@ -10,16 +10,18 @@ import type { Dictionary, Translated } from "./en";
 
 export const fr: Translated<Dictionary> = {
   meta: {
-    title: "Vivace — chaque course, une histoire",
+    title: "Transformez vos courses Strava en vidéos | Vivace",
     description:
-      "Connectez Strava une fois. Chaque activité revient en film vertical — votre tracé qui se dessine, votre allure et votre fréquence cardiaque telles qu’elles étaient, prêtes à partager.",
-    ogTitle: "Vivace — chaque course, une histoire",
+      "Connectez Strava et transformez chaque course en film vertical avec tracé, allure et fréquence cardiaque. Téléchargez un MP4 prêt à partager.",
+    ogTitle: "Vivace — vos courses Strava, prêtes à partager",
     ogDescription:
-      "Vos courses Strava, rejouées en film vertical à regarder et à partager.",
+      "Transformez une course Strava en film vertical avec tracé animé, effort en direct et MP4 à télécharger.",
+    imageAlt:
+      "Vivace transforme les courses Strava en vidéos verticales avec tracé, allure et fréquence cardiaque.",
   },
 
   header: {
-    backToTop: "Vivace — retour en haut",
+    backToTop: "Vivace — accueil",
     film: "Le film",
     sports: "Sports",
     coach: "Coach",
@@ -37,9 +39,9 @@ export const fr: Translated<Dictionary> = {
 
   hero: {
     badge: "La course aujourd’hui · vélo, muscu & natation ensuite",
-    titleLine1: "Chaque course,",
-    titleLine2: "une histoire.",
-    body: "Connectez Strava une fois. Chaque activité revient en film vertical — votre tracé qui se dessine, votre allure et votre fréquence cardiaque telles qu’elles étaient, prêtes à partager.",
+    titleLine1: "Vos courses Strava,",
+    titleLine2: "prêtes à partager.",
+    body: "Connectez Strava et transformez chaque course en film vertical — le tracé se dessine, l’allure et la fréquence cardiaque défilent, puis le MP4 est prêt à partager.",
     primaryCta: "Continuer avec Strava",
     secondaryCta: "Voir un replay",
     footnote:
@@ -169,11 +171,15 @@ export const fr: Translated<Dictionary> = {
       },
       {
         q: "Publiez-vous quelque chose sur mon Strava ?",
-        a: "Non. Nous lisons vos activités et n’écrivons jamais. Vous pouvez vous déconnecter de Strava à tout moment, et vos replays partent avec vous.",
+        a: "Non. Nous lisons vos activités et n’écrivons jamais. Vous pouvez révoquer Vivace dans Strava à tout moment pour couper les futurs accès, puis nous contacter pour supprimer les données Vivace et fichiers déjà conservés.",
       },
       {
         q: "Et si une course n’a ni fréquence cardiaque ni GPS ?",
         a: "Le film s’adapte — les sorties sur tapis abandonnent le chapitre carte et s’appuient sur les splits et l’effort. Rien n’est inventé.",
+      },
+      {
+        q: "Quelle différence avec Strava Flyover ?",
+        a: "Strava Flyover permet d’explorer une activité sur une carte 3D dans Strava. Vivace crée un film vertical fixe de 20 secondes avec tracé, allure, fréquence cardiaque et bilan, puis fournit un MP4 à partager partout.",
       },
       {
         q: "Combien ça coûte ?",

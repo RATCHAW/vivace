@@ -5,7 +5,13 @@ export function HowItWorks({ copy }: { copy: Copy }) {
   const t = copy.howItWorks;
 
   return (
-    <section aria-label={t.label} className="px-6 pb-20 sm:px-8 sm:pb-30">
+    <section
+      aria-labelledby="how-it-works-heading"
+      className="px-6 pb-20 sm:px-8 sm:pb-30"
+    >
+      <h2 id="how-it-works-heading" className="sr-only">
+        {t.label}
+      </h2>
       {/* The 1px gutters are the border showing through, not three bordered
           cards — DESIGN.md: elevation is hairlines, never shadow. */}
       <div className="bg-border mx-auto grid w-full max-w-[1200px] gap-px overflow-hidden rounded-lg border sm:grid-cols-3">

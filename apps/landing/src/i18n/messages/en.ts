@@ -9,16 +9,18 @@
  */
 export const en = {
   meta: {
-    title: "Vivace — every run, a story",
+    title: "Turn Strava Runs Into Shareable Videos | Vivace",
     description:
-      "Connect Strava once. Every activity comes back as a vertical film — your route drawing itself, your pace and heart rate as they happened, ready to share.",
-    ogTitle: "Vivace — every run, a story",
+      "Connect Strava and turn every run into a shareable vertical video with an animated route, live pace, heart rate and a downloadable 9:16 MP4.",
+    ogTitle: "Vivace — Strava runs, made to share",
     ogDescription:
-      "Your Strava runs, replayed as a vertical film you can watch and share.",
+      "Turn a Strava run into a vertical film with an animated route, live effort and a downloadable MP4.",
+    imageAlt:
+      "Vivace turns Strava runs into shareable vertical videos with route, pace and heart rate.",
   },
 
   header: {
-    backToTop: "Vivace — back to top",
+    backToTop: "Vivace — home",
     film: "The film",
     sports: "Sports",
     coach: "Coach",
@@ -36,9 +38,9 @@ export const en = {
 
   hero: {
     badge: "Runs today · rides, lifts & swims next",
-    titleLine1: "Every run,",
-    titleLine2: "a story.",
-    body: "Connect Strava once. Every activity comes back as a vertical film — your route drawing itself, your pace and heart rate as they happened, ready to share.",
+    titleLine1: "Strava runs,",
+    titleLine2: "made to share.",
+    body: "Connect Strava and turn every run into a vertical film — your route drawing itself, your pace and heart rate as they happened, ready to download and share.",
     primaryCta: "Continue with Strava",
     secondaryCta: "See a replay",
     footnote:
@@ -159,11 +161,15 @@ export const en = {
       },
       {
         q: "Do you post anything to my Strava?",
-        a: "No. We read your activities and never write. You can disconnect from Strava at any time and your replays go with you.",
+        a: "No. We read your activities and never write. You can revoke Vivace in Strava at any time to stop future access, then contact us if you want stored Vivace data and generated files deleted.",
       },
       {
         q: "What if a run has no heart rate or GPS?",
         a: "The film adapts — treadmill runs drop the map chapter and lean on splits and effort instead. Nothing is invented.",
+      },
+      {
+        q: "How is Vivace different from Strava Flyover?",
+        a: "Strava Flyover explores an activity on a 3D map inside Strava. Vivace creates a fixed 20-second vertical film that combines your route, live pace, heart rate and summary, then gives you a downloadable MP4 to share anywhere.",
       },
       {
         q: "What does it cost?",

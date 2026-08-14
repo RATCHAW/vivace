@@ -9,7 +9,6 @@
 // costs nothing at each of the six call sites — and none of them has to become
 // a client component to get an onClick.
 import { useEffect } from "react";
-import posthog from "posthog-js";
 
 // NEXT_PUBLIC_* is inlined at build time, so this is a Docker build arg, not a
 // runtime variable — same as NEXT_PUBLIC_APP_URL in lib/site.ts.
@@ -20,17 +19,27 @@ export function Analytics() {
   useEffect(() => {
     if (!key) return;
 
-    posthog.init(key, {
-      api_host: host,
-      // Visitors here are anonymous by definition — they become a person when
-      // they reach the app and sign in, and PostHog stitches the two together.
-      person_profiles: "identified_only",
-      capture_pageview: "history_change",
-      capture_pageleave: true,
-      // The waitlist email is the only input on the page, and masking is on by
-      // default — a replay of this page shows the scroll, not the address.
-      session_recording: { maskAllInputs: true },
+    let cancelled = false;
+
+    void import("posthog-js").then(({ default: posthog }) => {
+      if (cancelled) return;
+
+      posthog.init(key, {
+        api_host: host,
+        // Visitors here are anonymous by definition — they become a person
+        // when they reach the app and sign in, and PostHog stitches the two.
+        person_profiles: "identified_only",
+        capture_pageview: "history_change",
+        capture_pageleave: true,
+        // The waitlist email is the only input on the page, and masking is on
+        // by default — a replay shows the scroll, not the address.
+        session_recording: { maskAllInputs: true },
+      });
     });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   return null;
