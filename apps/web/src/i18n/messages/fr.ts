@@ -109,6 +109,7 @@ export const fr: Translated<Messages> = {
 
   runs: {
     backToOverview: "Retour à l’aperçu",
+    backToList: "Retour à toutes les courses",
     title: "Vos courses",
     syncCount_one: "{{count}} activité · synchronisée depuis Strava",
     syncCount_other: "{{count}} activités · synchronisées depuis Strava",
@@ -138,6 +139,8 @@ export const fr: Translated<Messages> = {
 
   videoOptions: {
     section: "Options de la vidéo",
+    edit: "Modifier",
+    hide: "Masquer",
     themeGroup: "Thème de la vidéo",
     templateSelect: "Modèle de vidéo",
     runAsAvatar: "Courir avec votre avatar",
@@ -195,16 +198,14 @@ export const fr: Translated<Messages> = {
   },
 
   render: {
-    loadErrorTitle: "Impossible de charger l’état du rendu",
-    rendering: "Rendu de la vidéo…",
-    progressLabel: "Progression du rendu vidéo",
+    loadErrorTitle: "Impossible de charger l’état de la vidéo",
+    preparing: "Préparation de votre vidéo…",
+    progressLabel: "Progression de la préparation de la vidéo",
     downloadVideo: "Télécharger la vidéo",
-    failedTitle: "Échec du rendu",
-    paused: "Le rendu vidéo est en pause pour le moment. Revenez d’ici peu.",
-    lastRendered: "Votre dernière vidéo a été rendue {{options}}.",
-    retry: "Relancer le rendu",
-    again: "Refaire le rendu",
-    start: "Lancer le rendu",
+    failedTitle: "Impossible de préparer cette vidéo",
+    paused: "Les téléchargements vidéo sont en pause pour le moment. Revenez d’ici peu.",
+    lastRendered: "Votre dernière vidéo a été créée {{options}}.",
+    retry: "Réessayer",
     downloadLast: "Télécharger la dernière vidéo",
     optionTheme: "en {{theme}}",
     optionAvatar: "avec votre avatar",
