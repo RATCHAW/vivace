@@ -22,6 +22,6 @@
       "source": "/api/:path*",
       "destination": "https://api.vivace.run/api/:path*"
     },
-    { "source": "/(.*)", "destination": "/index.html" }
+    { "source": "/((?!assets/).*)", "destination": "/index.html" }
   ]
 }
