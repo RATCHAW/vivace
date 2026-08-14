@@ -5,7 +5,7 @@
 //
 // `z` must come from @hono/zod-openapi — it is Zod extended with `.openapi()`.
 import { z } from "@hono/zod-openapi";
-import { DEFAULT_TEMPLATE_ID, TEMPLATE_IDS } from "@repo/video";
+import { DEFAULT_TEMPLATE_ID, DEFAULT_THEME, TEMPLATE_IDS, THEME_NAMES } from "@repo/video";
 
 export const HealthSchema = z
   .object({
@@ -137,6 +137,11 @@ export const VideoTemplateSchema = z
   .enum(TEMPLATE_IDS)
   .openapi("VideoTemplate", { example: DEFAULT_TEMPLATE_ID });
 
+/** The three looks a video can be cut in — the catalogue's, not the app's. */
+export const VideoThemeSchema = z
+  .enum(THEME_NAMES)
+  .openapi("VideoTheme", { example: DEFAULT_THEME });
+
 /**
  * What the athlete chose in the replay's options panel, sent when a render is
  * started. Part of a render's identity, not a display setting: the same run as
@@ -150,6 +155,9 @@ export const RunRenderOptionsSchema = z
     /** Draw the runner as the athlete's Strava picture instead of a dot.
      *  Ignored by a template whose `supportsAvatar` is false. */
     show_avatar: z.boolean().default(false).openapi({ example: true }),
+    /** Which of the three looks to cut it in. Ignored by a template whose
+     *  `supportsTheme` is false — the replay's plate is a Mapbox style. */
+    theme: VideoThemeSchema.default(DEFAULT_THEME),
   })
   .openapi("RunRenderOptions");
 
@@ -166,8 +174,12 @@ export const RunRenderSchema = z
     /** Which cut this is. Rendering another template leaves this one alone. */
     template: VideoTemplateSchema,
     status: z.enum(["rendering", "done", "error"]).openapi({ example: "rendering" }),
-    /** The option this render was started with — see `RunRenderOptions`. */
+    /** The options this render was started with — see `RunRenderOptions`. A
+     *  stored render whose options no longer match what the athlete has chosen
+     *  is a different video, and the browser offers a re-render rather than the
+     *  wrong MP4. */
     show_avatar: z.boolean(),
+    theme: VideoThemeSchema,
     /** Overall Lambda render progress, 0–1. */
     progress: z.number().min(0).max(1).openapi({ example: 0.42 }),
     output_url: z.string().nullable().openapi({

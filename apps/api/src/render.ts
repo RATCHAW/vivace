@@ -9,11 +9,13 @@ import {
   type AwsRegion,
 } from "@remotion/lambda/client";
 import {
+  DEFAULT_THEME,
   functionNameEnvVar,
   getProfile,
   getTemplate,
   serveUrlEnvVar,
   type TemplateId,
+  type ThemeName,
   type VideoTemplate,
 } from "@repo/video";
 import type { Run, RunStreams } from "./schemas.js";
@@ -31,6 +33,7 @@ export interface RenderTarget {
 /** What the athlete chose, as it is stored and hashed. */
 export interface RenderOptions {
   showAvatar: boolean;
+  theme: ThemeName;
 }
 
 const DEFAULT_REGION = "us-east-1";
@@ -78,6 +81,10 @@ export function renderPropsHash(template: TemplateId, options: RenderOptions): s
     // Spelled out rather than serialised wholesale, so adding a field to
     // `RenderOptions` is a deliberate decision about invalidating stored videos.
     show_avatar: options.showAvatar,
+    // The default theme is left out of the hash entirely, so every video
+    // rendered before themes existed still hashes to what it hashed to then —
+    // adding the option didn't mark a single athlete's finished film stale.
+    ...(options.theme === DEFAULT_THEME ? {} : { theme: options.theme }),
   });
   return createHash("sha256").update(canonical).digest("hex").slice(0, 32);
 }
@@ -89,6 +96,8 @@ export async function startLambdaRender(
   streams: RunStreams,
   /** The athlete's Strava picture URL when the avatar option is on, else "". */
   avatarUrl: string,
+  /** The look to cut it in; a template that isn't themed ignores it. */
+  theme: ThemeName = DEFAULT_THEME,
 ): Promise<{ renderId: string; bucketName: string }> {
   const { template, region, functionName, serveUrl } = target;
   const profile = getProfile(template);
@@ -106,6 +115,7 @@ export async function startLambdaRender(
       // template that draws no map never sees it at all.
       mapboxToken: template.usesMap ? (process.env.MAPBOX_TOKEN ?? "") : "",
       avatarUrl,
+      theme,
     },
     codec: "h264",
     // Public so output_url is directly downloadable from the browser.

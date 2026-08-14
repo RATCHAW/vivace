@@ -1,5 +1,17 @@
+import type { LatLng, RoutePadding } from "../../core/geo";
 import { getTemplate } from "../../registry";
 import type { VideoActivity, VideoStreams } from "../../types";
+
+// The formatters and the projection are shared with every other template now;
+// they are re-exported here so the replay's own maths — and its tests — still
+// read as one module.
+export {
+  formatClock,
+  formatKm,
+  formatPace,
+  formatStartDate,
+} from "../../core/format";
+export { projectRoute, type LatLng, type RoutePadding } from "../../core/geo";
 
 // Story format: 9:16 at 30fps, 20 seconds. The registry is the source — it is
 // what the <Composition>, the browser's <Player> and the Lambda render all read
@@ -39,59 +51,10 @@ export const DRAW_END = Math.round(0.92 * DURATION_IN_FRAMES);
 // video time's worth of samples into each frame settles them.
 export const SMOOTHING_SECONDS = 0.5;
 
-/** Strava streams deliver [latitude, longitude] pairs. */
-export type LatLng = number[];
-
 /** Map a 0–1 progress onto an index into a stream of `length` samples. */
 export function sampleIndex(length: number, progress: number): number {
   if (length <= 0) return 0;
   return Math.min(length - 1, Math.floor(clamp01(progress) * (length - 1)));
-}
-
-export function formatKm(meters: number): string {
-  return (meters / 1000).toFixed(2);
-}
-
-/** 3723 -> "1:02:03", 754 -> "12:34" */
-export function formatClock(totalSeconds: number): string {
-  const s = Math.max(0, Math.round(totalSeconds));
-  const hours = Math.floor(s / 3600);
-  const minutes = Math.floor((s % 3600) / 60);
-  const seconds = s % 60;
-  const mm = hours > 0 ? String(minutes).padStart(2, "0") : String(minutes);
-  const ss = String(seconds).padStart(2, "0");
-  return hours > 0 ? `${hours}:${mm}:${ss}` : `${mm}:${ss}`;
-}
-
-/** Seconds-per-km -> "5:12". Returns "–:––" when pace is unknown. */
-export function formatPace(secondsPerKm: number | null): string {
-  if (secondsPerKm == null || !Number.isFinite(secondsPerKm) || secondsPerKm <= 0) {
-    return "–:––";
-  }
-  const s = Math.round(secondsPerKm);
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
-}
-
-/** "SAT · AUG 9 · 7:12 AM" — start_date_local carries the local clock with a
- *  Z suffix, so format it in UTC to preserve the athlete's wall time. */
-export function formatStartDate(activity: VideoActivity): string {
-  const date = new Date(activity.start_date_local);
-  if (Number.isNaN(date.getTime())) return "";
-  const day = new Intl.DateTimeFormat("en-US", {
-    weekday: "short",
-    timeZone: "UTC",
-  }).format(date);
-  const monthDay = new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    timeZone: "UTC",
-  }).format(date);
-  const time = new Intl.DateTimeFormat("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-    timeZone: "UTC",
-  }).format(date);
-  return `${day} · ${monthDay} · ${time}`.toUpperCase();
 }
 
 /** Mean of `data` over `centre ± halfWidth`, clamped to the stream bounds.
@@ -177,13 +140,6 @@ export function metricsAtProgress(
   };
 }
 
-export interface RoutePadding {
-  top: number;
-  right: number;
-  bottom: number;
-  left: number;
-}
-
 /** The safe box: the title band sits above it, the metrics band below. Whatever
  *  the eye is following — the cobalt trace and the runner dot at its head — is
  *  kept inside it, on the Mapbox camera and on the fallback canvas alike. */
@@ -193,38 +149,6 @@ export const ROUTE_PADDING: RoutePadding = {
   bottom: 660,
   left: 130,
 };
-
-/** Project [lat, lng] points onto composition pixels (equirectangular with
- *  latitude correction — plenty accurate at running distances). Used by the
- *  no-Mapbox-token fallback canvas. */
-export function projectRoute(
-  points: LatLng[],
-  width: number,
-  height: number,
-  padding: RoutePadding,
-): [number, number][] {
-  if (points.length === 0) return [];
-  const lats = points.map((p) => p[0]);
-  const lngs = points.map((p) => p[1]);
-  const minLat = Math.min(...lats);
-  const maxLat = Math.max(...lats);
-  const minLng = Math.min(...lngs);
-  const maxLng = Math.max(...lngs);
-  const kx = Math.cos(((minLat + maxLat) / 2) * (Math.PI / 180));
-
-  const spanX = Math.max((maxLng - minLng) * kx, 1e-9);
-  const spanY = Math.max(maxLat - minLat, 1e-9);
-  const innerWidth = width - padding.left - padding.right;
-  const innerHeight = height - padding.top - padding.bottom;
-  const scale = Math.min(innerWidth / spanX, innerHeight / spanY);
-
-  const offsetX = padding.left + (innerWidth - spanX * scale) / 2;
-  const offsetY = padding.top + (innerHeight - spanY * scale) / 2;
-  return points.map(([lat, lng]) => [
-    offsetX + (lng - minLng) * kx * scale,
-    offsetY + (maxLat - lat) * scale,
-  ]);
-}
 
 /* ---- Runner marker ------------------------------------------------------ */
 

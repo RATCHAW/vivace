@@ -12,7 +12,7 @@ import {
   validateUIMessages,
   type UIMessage,
 } from "ai";
-import { DEFAULT_TEMPLATE_ID, getTemplate } from "@repo/video";
+import { DEFAULT_TEMPLATE_ID, DEFAULT_THEME, getTemplate } from "@repo/video";
 import { auth } from "./auth.js";
 import { track, trackError } from "./analytics.js";
 import { logger } from "./logger.js";
@@ -589,7 +589,10 @@ app.openapi(startRunRenderRoute, async (c) => {
   // A template that draws no runner has nothing to put a face on, so the option
   // is dropped here rather than stored as an answer that changed nothing.
   const showAvatar = (body?.show_avatar ?? false) && getTemplate(template).supportsAvatar;
-  const options = { showAvatar };
+  // Same rule for the look: a template whose plate isn't ours to re-tint stores
+  // the default rather than an answer that changed nothing.
+  const theme = getTemplate(template).supportsTheme ? (body?.theme ?? DEFAULT_THEME) : DEFAULT_THEME;
+  const options = { showAvatar, theme };
 
   const target = resolveRenderTarget(template);
   if (!target) {
@@ -616,7 +619,7 @@ app.openapi(startRunRenderRoute, async (c) => {
     track(
       c,
       "render.reused",
-      { activityId, template, status: existing.status, showAvatar },
+      { activityId, template, status: existing.status, showAvatar, theme },
       "Returned the existing render",
     );
     return c.json({ render: toRunRender(existing) }, 200);
@@ -638,6 +641,7 @@ app.openapi(startRunRenderRoute, async (c) => {
       run,
       streams,
       athlete?.profile ?? "",
+      theme,
     );
     const row = await saveStartedRender({
       userId: session.user.id,
@@ -660,6 +664,7 @@ app.openapi(startRunRenderRoute, async (c) => {
         renderId,
         bucketName,
         showAvatar,
+        theme,
         retry: Boolean(existing),
       },
       "Started a Lambda render",

@@ -3,7 +3,14 @@
 // download instead of a re-render — and a run can hold one of each template at
 // the same time, so choosing another cut doesn't throw away the last video.
 import type { AwsRegion } from "@remotion/lambda/client";
-import { DEFAULT_TEMPLATE_ID, TEMPLATE_IDS, type TemplateId } from "@repo/video";
+import {
+  DEFAULT_TEMPLATE_ID,
+  DEFAULT_THEME,
+  isThemeName,
+  TEMPLATE_IDS,
+  type TemplateId,
+  type ThemeName,
+} from "@repo/video";
 import { pool } from "./db.js";
 import type { RunRender } from "./schemas.js";
 import {
@@ -113,7 +120,14 @@ async function migrate(): Promise<void> {
         `UPDATE "run_render" SET "props_hash" = $1
            WHERE "props_hash" = '' AND "template" = $2
              AND COALESCE(("options"->>'show_avatar')::boolean, false) = $3`,
-        [renderPropsHash(template, { showAvatar }), template, showAvatar],
+        [
+          // Every one of these predates themes, so they were all cut in the
+          // default one — which the hash deliberately leaves out, so these are
+          // the same hashes they had before the option existed.
+          renderPropsHash(template, { showAvatar, theme: DEFAULT_THEME }),
+          template,
+          showAvatar,
+        ],
       );
     }
   }
@@ -164,10 +178,16 @@ interface DbRow {
   progress: number;
   output_url: string | null;
   error: string | null;
-  options: { show_avatar?: boolean } | null;
+  options: { show_avatar?: boolean; theme?: string } | null;
   props_hash: string;
   created_at: Date;
   updated_at: Date;
+}
+
+/** A stored theme name, or the default for a row written before themes were an
+ *  option (or by a version of us that has since dropped one). */
+function themeOf(stored: string | undefined): ThemeName {
+  return stored != null && isThemeName(stored) ? stored : DEFAULT_THEME;
 }
 
 function fromDb(row: DbRow): RunRenderRow {
@@ -187,7 +207,12 @@ function fromDb(row: DbRow): RunRenderRow {
     progress: row.progress,
     outputUrl: row.output_url,
     error: row.error,
-    options: { showAvatar: row.options?.show_avatar ?? false },
+    options: {
+      showAvatar: row.options?.show_avatar ?? false,
+      // A row written before themes existed carries none, and the film it
+      // describes was cut in the default one.
+      theme: themeOf(row.options?.theme),
+    },
     propsHash: row.props_hash,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -201,6 +226,7 @@ export function toRunRender(row: RunRenderRow): RunRender {
     template: row.template,
     status: row.status,
     show_avatar: row.options.showAvatar,
+    theme: row.options.theme,
     progress: row.progress,
     output_url: row.outputUrl,
     error: row.error,
@@ -268,7 +294,10 @@ export async function saveStartedRender(input: {
       input.region,
       input.functionName,
       input.serveUrl,
-      JSON.stringify({ show_avatar: input.options.showAvatar }),
+      JSON.stringify({
+        show_avatar: input.options.showAvatar,
+        theme: input.options.theme,
+      }),
       input.propsHash,
     ],
   );

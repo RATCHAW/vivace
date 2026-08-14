@@ -340,6 +340,9 @@
           "show_avatar": {
             "type": "boolean"
           },
+          "theme": {
+            "$ref": "#/components/schemas/VideoTheme"
+          },
           "progress": {
             "type": "number",
             "minimum": 0,
@@ -373,6 +376,7 @@
           "template",
           "status",
           "show_avatar",
+          "theme",
           "progress",
           "output_url",
           "error",
@@ -383,9 +387,21 @@
       "VideoTemplate": {
         "type": "string",
         "enum": [
-          "run-video"
+          "run-video",
+          "split-rush",
+          "living-poster",
+          "minimal-numbers"
         ],
         "example": "run-video"
+      },
+      "VideoTheme": {
+        "type": "string",
+        "enum": [
+          "charcoal",
+          "cream",
+          "accent"
+        ],
+        "example": "charcoal"
       },
       "RunRenderOptions": {
         "type": "object",
@@ -397,6 +413,9 @@
             "type": "boolean",
             "default": false,
             "example": true
+          },
+          "theme": {
+            "$ref": "#/components/schemas/VideoTheme"
           }
         }
       },
