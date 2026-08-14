@@ -13,6 +13,29 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Nothing here needs pnpm or a database — it reads the diff, so it finishes in
+  # seconds and reports the migration problem long before `validate` is done.
+  # Skipped in a merge queue, where there is no pull request to compare against.
+  migrations:
+    name: Migration history
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out the pull request
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          # The script diffs base against head, and neither commit is reachable
+          # from a shallow clone of the other.
+          fetch-depth: 0
+
+      - name: Ensure at most one new migration
+        run: |
+          bash scripts/check-new-migrations.sh \
+            "${{ github.event.pull_request.base.sha }}" \
+            "${{ github.event.pull_request.head.sha }}"
+
   validate:
     name: Typecheck, test, and build
     runs-on: ubuntu-latest

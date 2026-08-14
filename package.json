@@ -10,9 +10,13 @@
     "typecheck": "turbo run typecheck",
     "generate": "pnpm --filter @repo/strava-api generate && pnpm --filter @repo/api openapi:emit && pnpm --filter @repo/web generate",
     "spec:pull": "pnpm --filter @repo/strava-api spec:pull",
-    "auth:migrate": "pnpm --filter @repo/api run auth:migrate",
     "video:deploy": "pnpm --filter @repo/video run deploy",
     "db:up": "docker compose up -d db",
+    "db:generate": "pnpm --filter @repo/api run db:generate",
+    "db:migrate": "pnpm --filter @repo/api run db:migrate",
+    "db:studio": "pnpm --filter @repo/api run db:studio",
+    "db:seed": "pnpm --filter @repo/api run db:seed",
+    "db:reset": "docker compose down -v db && docker compose up -d db",
     "logs:up": "docker compose --profile observability up -d"
   },
   "devDependencies": {

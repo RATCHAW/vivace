@@ -13,6 +13,12 @@ name: Deploy
 #      build time, so a second commit landing mid-build would deploy something
 #      CI never saw. Pinning `git_commit_sha` first removes that gap.
 #
+# Coolify's pre/post-deployment command must be EMPTY too (Application ->
+# Advanced). It ran `pnpm --filter @repo/api auth:migrate` inside the container,
+# which the hardened image cannot execute: no pnpm, and no migration CLI in a
+# `--prod` install. The API migrates the schema itself before it binds the port —
+# see apps/api/src/db/migrate.ts.
+#
 # apps/web and apps/landing are deliberately not here: they go to Vercel through
 # its own git integration, which has no env coupling to sequence and gives
 # preview deployments for free.

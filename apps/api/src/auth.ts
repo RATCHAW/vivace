@@ -1,8 +1,10 @@
 import "dotenv/config";
 import { betterAuth } from "better-auth";
+import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { genericOAuth, openAPI } from "better-auth/plugins";
 import { createStravaClient, getLoggedInAthlete } from "@repo/strava-api";
-import { pool } from "./db.js";
+import { db } from "./db/index.js";
+import { account, session, user, verification } from "./db/schema/auth.js";
 
 const production =
   process.env.NODE_ENV === "production" || process.env.APP_ENV === "production";
@@ -41,7 +43,15 @@ if (production) {
 }
 
 export const auth = betterAuth({
-  database: pool,
+  // The tables are ours now (src/db/schema/auth.ts) and migrate with everything
+  // else. `schema` is passed explicitly rather than letting the adapter scan:
+  // the keys here are better-auth's *model* names, and it resolves columns
+  // through them, which is what keeps the camelCase columns already in
+  // production reachable.
+  database: drizzleAdapter(db, {
+    provider: "pg",
+    schema: { user, session, account, verification },
+  }),
   baseURL,
   secret,
   trustedOrigins: [webOrigin],
