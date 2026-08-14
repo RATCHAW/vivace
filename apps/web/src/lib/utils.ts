@@ -1,5 +1,5 @@
-import { clsx, type ClassValue } from "clsx"
-import { extendTailwindMerge } from "tailwind-merge"
+import { clsx, type ClassValue } from "clsx";
+import { extendTailwindMerge } from "tailwind-merge";
 
 // The DESIGN.md type ramp and brand colours are custom theme namespaces
 // (`--text-*`, `--color-*` in styles.css). tailwind-merge has to be told about
@@ -44,8 +44,8 @@ const twMerge = extendTailwindMerge({
       ],
     },
   },
-})
+});
 
 export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs))
+  return twMerge(clsx(inputs));
 }

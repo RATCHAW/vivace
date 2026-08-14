@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { FIXTURE_A, FIXTURE_B, FIXTURE_C, FIXTURE_F, FIXTURE_K } from "../../fixtures";
+import {
+  FIXTURE_A,
+  FIXTURE_B,
+  FIXTURE_C,
+  FIXTURE_F,
+  FIXTURE_K,
+} from "../../fixtures";
 import { LOGO_TOP, SAFE_TOP } from "../../core/layout";
 import type { VideoActivity, VideoStreams } from "../../types";
 import {
@@ -16,7 +22,10 @@ import {
 const FPS = 30;
 
 /** A run built split by split, so a test can say exactly what happened in it. */
-function runOfSplits(paces: number[], tailMeters = 0): {
+function runOfSplits(
+  paces: number[],
+  tailMeters = 0,
+): {
   activity: VideoActivity;
   streams: VideoStreams;
 } {
@@ -97,7 +106,9 @@ describe("computeSplits", () => {
     const splits = computeSplits(FIXTURE_F.activity, FIXTURE_F.streams);
     const paces = splits.map((split) => split.paceSecondsPerKm);
     const slowest = Math.max(...paces);
-    const median = [...paces].sort((a, b) => a - b)[Math.floor(paces.length / 2)];
+    const median = [...paces].sort((a, b) => a - b)[
+      Math.floor(paces.length / 2)
+    ];
     expect(slowest).toBeLessThan(median * 1.25);
   });
 
@@ -136,7 +147,9 @@ describe("the bar encoding", () => {
 
   it("keeps every bar inside the measure", () => {
     for (const fixture of [FIXTURE_A, FIXTURE_C, FIXTURE_F]) {
-      const { widths } = encodeSplits(computeSplits(fixture.activity, fixture.streams));
+      const { widths } = encodeSplits(
+        computeSplits(fixture.activity, fixture.streams),
+      );
       for (const width of widths) {
         expect(width).toBeGreaterThan(0);
         expect(width).toBeLessThanOrEqual(1);
@@ -158,7 +171,9 @@ describe("the bar encoding", () => {
   });
 
   it("sees a treadmill at one speed as flat", () => {
-    const encoding = encodeSplits(computeSplits(FIXTURE_B.activity, FIXTURE_B.streams));
+    const encoding = encodeSplits(
+      computeSplits(FIXTURE_B.activity, FIXTURE_B.streams),
+    );
     expect(encoding.flat).toBe(true);
     expect(encoding.fastestIndex).toBe(-1);
     expect(new Set(encoding.widths)).toEqual(new Set([FLAT_BAR]));
@@ -198,13 +213,19 @@ describe("the verdict", () => {
   });
 
   it("falls back to average pace, including for a treadmill", () => {
-    expect(chooseVerdict(computeSplits(FIXTURE_B.activity, FIXTURE_B.streams), FIXTURE_B.activity).id).toBe(
-      "average-pace",
-    );
+    expect(
+      chooseVerdict(
+        computeSplits(FIXTURE_B.activity, FIXTURE_B.streams),
+        FIXTURE_B.activity,
+      ).id,
+    ).toBe("average-pace");
     const short = runOfSplits([300]);
-    expect(chooseVerdict(computeSplits(short.activity, short.streams), short.activity).id).toBe(
-      "average-pace",
-    );
+    expect(
+      chooseVerdict(
+        computeSplits(short.activity, short.streams),
+        short.activity,
+      ).id,
+    ).toBe("average-pace");
   });
 
   it("never surfaces a negative", () => {
@@ -231,11 +252,21 @@ describe("splitStats", () => {
 
 describe("the plan", () => {
   it("cascades a short run and draws a long one as a strip", () => {
-    const short = splitRushPlan(FIXTURE_A.activity, FIXTURE_A.streams, FPS, 12 * FPS);
+    const short = splitRushPlan(
+      FIXTURE_A.activity,
+      FIXTURE_A.streams,
+      FPS,
+      12 * FPS,
+    );
     expect(short.mode).toBe("cascade");
     expect(short.splits.length).toBeLessThanOrEqual(CASCADE_LIMIT);
 
-    const marathon = splitRushPlan(FIXTURE_C.activity, FIXTURE_C.streams, FPS, 12 * FPS);
+    const marathon = splitRushPlan(
+      FIXTURE_C.activity,
+      FIXTURE_C.streams,
+      FPS,
+      12 * FPS,
+    );
     expect(marathon.mode).toBe("strip");
     expect(marathon.splits.length).toBeGreaterThan(40);
     // Three splits worth zooming to, and no two the same.
@@ -247,7 +278,12 @@ describe("the plan", () => {
 
   it("keeps every row inside the safe area, marathon included", () => {
     for (const fixture of [FIXTURE_A, FIXTURE_B, FIXTURE_C, FIXTURE_F]) {
-      const plan = splitRushPlan(fixture.activity, fixture.streams, FPS, 12 * FPS);
+      const plan = splitRushPlan(
+        fixture.activity,
+        fixture.streams,
+        FPS,
+        12 * FPS,
+      );
       for (const row of plan.rows) {
         expect(row.top, fixture.key).toBeGreaterThanOrEqual(SAFE_TOP);
         expect(row.top + row.height, fixture.key).toBeLessThanOrEqual(LOGO_TOP);
@@ -257,7 +293,12 @@ describe("the plan", () => {
 
   it("fills the frames it was given, however many those are", () => {
     for (const total of [8 * FPS, 12 * FPS, 15 * FPS]) {
-      const plan = splitRushPlan(FIXTURE_A.activity, FIXTURE_A.streams, FPS, total);
+      const plan = splitRushPlan(
+        FIXTURE_A.activity,
+        FIXTURE_A.streams,
+        FPS,
+        total,
+      );
       expect(plan.beats[0].from).toBe(0);
       expect(plan.beats[plan.beats.length - 1].to).toBe(total);
       // Beats run end to end with no gap and no overlap.
@@ -269,14 +310,17 @@ describe("the plan", () => {
 
   it("is shorter for a run with nothing to compare", () => {
     expect(splitRushSeconds(FIXTURE_B.activity, FIXTURE_B.streams)).toBe(8);
-    expect(splitRushSeconds(FIXTURE_A.activity, FIXTURE_A.streams)).toBeGreaterThan(8);
+    expect(
+      splitRushSeconds(FIXTURE_A.activity, FIXTURE_A.streams),
+    ).toBeGreaterThan(8);
   });
 
   it("never runs past the story ceiling", () => {
     for (const fixture of [FIXTURE_A, FIXTURE_B, FIXTURE_C, FIXTURE_F]) {
-      expect(splitRushSeconds(fixture.activity, fixture.streams), fixture.key).toBeLessThanOrEqual(
-        15,
-      );
+      expect(
+        splitRushSeconds(fixture.activity, fixture.streams),
+        fixture.key,
+      ).toBeLessThanOrEqual(15);
     }
   });
 });

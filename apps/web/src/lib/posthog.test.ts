@@ -23,7 +23,9 @@ function mockTransports() {
   });
   return {
     fetchMock,
-    capture: vi.spyOn(analytics, "capturePostHogEvent").mockImplementation(() => {}),
+    capture: vi
+      .spyOn(analytics, "capturePostHogEvent")
+      .mockImplementation(() => {}),
     captureException: vi
       .spyOn(analytics, "capturePostHogException")
       .mockImplementation(() => {}),
@@ -41,7 +43,9 @@ describe("analytics fan-out", () => {
 
     trackEvent("ui.render_clicked", { activityId: 7 });
 
-    expect(capture).toHaveBeenCalledWith("ui.render_clicked", { activityId: 7 });
+    expect(capture).toHaveBeenCalledWith("ui.render_clicked", {
+      activityId: 7,
+    });
 
     flushClientLogs();
     await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
@@ -92,7 +96,9 @@ describe("with a project key", () => {
     vi.resetModules();
 
     const posthogJs = (await import("posthog-js")).default;
-    const init = vi.spyOn(posthogJs, "init").mockImplementation(() => posthogJs);
+    const init = vi
+      .spyOn(posthogJs, "init")
+      .mockImplementation(() => posthogJs);
     const { initPostHog } = await import("@/lib/posthog");
 
     initPostHog();

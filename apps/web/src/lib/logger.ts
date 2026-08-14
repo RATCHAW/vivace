@@ -9,7 +9,11 @@
 //
 // One funnel, two destinations, because the alternative — a `posthog.capture`
 // next to every `trackEvent` — is how the two views of the app drift apart.
-import { sendClientLogs, type ClientLogContext, type ClientLogEvent } from "@/api";
+import {
+  sendClientLogs,
+  type ClientLogContext,
+  type ClientLogEvent,
+} from "@/api";
 import { capturePostHogEvent, capturePostHogException } from "@/lib/posthog";
 
 /** The server rejects longer batches; matches ClientLogBatchSchema. */
@@ -52,7 +56,8 @@ const POSTHOG_CAPTURES_NATIVELY = new Set(["ui.page_view"]);
 /** Something the user did. */
 export function trackEvent(event: string, context?: ClientLogContext): void {
   enqueue("info", event, undefined, context);
-  if (!POSTHOG_CAPTURES_NATIVELY.has(event)) capturePostHogEvent(event, context);
+  if (!POSTHOG_CAPTURES_NATIVELY.has(event))
+    capturePostHogEvent(event, context);
 }
 
 /** Something that broke, with whatever the thrower gave us. */
@@ -70,7 +75,10 @@ export function trackError(
 
   // PostHog wants the Error itself — it reads the stack for grouping, which a
   // truncated string can't support.
-  capturePostHogException(error ?? new Error(String(cause)), { event, ...context });
+  capturePostHogException(error ?? new Error(String(cause)), {
+    event,
+    ...context,
+  });
 }
 
 /**

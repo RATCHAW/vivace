@@ -123,12 +123,12 @@ export const Reasoning = memo(
       (newOpen: boolean) => {
         setIsOpen(newOpen);
       },
-      [setIsOpen]
+      [setIsOpen],
     );
 
     const contextValue = useMemo(
       () => ({ duration, isOpen, isStreaming, setIsOpen }),
-      [duration, isOpen, isStreaming, setIsOpen]
+      [duration, isOpen, isStreaming, setIsOpen],
     );
 
     return (
@@ -143,7 +143,7 @@ export const Reasoning = memo(
         </Collapsible>
       </ReasoningContext.Provider>
     );
-  }
+  },
 );
 
 export type ReasoningTriggerProps = ComponentProps<
@@ -182,7 +182,7 @@ export const ReasoningTrigger = memo(
       <CollapsibleTrigger
         className={cn(
           "text-body-sm text-muted-foreground hover:text-foreground flex w-full items-center gap-2 transition-colors",
-          className
+          className,
         )}
         {...props}
       >
@@ -193,14 +193,14 @@ export const ReasoningTrigger = memo(
             <ChevronDownIcon
               className={cn(
                 "size-4 transition-transform",
-                isOpen ? "rotate-180" : "rotate-0"
+                isOpen ? "rotate-180" : "rotate-0",
               )}
             />
           </>
         )}
       </CollapsibleTrigger>
     );
-  }
+  },
 );
 
 export type ReasoningContentProps = ComponentProps<
@@ -218,13 +218,13 @@ export const ReasoningContent = memo(
       className={cn(
         "text-body-sm text-muted-foreground mt-3.5 outline-none",
         "data-closed:animate-out data-closed:fade-out-0 data-open:animate-in data-open:fade-in-0",
-        className
+        className,
       )}
       {...props}
     >
       <Streamdown>{children}</Streamdown>
     </CollapsibleContent>
-  )
+  ),
 );
 
 Reasoning.displayName = "Reasoning";

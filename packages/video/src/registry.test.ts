@@ -22,15 +22,23 @@ describe("the catalogue", () => {
     // template with no entry in Root.tsx would deploy a site whose composition
     // renders nothing, and fail at render time on Lambda rather than here.
     for (const template of VIDEO_TEMPLATES) {
-      expect(TEMPLATE_COMPONENTS[template.id], template.id).toBeTypeOf("function");
-      expect(TEMPLATE_DEFAULT_PROPS[template.id], template.id).toBeTypeOf("object");
+      expect(TEMPLATE_COMPONENTS[template.id], template.id).toBeTypeOf(
+        "function",
+      );
+      expect(TEMPLATE_DEFAULT_PROPS[template.id], template.id).toBeTypeOf(
+        "object",
+      );
     }
-    expect(Object.keys(TEMPLATE_COMPONENTS).sort()).toEqual([...TEMPLATE_IDS].sort());
+    expect(Object.keys(TEMPLATE_COMPONENTS).sort()).toEqual(
+      [...TEMPLATE_IDS].sort(),
+    );
   });
 
   it("keeps ids unique, and composition ids with them", () => {
     expect(new Set(TEMPLATE_IDS).size).toBe(TEMPLATE_IDS.length);
-    const compositions = VIDEO_TEMPLATES.map((template) => template.compositionId);
+    const compositions = VIDEO_TEMPLATES.map(
+      (template) => template.compositionId,
+    );
     // Two templates pointing at one composition would render the same film for
     // both, and the second would silently be the first.
     expect(new Set(compositions).size).toBe(compositions.length);
@@ -53,7 +61,9 @@ describe("the catalogue", () => {
 
   it("rejects an unknown id rather than rendering something else", () => {
     expect(isTemplateId("race-recap")).toBe(false);
-    expect(() => getTemplate("race-recap" as never)).toThrow(/Unknown video template/);
+    expect(() => getTemplate("race-recap" as never)).toThrow(
+      /Unknown video template/,
+    );
   });
 
   it("lists each profile in use once", () => {
@@ -86,7 +96,9 @@ describe("the catalogue", () => {
       // not a theme, it is a different template.
       expect(template.usesMap, template.id).toBe(false);
       // …and a themed template is handed one, so Studio opens on a real look.
-      expect(TEMPLATE_DEFAULT_PROPS[template.id].theme, template.id).toBe(DEFAULT_THEME);
+      expect(TEMPLATE_DEFAULT_PROPS[template.id].theme, template.id).toBe(
+        DEFAULT_THEME,
+      );
     }
   });
 
@@ -97,13 +109,15 @@ describe("the catalogue", () => {
       // Lambda has no GPU: a map template on the default backend renders black.
       expect(profile.gl, template.id).toBe("swangle");
       // Every frame waits on tiles, so the 30s delayRender default is not enough.
-      expect(profile.delayRenderTimeoutInMilliseconds, template.id).toBeGreaterThan(
-        30_000,
-      );
-      // …and the frame budget has to fit inside the invocation that holds it.
-      expect(profile.timeoutInSeconds * 1000, template.id).toBeGreaterThanOrEqual(
+      expect(
         profile.delayRenderTimeoutInMilliseconds,
-      );
+        template.id,
+      ).toBeGreaterThan(30_000);
+      // …and the frame budget has to fit inside the invocation that holds it.
+      expect(
+        profile.timeoutInSeconds * 1000,
+        template.id,
+      ).toBeGreaterThanOrEqual(profile.delayRenderTimeoutInMilliseconds);
     }
   });
 });
@@ -124,7 +138,9 @@ describe("environment variable names", () => {
   });
 
   it("does not collide two templates onto one variable", () => {
-    const names = VIDEO_TEMPLATES.map((template) => serveUrlEnvVar(template.id));
+    const names = VIDEO_TEMPLATES.map((template) =>
+      serveUrlEnvVar(template.id),
+    );
     expect(new Set(names).size).toBe(names.length);
   });
 });

@@ -20,8 +20,10 @@ export const Message = ({ className, from, ...props }: MessageProps) => (
   <div
     className={cn(
       "group flex w-full flex-col gap-2",
-      from === "user" ? "is-user max-w-[85%] items-end self-end" : "is-assistant",
-      className
+      from === "user"
+        ? "is-user max-w-[85%] items-end self-end"
+        : "is-assistant",
+      className,
     )}
     {...props}
   />
@@ -43,7 +45,7 @@ export const MessageContent = ({
     className={cn(
       "text-body-md flex w-fit max-w-full min-w-0 flex-col gap-2 overflow-hidden leading-relaxed",
       "group-[.is-user]:bg-secondary group-[.is-user]:text-secondary-foreground group-[.is-user]:rounded-lg group-[.is-user]:rounded-br-sm group-[.is-user]:px-4.5 group-[.is-user]:py-3.5",
-      className
+      className,
     )}
     {...props}
   >
@@ -62,7 +64,7 @@ export const MessageActions = ({
   <div
     className={cn(
       "flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100",
-      className
+      className,
     )}
     {...props}
   >
@@ -122,14 +124,14 @@ export const MessageResponse = memo(
         "[&_li]:my-1 [&_ol]:my-3 [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:my-3 [&_ul]:list-disc [&_ul]:pl-5",
         "[&_p]:my-3 [&_strong]:font-semibold",
         "[&_table]:my-3 [&_table]:w-full [&_table]:border-collapse [&_td]:border-t [&_td]:py-2 [&_td]:pr-4 [&_th]:pb-2 [&_th]:pr-4 [&_th]:text-left [&_th]:font-semibold",
-        className
+        className,
       )}
       {...props}
     />
   ),
   (prevProps, nextProps) =>
     prevProps.children === nextProps.children &&
-    nextProps.isAnimating === prevProps.isAnimating
+    nextProps.isAnimating === prevProps.isAnimating,
 );
 
 MessageResponse.displayName = "MessageResponse";

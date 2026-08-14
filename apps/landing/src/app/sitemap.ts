@@ -1,9 +1,6 @@
 import type { MetadataRoute } from "next";
 import { LOCALES } from "@/i18n/config";
-import {
-  CONTENT_PAGE_KEYS,
-  contentPagePaths,
-} from "@/i18n/content-pages";
+import { CONTENT_PAGE_KEYS, contentPagePaths } from "@/i18n/content-pages";
 import {
   absoluteSiteUrl,
   homePagePaths,

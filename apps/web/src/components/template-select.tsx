@@ -41,19 +41,30 @@ export function TemplateSelect({
   // the run has none.
   const verdicts = input
     ? templateEligibilities(input)
-    : VIDEO_TEMPLATES.map((entry) => ({ id: entry.id, eligible: true, reason: undefined }));
+    : VIDEO_TEMPLATES.map((entry) => ({
+        id: entry.id,
+        eligible: true,
+        reason: undefined,
+      }));
 
   return (
     <Select
       value={template}
       onValueChange={(next) => onChange(next as TemplateId)}
     >
-      <SelectTrigger aria-label={t("videoOptions.templateSelect")} className="max-w-full">
+      <SelectTrigger
+        aria-label={t("videoOptions.templateSelect")}
+        className="max-w-full"
+      >
         <SelectValue>{labels.templateLabel(template)}</SelectValue>
       </SelectTrigger>
       {/* Anchored under the trigger rather than over it: the list is taller than
           the control and each row carries a line of explanation. */}
-      <SelectContent align="start" alignItemWithTrigger={false} className="max-w-[360px]">
+      <SelectContent
+        align="start"
+        alignItemWithTrigger={false}
+        className="max-w-[360px]"
+      >
         {verdicts.map((entry) => (
           <SelectItem
             key={entry.id}
@@ -62,7 +73,9 @@ export function TemplateSelect({
             className="items-start py-2.5"
           >
             <span className="flex flex-col gap-1">
-              <span className="font-semibold">{labels.templateLabel(entry.id)}</span>
+              <span className="font-semibold">
+                {labels.templateLabel(entry.id)}
+              </span>
               <span className="text-caption text-muted-foreground text-wrap">
                 {labels.eligibilityReason(entry) ??
                   labels.templateDescription(entry.id)}

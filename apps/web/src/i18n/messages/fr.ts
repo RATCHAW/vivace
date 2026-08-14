@@ -302,7 +302,10 @@ export const fr: Translated<Messages> = {
         name: "/charge",
         desc: "Vérifier ma montée en volume et mon ratio de charge",
       },
-      goal: { name: "/objectif", desc: "Définir ou changer la course objectif" },
+      goal: {
+        name: "/objectif",
+        desc: "Définir ou changer la course objectif",
+      },
     },
   },
 

@@ -63,12 +63,15 @@ export function RenderControls({
   const renderEnabled = useFeatureFlag(RENDER_FLAG, true);
   const path = { id: String(run.id) } as const;
   const query = { template } as const;
-  const { data, error: loadError } = useQuery(getRunRenderOptions({ path, query }));
+  const { data, error: loadError } = useQuery(
+    getRunRenderOptions({ path, query }),
+  );
   const render = data?.render ?? null;
   // Every option the render was started with is part of what it *is*: a stored
   // film made with another answer is a different video, not this one.
   const stale =
-    render != null && (render.show_avatar !== showAvatar || render.theme !== theme);
+    render != null &&
+    (render.show_avatar !== showAvatar || render.theme !== theme);
 
   const start = useMutation({
     ...startRunRenderMutation(),
@@ -85,7 +88,10 @@ export function RenderControls({
     if (render?.status !== "rendering") return;
     return subscribeRunRenderProgress(run.id, template, (next) =>
       queryClient.setQueryData<RunRenderState>(
-        getRunRenderQueryKey({ path: { id: String(run.id) }, query: { template } }),
+        getRunRenderQueryKey({
+          path: { id: String(run.id) },
+          query: { template },
+        }),
         { render: next },
       ),
     );
@@ -120,7 +126,9 @@ export function RenderControls({
     return (
       <Button
         className="mt-4 w-full"
-        onClick={() => trackEvent("ui.video_downloaded", { activityId: run.id })}
+        onClick={() =>
+          trackEvent("ui.video_downloaded", { activityId: run.id })
+        }
         render={<a href={download} download />}
       >
         <DownloadIcon />
@@ -129,7 +137,8 @@ export function RenderControls({
     );
   }
 
-  const failure = start.error?.error ?? (render?.status === "error" ? render.error : null);
+  const failure =
+    start.error?.error ?? (render?.status === "error" ? render.error : null);
   // Past that return, a finished render can only be one made with the other
   // options — a file worth keeping hold of, but not the film in the player.
   const previous = stale ? download : null;
@@ -169,10 +178,17 @@ export function RenderControls({
             showAvatar,
             theme,
           });
-          start.mutate({ path, body: { template, show_avatar: showAvatar, theme } });
+          start.mutate({
+            path,
+            body: { template, show_avatar: showAvatar, theme },
+          });
         }}
       >
-        {start.isPending ? <Loader2Icon className="animate-spin" /> : <FilmIcon />}
+        {start.isPending ? (
+          <Loader2Icon className="animate-spin" />
+        ) : (
+          <FilmIcon />
+        )}
         {render?.status === "error"
           ? t("render.retry")
           : previous
@@ -185,7 +201,9 @@ export function RenderControls({
         <Button
           variant="subtle"
           className="w-full"
-          onClick={() => trackEvent("ui.video_downloaded", { activityId: run.id })}
+          onClick={() =>
+            trackEvent("ui.video_downloaded", { activityId: run.id })
+          }
           render={<a href={previous} download />}
         >
           <DownloadIcon />
@@ -216,7 +234,9 @@ function describeOptions(
   const entry = getTemplate(template);
   const parts: string[] = [];
   if (entry.supportsTheme) {
-    parts.push(t("render.optionTheme", { theme: labels.themeLabel(render.theme) }));
+    parts.push(
+      t("render.optionTheme", { theme: labels.themeLabel(render.theme) }),
+    );
   }
   if (entry.supportsAvatar) {
     parts.push(

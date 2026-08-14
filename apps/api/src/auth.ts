@@ -25,10 +25,14 @@ if (production) {
     .map(([name]) => name);
 
   if (missing.length > 0) {
-    throw new Error(`Missing required production configuration: ${missing.join(", ")}`);
+    throw new Error(
+      `Missing required production configuration: ${missing.join(", ")}`,
+    );
   }
   if ((secret?.length ?? 0) < 32) {
-    throw new Error("BETTER_AUTH_SECRET must be at least 32 characters in production");
+    throw new Error(
+      "BETTER_AUTH_SECRET must be at least 32 characters in production",
+    );
   }
   for (const [name, value] of [
     ["BETTER_AUTH_URL", baseURL],
@@ -78,7 +82,9 @@ export const auth = betterAuth({
             const now = new Date();
             return {
               id: String(athlete.id),
-              name: [athlete.firstname, athlete.lastname].filter(Boolean).join(" "),
+              name: [athlete.firstname, athlete.lastname]
+                .filter(Boolean)
+                .join(" "),
               // Strava never exposes the athlete's email, so store a stable placeholder
               email: `strava-${athlete.id}@users.noreply.strava.local`,
               emailVerified: false,

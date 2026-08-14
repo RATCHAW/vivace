@@ -37,7 +37,9 @@ export function AppHeader() {
             key={item.to}
             size="sm"
             variant={pathname === item.to ? "secondary" : "ghost"}
-            className={pathname === item.to ? undefined : "text-muted-foreground"}
+            className={
+              pathname === item.to ? undefined : "text-muted-foreground"
+            }
             aria-current={pathname === item.to ? "page" : undefined}
             render={<Link to={item.to} />}
           >

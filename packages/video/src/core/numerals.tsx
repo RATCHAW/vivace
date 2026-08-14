@@ -120,7 +120,12 @@ export function MetricValue({
         display: "flex",
         flexDirection: "column",
         gap: 12,
-        alignItems: align === "center" ? "center" : align === "right" ? "flex-end" : "flex-start",
+        alignItems:
+          align === "center"
+            ? "center"
+            : align === "right"
+              ? "flex-end"
+              : "flex-start",
       }}
     >
       <div
@@ -135,7 +140,14 @@ export function MetricValue({
       >
         {label}
       </div>
-      <div style={{ ...NUMERAL_STYLE, fontSize: size, color: theme.ink, whiteSpace: "nowrap" }}>
+      <div
+        style={{
+          ...NUMERAL_STYLE,
+          fontSize: size,
+          color: theme.ink,
+          whiteSpace: "nowrap",
+        }}
+      >
         {value}
         {unit && (
           <span

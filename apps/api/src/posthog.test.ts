@@ -31,12 +31,12 @@ describe("posthog, unconfigured", () => {
     const { isFeatureEnabledFor } = await import("./posthog.js");
 
     // Both directions: an unreachable PostHog must never decide a feature.
-    await expect(isFeatureEnabledFor("video-render", "athlete-1", true)).resolves.toBe(
-      true,
-    );
-    await expect(isFeatureEnabledFor("video-render", "athlete-1", false)).resolves.toBe(
-      false,
-    );
+    await expect(
+      isFeatureEnabledFor("video-render", "athlete-1", true),
+    ).resolves.toBe(true);
+    await expect(
+      isFeatureEnabledFor("video-render", "athlete-1", false),
+    ).resolves.toBe(false);
   });
 
   it("drops LLM generations on the floor", async () => {

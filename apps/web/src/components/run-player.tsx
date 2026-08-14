@@ -62,7 +62,10 @@ export function RunPlayer({
   // is longer than a parkrun's. Lambda gets the same number from the same
   // function through the composition's `calculateMetadata`, so what plays here
   // and what comes off the render are the same cut.
-  const durationInFrames = estimateDurationInFrames(template, { activity, streams });
+  const durationInFrames = estimateDurationInFrames(template, {
+    activity,
+    streams,
+  });
   const player = useRef<PlayerRef>(null);
   const [frame, setFrame] = useState(0);
   const [playing, setPlaying] = useState(false);
@@ -160,7 +163,9 @@ export function RunPlayer({
         <Button
           size="icon"
           variant="subtle"
-          aria-label={expanded ? t("player.leaveTheatre") : t("player.enterTheatre")}
+          aria-label={
+            expanded ? t("player.leaveTheatre") : t("player.enterTheatre")
+          }
           aria-pressed={expanded}
           onClick={onToggleExpanded}
         >
@@ -176,7 +181,9 @@ export function RunPlayer({
             Coach screen as an attached run, so the first question is about
             this session without naming it. */}
         <Button
-          onClick={() => trackEvent("ui.ask_coach_clicked", { activityId: activity.id })}
+          onClick={() =>
+            trackEvent("ui.ask_coach_clicked", { activityId: activity.id })
+          }
           render={<Link to={`/coach?run=${activity.id}`} />}
           size="sm"
           variant="subtle"

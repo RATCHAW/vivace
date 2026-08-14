@@ -35,7 +35,11 @@ export interface BeatSpec {
  * plan that always fills the frames it was given can't leave black at the end or
  * cut its own final card off.
  */
-export function buildBeats(spans: BeatSpec[], fps: number, total?: number): Beat[] {
+export function buildBeats(
+  spans: BeatSpec[],
+  fps: number,
+  total?: number,
+): Beat[] {
   const beats: Beat[] = [];
   let at = 0;
   for (const span of spans) {
@@ -82,7 +86,10 @@ export function envelope(
   fadeOut = fadeIn,
 ): number {
   if (frame <= from || frame >= to) return 0;
-  return Math.min(ramp(frame, from, fadeIn), 1 - ramp(frame, to - fadeOut, fadeOut));
+  return Math.min(
+    ramp(frame, from, fadeIn),
+    1 - ramp(frame, to - fadeOut, fadeOut),
+  );
 }
 
 /* ---- Easing -------------------------------------------------------------
@@ -114,6 +121,10 @@ export function mix(t: number, from: number, to: number): number {
 }
 
 /** The frame the `index`-th item of a cascade enters on. */
-export function stagger(index: number, from: number, everyFrames: number): number {
+export function stagger(
+  index: number,
+  from: number,
+  everyFrames: number,
+): number {
   return from + index * everyFrames;
 }

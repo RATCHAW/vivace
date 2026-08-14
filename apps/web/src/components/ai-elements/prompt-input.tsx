@@ -95,7 +95,7 @@ export const usePromptInputAttachments = () => {
   const context = useContext(AttachmentsContextValue);
   if (!context) {
     throw new Error(
-      "usePromptInputAttachments must be used within a PromptInput"
+      "usePromptInputAttachments must be used within a PromptInput",
     );
   }
   return context;
@@ -124,7 +124,7 @@ export type PromptInputProps = Omit<
   }) => void;
   onSubmit: (
     message: PromptInputMessage,
-    event: FormEvent<HTMLFormElement>
+    event: FormEvent<HTMLFormElement>,
   ) => void | Promise<void>;
 };
 
@@ -160,10 +160,10 @@ export const PromptInput = ({
         .some((pattern) =>
           pattern.endsWith("/*")
             ? file.type.startsWith(pattern.slice(0, -1))
-            : file.type === pattern
+            : file.type === pattern,
         );
     },
-    [accept]
+    [accept],
   );
 
   const add = useCallback(
@@ -179,7 +179,7 @@ export const PromptInput = ({
       }
 
       const sized = accepted.filter((file) =>
-        maxFileSize ? file.size <= maxFileSize : true
+        maxFileSize ? file.size <= maxFileSize : true,
       );
       if (accepted.length > 0 && sized.length === 0) {
         onError?.({
@@ -214,7 +214,7 @@ export const PromptInput = ({
         ];
       });
     },
-    [matchesAccept, maxFiles, maxFileSize, onError]
+    [matchesAccept, maxFiles, maxFileSize, onError],
   );
 
   const remove = useCallback(
@@ -224,7 +224,7 @@ export const PromptInput = ({
         if (found?.url) URL.revokeObjectURL(found.url);
         return prev.filter((file) => file.id !== id);
       }),
-    []
+    [],
   );
 
   const clear = useCallback(
@@ -235,7 +235,7 @@ export const PromptInput = ({
         }
         return [];
       }),
-    []
+    [],
   );
 
   const openFileDialog = useCallback(() => inputRef.current?.click(), []);
@@ -269,7 +269,7 @@ export const PromptInput = ({
         if (file.url) URL.revokeObjectURL(file.url);
       }
     },
-    []
+    [],
   );
 
   const handleChange: ChangeEventHandler<HTMLInputElement> = useCallback(
@@ -278,12 +278,19 @@ export const PromptInput = ({
       // Reset so re-picking a file that was just removed still fires a change.
       event.currentTarget.value = "";
     },
-    [add]
+    [add],
   );
 
   const attachments = useMemo<AttachmentsContext>(
-    () => ({ add, clear, fileInputRef: inputRef, files, openFileDialog, remove }),
-    [files, add, remove, clear, openFileDialog]
+    () => ({
+      add,
+      clear,
+      fileInputRef: inputRef,
+      files,
+      openFileDialog,
+      remove,
+    }),
+    [files, add, remove, clear, openFileDialog],
   );
 
   const handleSubmit: FormEventHandler<HTMLFormElement> = useCallback(
@@ -300,9 +307,12 @@ export const PromptInput = ({
         const converted: FileUIPart[] = await Promise.all(
           files.map(async ({ id: _id, ...file }) =>
             file.url?.startsWith("blob:")
-              ? { ...file, url: (await convertBlobUrlToDataUrl(file.url)) ?? file.url }
-              : file
-          )
+              ? {
+                  ...file,
+                  url: (await convertBlobUrlToDataUrl(file.url)) ?? file.url,
+                }
+              : file,
+          ),
         );
 
         await onSubmit({ files: converted, text }, event);
@@ -311,7 +321,7 @@ export const PromptInput = ({
         // Leave the attachments in place — the athlete may want to retry.
       }
     },
-    [files, onSubmit, clear]
+    [files, onSubmit, clear],
   );
 
   return (
@@ -332,7 +342,9 @@ export const PromptInput = ({
         {...props}
       >
         {/* rounded-lg is DESIGN.md's 20px; the composer is a card, not a pill. */}
-        <InputGroup className="overflow-hidden rounded-lg">{children}</InputGroup>
+        <InputGroup className="overflow-hidden rounded-lg">
+          {children}
+        </InputGroup>
       </form>
     </AttachmentsContextValue.Provider>
   );
@@ -347,7 +359,9 @@ export const PromptInputBody = ({
   <div className={cn("contents", className)} {...props} />
 );
 
-export type PromptInputTextareaProps = ComponentProps<typeof InputGroupTextarea>;
+export type PromptInputTextareaProps = ComponentProps<
+  typeof InputGroupTextarea
+>;
 
 export const PromptInputTextarea = ({
   onKeyDown,
@@ -370,7 +384,7 @@ export const PromptInputTextarea = ({
 
         const { form } = e.currentTarget;
         const submit = form?.querySelector<HTMLButtonElement>(
-          'button[type="submit"]'
+          'button[type="submit"]',
         );
         if (submit?.disabled) return;
         form?.requestSubmit();
@@ -387,7 +401,7 @@ export const PromptInputTextarea = ({
         if (last) attachments.remove(last.id);
       }
     },
-    [onKeyDown, isComposing, attachments]
+    [onKeyDown, isComposing, attachments],
   );
 
   const handlePaste: ClipboardEventHandler<HTMLTextAreaElement> = useCallback(
@@ -403,7 +417,7 @@ export const PromptInputTextarea = ({
         attachments.add(pasted);
       }
     },
-    [attachments]
+    [attachments],
   );
 
   return (
@@ -458,7 +472,10 @@ export const PromptInputTools = ({
   className,
   ...props
 }: PromptInputToolsProps) => (
-  <div className={cn("flex min-w-0 items-center gap-1", className)} {...props} />
+  <div
+    className={cn("flex min-w-0 items-center gap-1", className)}
+    {...props}
+  />
 );
 
 export type PromptInputButtonProps = ComponentProps<typeof InputGroupButton> & {
@@ -517,7 +534,7 @@ export type PromptInputActionMenuContentProps = ComponentProps<
 >;
 
 export const PromptInputActionMenuContent = (
-  props: PromptInputActionMenuContentProps
+  props: PromptInputActionMenuContentProps,
 ) => <DropdownMenuContent align="start" {...props} />;
 
 export type PromptInputActionAddAttachmentsProps = ComponentProps<
@@ -583,7 +600,7 @@ export const PromptInputSubmit = ({
         }
         onClick?.(e);
       },
-      [isGenerating, onStop, onClick]
+      [isGenerating, onStop, onClick],
     );
 
   return (

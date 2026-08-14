@@ -11,7 +11,10 @@ export function MonoLabel({
 }: React.ComponentProps<"span">) {
   return (
     <span
-      className={cn("text-mono-label text-stone font-mono uppercase", className)}
+      className={cn(
+        "text-mono-label text-stone font-mono uppercase",
+        className,
+      )}
       {...props}
     />
   );
@@ -43,7 +46,10 @@ export function SoonBadge({
 }
 
 /** The cobalt counterpart: a sport, or a section, that is live now. */
-export function BrandBadge({ className, ...props }: React.ComponentProps<"span">) {
+export function BrandBadge({
+  className,
+  ...props
+}: React.ComponentProps<"span">) {
   return (
     <span
       className={cn(

@@ -22,7 +22,11 @@ import { execFileSync } from "node:child_process";
 import { existsSync, writeFileSync } from "node:fs";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
-import { deployFunction, deploySite, getOrCreateBucket } from "@remotion/lambda";
+import {
+  deployFunction,
+  deploySite,
+  getOrCreateBucket,
+} from "@remotion/lambda";
 import type { AwsRegion } from "@remotion/lambda/client";
 import {
   DEFAULT_TEMPLATE_ID,
@@ -35,7 +39,9 @@ import {
 
 // The AWS credentials live in apps/api/.env with the rest of the secrets —
 // load them from there so this script needs no --env-file or exports.
-const apiEnvPath = fileURLToPath(new URL("../../../apps/api/.env", import.meta.url));
+const apiEnvPath = fileURLToPath(
+  new URL("../../../apps/api/.env", import.meta.url),
+);
 if (existsSync(apiEnvPath)) process.loadEnvFile(apiEnvPath);
 
 if (

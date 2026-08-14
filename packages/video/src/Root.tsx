@@ -61,7 +61,10 @@ const placeholderRun: VideoActivity = {
   workout_type: "default",
 };
 
-export const TEMPLATE_DEFAULT_PROPS: Record<TemplateId, Record<string, unknown>> = {
+export const TEMPLATE_DEFAULT_PROPS: Record<
+  TemplateId,
+  Record<string, unknown>
+> = {
   "run-video": {
     activity: placeholderRun,
     streams: {},
@@ -69,8 +72,16 @@ export const TEMPLATE_DEFAULT_PROPS: Record<TemplateId, Record<string, unknown>>
     avatarUrl: "",
   },
   "split-rush": { activity: placeholderRun, streams: {}, theme: DEFAULT_THEME },
-  "living-poster": { activity: placeholderRun, streams: {}, theme: DEFAULT_THEME },
-  "minimal-numbers": { activity: placeholderRun, streams: {}, theme: DEFAULT_THEME },
+  "living-poster": {
+    activity: placeholderRun,
+    streams: {},
+    theme: DEFAULT_THEME,
+  },
+  "minimal-numbers": {
+    activity: placeholderRun,
+    streams: {},
+    theme: DEFAULT_THEME,
+  },
 };
 
 /**
@@ -109,7 +120,10 @@ export function RemotionRoot() {
           // run with three numbers in it is a shorter Minimal Numbers than one
           // with five. The browser's <Player> calls the same function.
           calculateMetadata={({ props }) => ({
-            durationInFrames: estimateDurationInFrames(template.id, videoInput(props)),
+            durationInFrames: estimateDurationInFrames(
+              template.id,
+              videoInput(props),
+            ),
           })}
         />
       ))}

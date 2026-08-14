@@ -14,14 +14,17 @@ describe("fitting type without a DOM", () => {
   it("never lets a numeral run off the frame", () => {
     for (const text of ["5.02", "42.20", "1:02:03", "4:32", "812", "154"]) {
       const size = fitFontSize(text, SAFE_WIDTH, 520);
-      expect(estimateTextWidth(text, size, NUMERAL_TRACKING), text).toBeLessThanOrEqual(
-        SAFE_WIDTH,
-      );
+      expect(
+        estimateTextWidth(text, size, NUMERAL_TRACKING),
+        text,
+      ).toBeLessThanOrEqual(SAFE_WIDTH);
     }
   });
 
   it("shrinks a longer number rather than clipping it", () => {
-    expect(fitFontSize("42.20", SAFE_WIDTH, 520)).toBeLessThan(fitFontSize("5.0", SAFE_WIDTH, 520));
+    expect(fitFontSize("42.20", SAFE_WIDTH, 520)).toBeLessThan(
+      fitFontSize("5.0", SAFE_WIDTH, 520),
+    );
   });
 
   it("stops at the ceiling for a number short enough to reach it", () => {
@@ -29,7 +32,9 @@ describe("fitting type without a DOM", () => {
   });
 
   it("measures a wider string as wider", () => {
-    expect(estimateTextWidth("1:02:03", 100)).toBeGreaterThan(estimateTextWidth("12:34", 100));
+    expect(estimateTextWidth("1:02:03", 100)).toBeGreaterThan(
+      estimateTextWidth("12:34", 100),
+    );
   });
 });
 

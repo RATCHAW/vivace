@@ -12,7 +12,11 @@
 import { cleanRoute } from "./core/geo";
 import { MIN_ROUTE_POINTS } from "./templates/living-poster/poster";
 import { SPLIT_METERS } from "./templates/split-rush/splits";
-import { DEFAULT_TEMPLATE_ID, VIDEO_TEMPLATES, type TemplateId } from "./registry";
+import {
+  DEFAULT_TEMPLATE_ID,
+  VIDEO_TEMPLATES,
+  type TemplateId,
+} from "./registry";
 import type { VideoActivity, VideoStreams } from "./types";
 
 /** What every rule is handed: the run, and whatever streams came with it. */
@@ -30,9 +34,7 @@ export interface TemplateInput {
  * translation still says something true.
  */
 export type EligibilityReason =
-  | "needs-route"
-  | "needs-two-km"
-  | "needs-distance-time";
+  "needs-route" | "needs-two-km" | "needs-distance-time";
 
 export interface Eligibility {
   eligible: boolean;
@@ -79,7 +81,8 @@ const RULES: Record<TemplateId, (input: TemplateInput) => Eligibility> = {
   },
 
   "living-poster": ({ streams }) =>
-    cleanRoute(streams.latlng?.data ?? [], streams.time?.data).length >= MIN_ROUTE_POINTS
+    cleanRoute(streams.latlng?.data ?? [], streams.time?.data).length >=
+    MIN_ROUTE_POINTS
       ? OK
       : no("needs-route", "Needs a GPS route — this run has none"),
 
@@ -88,7 +91,10 @@ const RULES: Record<TemplateId, (input: TemplateInput) => Eligibility> = {
   "minimal-numbers": () => OK,
 };
 
-export function templateEligibility(id: TemplateId, input: TemplateInput): Eligibility {
+export function templateEligibility(
+  id: TemplateId,
+  input: TemplateInput,
+): Eligibility {
   return RULES[id](input);
 }
 
@@ -108,6 +114,8 @@ export function templateEligibilities(
  * precedence. Minimal Numbers is always eligible, so this always answers.
  */
 export function recommendTemplate(input: TemplateInput): TemplateId {
-  const match = VIDEO_TEMPLATES.find((template) => RULES[template.id](input).eligible);
+  const match = VIDEO_TEMPLATES.find(
+    (template) => RULES[template.id](input).eligible,
+  );
   return match?.id ?? DEFAULT_TEMPLATE_ID;
 }

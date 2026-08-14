@@ -49,11 +49,7 @@ describe("Login page", () => {
   });
 
   it("starts Strava sign-in automatically after a landing-page handoff", async () => {
-    window.history.replaceState(
-      null,
-      "",
-      "/login?lang=en&provider=strava",
-    );
+    window.history.replaceState(null, "", "/login?lang=en&provider=strava");
 
     render(<Login />);
 

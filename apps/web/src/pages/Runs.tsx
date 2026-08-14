@@ -64,7 +64,9 @@ export function Runs() {
   const [theme, setTheme] = useState<ThemeName>(DEFAULT_THEME);
 
   const { data: runs, error: runsError } = useQuery(getRunsOptions());
-  const { data: athlete, error: athleteError } = useQuery(getStravaAthleteOptions());
+  const { data: athlete, error: athleteError } = useQuery(
+    getStravaAthleteOptions(),
+  );
   const avatarUrl = avatarSource(athlete?.profile);
   const requested = Number(params.get("run"));
   const selected =
@@ -84,7 +86,9 @@ export function Runs() {
   // run in the list must not leave the route replay selected and empty. Derived
   // rather than stored, so their choice comes back the moment a run can serve it.
   const template =
-    input && !templateEligibility(chosen, input).eligible ? recommendTemplate(input) : chosen;
+    input && !templateEligibility(chosen, input).eligible
+      ? recommendTemplate(input)
+      : chosen;
   // A template that draws no runner has nothing for the avatar switch to do,
   // and one whose plate isn't ours to re-tint has nothing for the theme. Both
   // are resolved once, so the player and the render are handed the same answers.
@@ -136,7 +140,10 @@ export function Runs() {
         >
           {/* Theatre mode gives the 9:16 the whole row rather than shrinking
               the list beside it. */}
-          <section aria-label={t("runs.listLabel")} className={cn(expanded && "hidden")}>
+          <section
+            aria-label={t("runs.listLabel")}
+            className={cn(expanded && "hidden")}
+          >
             {runsError && (
               <Alert variant="destructive">
                 <AlertTitle>{t("runs.errorTitle")}</AlertTitle>
@@ -172,11 +179,15 @@ export function Runs() {
                   <button
                     key={run.id}
                     type="button"
-                    onClick={() => setParams({ run: String(run.id) }, { replace: true })}
+                    onClick={() =>
+                      setParams({ run: String(run.id) }, { replace: true })
+                    }
                     aria-pressed={selected?.id === run.id}
                     className={cn(
                       "focus-visible:ring-ring/50 flex w-full items-center gap-5 border-b px-7 py-5 text-left outline-none last:border-b-0 focus-visible:ring-3 focus-visible:ring-inset",
-                      selected?.id === run.id ? "bg-muted" : "hover:bg-muted/40",
+                      selected?.id === run.id
+                        ? "bg-muted"
+                        : "hover:bg-muted/40",
                     )}
                   >
                     {/* The cobalt tick is the only stamp in the list, so the
@@ -188,11 +199,14 @@ export function Runs() {
                       )}
                     />
                     <span className="flex min-w-0 flex-col gap-1.5">
-                      <span className="text-body-md font-semibold">{run.name}</span>
+                      <span className="text-body-md font-semibold">
+                        {run.name}
+                      </span>
                       <span className="text-caption text-muted-foreground truncate">
                         {format.runDate(run.start_date_local)} ·{" "}
                         {formatClock(run.moving_time)} ·{" "}
-                        {formatPace(averagePaceSeconds(run))} {t("common.perKm")}
+                        {formatPace(averagePaceSeconds(run))}{" "}
+                        {t("common.perKm")}
                       </span>
                     </span>
                     <span className="ml-auto flex shrink-0 items-baseline gap-1 tabular-nums">
@@ -225,7 +239,9 @@ export function Runs() {
                     input={input}
                     onChange={(next) => {
                       setChosen(next);
-                      trackEvent("ui.video_template_changed", { template: next });
+                      trackEvent("ui.video_template_changed", {
+                        template: next,
+                      });
                     }}
                   />
                 </div>
@@ -309,7 +325,10 @@ export function Runs() {
                   {/* The two <code> spans are part of the sentence, so the
                       translation owns where they fall — a French clause puts
                       the filename somewhere an English one does not. */}
-                  <Trans i18nKey="runs.noMapboxToken" components={{ code: <code /> }} />
+                  <Trans
+                    i18nKey="runs.noMapboxToken"
+                    components={{ code: <code /> }}
+                  />
                 </p>
               )}
             </div>

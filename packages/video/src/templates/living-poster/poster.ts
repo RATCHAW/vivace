@@ -12,7 +12,13 @@ import {
   formatKm,
   formatPace,
 } from "../../core/format";
-import { CANVAS_HEIGHT, CANVAS_WIDTH, LOGO_TOP, PAGE_INSET, SAFE_TOP } from "../../core/layout";
+import {
+  CANVAS_HEIGHT,
+  CANVAS_WIDTH,
+  LOGO_TOP,
+  PAGE_INSET,
+  SAFE_TOP,
+} from "../../core/layout";
 import {
   cleanRoute,
   pathLength,
@@ -111,7 +117,12 @@ export function posterPlan(
   durationInFrames: number,
 ): PosterPlan {
   const points = posterRoute(streams);
-  const projected = projectRoute(points, CANVAS_WIDTH, CANVAS_HEIGHT, POSTER_PADDING);
+  const projected = projectRoute(
+    points,
+    CANVAS_WIDTH,
+    CANVAS_HEIGHT,
+    POSTER_PADDING,
+  );
   return {
     projected,
     length: pathLength(projected),
@@ -128,8 +139,13 @@ export function posterGrid(): { columns: number[]; rows: number[] } {
   const rows: number[] = [];
   const left = PAGE_INSET;
   const right = CANVAS_WIDTH - PAGE_INSET;
-  for (let x = left; x <= right; x += (right - left) / 6) columns.push(Math.round(x));
-  for (let y = SAFE_TOP; y <= LOGO_TOP - 60; y += (LOGO_TOP - 60 - SAFE_TOP) / 8) {
+  for (let x = left; x <= right; x += (right - left) / 6)
+    columns.push(Math.round(x));
+  for (
+    let y = SAFE_TOP;
+    y <= LOGO_TOP - 60;
+    y += (LOGO_TOP - 60 - SAFE_TOP) / 8
+  ) {
     rows.push(Math.round(y));
   }
   return { columns, rows };

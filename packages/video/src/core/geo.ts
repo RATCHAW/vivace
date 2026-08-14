@@ -49,12 +49,17 @@ const DROPOUT_SECONDS = 20;
  * Non-finite coordinates and exact repeats go too: the first crash a projection
  * finds, the second makes the stroke furry for nothing.
  */
-export function cleanRoute(points: LatLng[], timeSeconds?: readonly number[]): LatLng[] {
+export function cleanRoute(
+  points: LatLng[],
+  timeSeconds?: readonly number[],
+): LatLng[] {
   const finite = points
     .map((point, index) => ({ point, index }))
     .filter(
       ({ point }) =>
-        point.length >= 2 && Number.isFinite(point[0]) && Number.isFinite(point[1]),
+        point.length >= 2 &&
+        Number.isFinite(point[0]) &&
+        Number.isFinite(point[1]),
     );
   if (finite.length === 0) return [];
 
@@ -73,7 +78,8 @@ export function cleanRoute(points: LatLng[], timeSeconds?: readonly number[]): L
     const current = at(i);
     const step = distanceMeters(previous, current);
     const seconds = gapSeconds(lastKept, i);
-    const implausible = seconds < DROPOUT_SECONDS && step / seconds > MAX_PLAUSIBLE_SPEED;
+    const implausible =
+      seconds < DROPOUT_SECONDS && step / seconds > MAX_PLAUSIBLE_SPEED;
 
     if (implausible && i + 1 < finite.length) {
       // Only a spike if the route comes straight back: a fix that flies out and
@@ -106,7 +112,10 @@ function segmentDistance(point: LatLng, a: LatLng, b: LatLng): number {
   const bx = (b[1] - a[1]) * k;
   const by = b[0] - a[0];
   const lengthSquared = bx * bx + by * by;
-  const t = lengthSquared === 0 ? 0 : Math.max(0, Math.min(1, (px * bx + py * by) / lengthSquared));
+  const t =
+    lengthSquared === 0
+      ? 0
+      : Math.max(0, Math.min(1, (px * bx + py * by) / lengthSquared));
   return Math.hypot(px - bx * t, py - by * t) * METERS_PER_DEGREE;
 }
 
@@ -116,7 +125,10 @@ function segmentDistance(point: LatLng, a: LatLng, b: LatLng): number {
  * Raw GPS at 1 Hz gives a 10 km run ~6000 points, and a stroke drawn through all
  * of them is furry — every metre of receiver noise becomes a kink at 10px wide.
  */
-export function simplifyRoute(points: LatLng[], toleranceMeters: number): LatLng[] {
+export function simplifyRoute(
+  points: LatLng[],
+  toleranceMeters: number,
+): LatLng[] {
   if (points.length <= 2 || toleranceMeters <= 0) return points.slice();
 
   const keep = new Uint8Array(points.length);
@@ -154,7 +166,11 @@ export function simplifyRoute(points: LatLng[], toleranceMeters: number): LatLng
  * back with 90 points and the other with 4000. A target count can, and it is
  * also what makes the stroke weight below mean the same thing on both.
  */
-export function simplifyToTarget(points: LatLng[], min = 300, max = 600): LatLng[] {
+export function simplifyToTarget(
+  points: LatLng[],
+  min = 300,
+  max = 600,
+): LatLng[] {
   if (points.length <= max) return points.slice();
 
   let low = 0.5;
@@ -234,7 +250,10 @@ export function projectRoute(
 export function pathLength(points: [number, number][]): number {
   let total = 0;
   for (let i = 1; i < points.length; i += 1) {
-    total += Math.hypot(points[i][0] - points[i - 1][0], points[i][1] - points[i - 1][1]);
+    total += Math.hypot(
+      points[i][0] - points[i - 1][0],
+      points[i][1] - points[i - 1][1],
+    );
   }
   return total;
 }

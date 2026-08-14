@@ -18,7 +18,9 @@ import { fileURLToPath } from "node:url";
 
 const ROOT_URL = "https://developers.strava.com/swagger/swagger.json";
 const REMOTE_PREFIX = "https://developers.strava.com/swagger/";
-const OUT = fileURLToPath(new URL("../openapi/strava-swagger.json", import.meta.url));
+const OUT = fileURLToPath(
+  new URL("../openapi/strava-swagger.json", import.meta.url),
+);
 
 /** @type {Map<string, Promise<Record<string, unknown>>>} url -> parsed document */
 const documents = new Map();
@@ -27,7 +29,8 @@ function fetchDocument(url) {
   let pending = documents.get(url);
   if (!pending) {
     pending = fetch(url).then((res) => {
-      if (!res.ok) throw new Error(`GET ${url} -> ${res.status} ${res.statusText}`);
+      if (!res.ok)
+        throw new Error(`GET ${url} -> ${res.status} ${res.statusText}`);
       return res.json();
     });
     documents.set(url, pending);
@@ -73,7 +76,8 @@ async function localizeRefs(node, ownerUrl) {
     const isSchemaRef =
       key === "$ref" &&
       typeof value === "string" &&
-      (value.startsWith(REMOTE_PREFIX) || (value.startsWith("#/") && ownerUrl !== ROOT_URL));
+      (value.startsWith(REMOTE_PREFIX) ||
+        (value.startsWith("#/") && ownerUrl !== ROOT_URL));
 
     if (isSchemaRef) {
       const { url, name } = parseRef(value, ownerUrl);

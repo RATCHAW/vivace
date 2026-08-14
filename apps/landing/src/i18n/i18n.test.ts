@@ -73,7 +73,10 @@ describe("dictionaries", () => {
       .filter(([key, text]) => {
         const other = french.get(key);
         const of = (s: string) =>
-          [...s.matchAll(/\{\{(\w+)\}\}/g)].map((m) => m[1]).sort().join();
+          [...s.matchAll(/\{\{(\w+)\}\}/g)]
+            .map((m) => m[1])
+            .sort()
+            .join();
         return other !== undefined && of(other) !== of(text);
       })
       .map(([key]) => key);

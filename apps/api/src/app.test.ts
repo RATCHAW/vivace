@@ -51,7 +51,11 @@ describe("api", () => {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         events: [
-          { level: "info", event: "ui.render_clicked", context: { activityId: 1 } },
+          {
+            level: "info",
+            event: "ui.render_clicked",
+            context: { activityId: 1 },
+          },
           { level: "error", event: "ui.crashed", message: "Boom" },
         ],
       }),
@@ -66,7 +70,9 @@ describe("api", () => {
       method: "POST",
       headers: { "content-type": "application/json" },
       // Free-text names would blow up the cardinality of every dashboard.
-      body: JSON.stringify({ events: [{ level: "info", event: "Clicked Render!" }] }),
+      body: JSON.stringify({
+        events: [{ level: "info", event: "Clicked Render!" }],
+      }),
     });
 
     expect(res.status).toBe(400);

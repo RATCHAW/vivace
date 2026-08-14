@@ -65,9 +65,7 @@ export function SiteFooter({
 
           {columns.map((column) => (
             <div key={column.heading} className="flex flex-col gap-3">
-              <h2 className="text-body-sm font-semibold">
-                {column.heading}
-              </h2>
+              <h2 className="text-body-sm font-semibold">{column.heading}</h2>
               {column.links.map((link) => (
                 <a
                   key={link.label}

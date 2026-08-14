@@ -70,7 +70,11 @@ export function RunMap({
   const clearance = avatarUrl ? RUNNER_AVATAR_CLEARANCE : RUNNER_CLEARANCE;
   const track = useMemo(
     () =>
-      buildCameraTrack(points, { width, height, padding: ROUTE_PADDING }, { clearance }),
+      buildCameraTrack(
+        points,
+        { width, height, padding: ROUTE_PADDING },
+        { clearance },
+      ),
     [points, width, height, clearance],
   );
 
@@ -94,13 +98,20 @@ export function RunMap({
     });
 
     mapInstance.on("load", () => {
-      mapInstance.addSource("route-full", { type: "geojson", data: lineString(coords) });
+      mapInstance.addSource("route-full", {
+        type: "geojson",
+        data: lineString(coords),
+      });
       mapInstance.addLayer({
         id: "route-full-line",
         type: "line",
         source: "route-full",
         layout: { "line-cap": "round", "line-join": "round" },
-        paint: { "line-color": "#ffffff", "line-opacity": 0.25, "line-width": 5 },
+        paint: {
+          "line-color": "#ffffff",
+          "line-opacity": 0.25,
+          "line-width": 5,
+        },
       });
 
       mapInstance.addSource("route-trace", {
@@ -115,7 +126,10 @@ export function RunMap({
         paint: { "line-color": ROUTE_COLOR, "line-width": 10 },
       });
 
-      mapInstance.addSource("start-marker", { type: "geojson", data: point(coords[0]) });
+      mapInstance.addSource("start-marker", {
+        type: "geojson",
+        data: point(coords[0]),
+      });
       mapInstance.addLayer({
         id: "start-marker-dot",
         type: "circle",
@@ -128,7 +142,10 @@ export function RunMap({
         },
       });
 
-      mapInstance.addSource("runner-marker", { type: "geojson", data: point(coords[0]) });
+      mapInstance.addSource("runner-marker", {
+        type: "geojson",
+        data: point(coords[0]),
+      });
       mapInstance.addLayer({
         id: "runner-marker-dot",
         type: "circle",

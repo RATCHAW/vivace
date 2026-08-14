@@ -120,7 +120,9 @@ export function metricsAtProgress(
       distanceMeters: activity.distance * p,
       elapsedSeconds: activity.moving_time * p,
       paceSecondsPerKm: averagePace,
-      heartrate: activity.average_heartrate ? Math.round(activity.average_heartrate) : null,
+      heartrate: activity.average_heartrate
+        ? Math.round(activity.average_heartrate)
+        : null,
       elevationGainMeters: activity.total_elevation_gain * p,
     };
   }
@@ -129,12 +131,14 @@ export function metricsAtProgress(
   const halfWidth = smoothingHalfWidth(sampleCount, fps);
   const velocity = windowMean(streams.velocity_smooth?.data, idx, halfWidth);
   const heartrate =
-    windowMean(streams.heartrate?.data, idx, halfWidth) ?? activity.average_heartrate;
+    windowMean(streams.heartrate?.data, idx, halfWidth) ??
+    activity.average_heartrate;
   return {
     distanceMeters: distance?.[idx] ?? activity.distance * p,
     elapsedSeconds: time?.[idx] ?? activity.moving_time * p,
     // Standing still produces absurd instantaneous paces — fall back to average.
-    paceSecondsPerKm: velocity && velocity > 0.5 ? 1000 / velocity : averagePace,
+    paceSecondsPerKm:
+      velocity && velocity > 0.5 ? 1000 / velocity : averagePace,
     heartrate: heartrate ? Math.round(heartrate) : null,
     elevationGainMeters: activity.total_elevation_gain * p,
   };
@@ -227,14 +231,17 @@ interface MercatorBox {
 
 /** [lat, lng] -> Mercator. Latitude is clamped to the projection's limit. */
 export function toMercator([lat, lng]: LatLng): Mercator {
-  const s = Math.sin((Math.min(85.051129, Math.max(-85.051129, lat)) * Math.PI) / 180);
+  const s = Math.sin(
+    (Math.min(85.051129, Math.max(-85.051129, lat)) * Math.PI) / 180,
+  );
   return [(lng + 180) / 360, 0.5 - Math.log((1 + s) / (1 - s)) / (4 * Math.PI)];
 }
 
 /** Inverse of `toMercator`, in Mapbox's [lng, lat] order. */
 export function fromMercator([x, y]: Mercator): [number, number] {
   const lat =
-    (2 * Math.atan(Math.exp((0.5 - y) * 2 * Math.PI)) - Math.PI / 2) * (180 / Math.PI);
+    (2 * Math.atan(Math.exp((0.5 - y) * 2 * Math.PI)) - Math.PI / 2) *
+    (180 / Math.PI);
   return [x * 360 - 180, lat];
 }
 
@@ -255,8 +262,12 @@ const safeBoxOffset = (viewport: Viewport): [number, number] => [
 /** Widest scale that fits `box` in the safe box, framed on the box's centre. */
 const fitScale = (box: MercatorBox, viewport: Viewport): number =>
   Math.min(
-    box.maxX > box.minX ? safeWidth(viewport) / (box.maxX - box.minX) : Infinity,
-    box.maxY > box.minY ? safeHeight(viewport) / (box.maxY - box.minY) : Infinity,
+    box.maxX > box.minX
+      ? safeWidth(viewport) / (box.maxX - box.minX)
+      : Infinity,
+    box.maxY > box.minY
+      ? safeHeight(viewport) / (box.maxY - box.minY)
+      : Infinity,
   );
 
 /** Widest scale that still holds `box` — `inset` pixels clear of the safe box's
@@ -283,10 +294,17 @@ const containScale = (
 };
 
 /** The camera that puts `anchor` at the centre of the safe box. */
-const cameraAt = (anchor: Mercator, scale: number, viewport: Viewport): Camera => {
+const cameraAt = (
+  anchor: Mercator,
+  scale: number,
+  viewport: Viewport,
+): Camera => {
   const [offsetX, offsetY] = safeBoxOffset(viewport);
   return {
-    center: fromMercator([anchor[0] - offsetX / scale, anchor[1] - offsetY / scale]),
+    center: fromMercator([
+      anchor[0] - offsetX / scale,
+      anchor[1] - offsetY / scale,
+    ]),
     zoom: Math.log2(scale / WORLD_SIZE_AT_ZOOM_0),
   };
 };
@@ -365,12 +383,15 @@ export function buildCameraTrack(
     heads.push(mercator[head]);
   }
 
-  const anchors = boxes.map(
-    (b): Mercator => [(b.minX + b.maxX) / 2, (b.minY + b.maxY) / 2],
-  );
+  const anchors = boxes.map((b): Mercator => [
+    (b.minX + b.maxX) / 2,
+    (b.minY + b.maxY) / 2,
+  ]);
   // Averaged as zoom, not as scale: halfway between z12 and z16 should read as
   // z14, not as the shot that is 8× closer than the wide one.
-  const zooms = boxes.map((b) => Math.log2(Math.min(fitScale(b, viewport), maxScale)));
+  const zooms = boxes.map((b) =>
+    Math.log2(Math.min(fitScale(b, viewport), maxScale)),
+  );
 
   const track: Camera[] = [];
   let widest = maxScale;
@@ -415,7 +436,10 @@ export function buildCameraTrack(
 }
 
 /** Read a camera track at a 0–1 progress, easing between its keyframes. */
-export function cameraAtProgress(track: Camera[], progress: number): Camera | null {
+export function cameraAtProgress(
+  track: Camera[],
+  progress: number,
+): Camera | null {
   if (track.length === 0) return null;
   const at = clamp01(progress) * (track.length - 1);
   const index = Math.min(track.length - 1, Math.floor(at));

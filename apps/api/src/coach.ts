@@ -173,7 +173,9 @@ export const coachMessageMetadataSchema = z
 export function attachedRun(
   messages: { metadata?: unknown }[],
 ): AttachedRun | undefined {
-  const parsed = coachMessageMetadataSchema.safeParse(messages.at(-1)?.metadata);
+  const parsed = coachMessageMetadataSchema.safeParse(
+    messages.at(-1)?.metadata,
+  );
   return parsed.success ? parsed.data?.run : undefined;
 }
 
@@ -214,7 +216,10 @@ function shortDate(date: string): string {
 function stravaFailure(err: unknown): { error: string } {
   if (err instanceof StravaApiError) {
     return err.status === 401 || err.status === 403
-      ? { error: "Strava denied access. Ask the athlete to sign out and back in." }
+      ? {
+          error:
+            "Strava denied access. Ask the athlete to sign out and back in.",
+        }
       : { error: `Strava is unavailable right now (${err.status}).` };
   }
   throw err;
@@ -232,10 +237,13 @@ function comparisonLine(run: Run, runs: Run[], today: string): string {
     const date = localDate(other);
     return other.id !== run.id && date <= today && date >= addWeeks(today, -4);
   });
-  if (window.length === 0) return "First run in this window — nothing to compare it to yet.";
+  if (window.length === 0)
+    return "First run in this window — nothing to compare it to yet.";
 
   const meanKm =
-    window.reduce((sum, other) => sum + other.distance, 0) / window.length / 1000;
+    window.reduce((sum, other) => sum + other.distance, 0) /
+    window.length /
+    1000;
   const km = run.distance / 1000;
   const deltaKm = km - meanKm;
   const parts = [
@@ -323,7 +331,9 @@ export async function buildRunDebriefCard(
       { label: "PACE", value: `${paceOf(run) ?? "—"} /km` },
       {
         label: "AVG HR",
-        value: run.average_heartrate ? `${Math.round(run.average_heartrate)}` : "—",
+        value: run.average_heartrate
+          ? `${Math.round(run.average_heartrate)}`
+          : "—",
       },
     ],
     elevation_m: Math.round(run.total_elevation_gain),
@@ -358,7 +368,9 @@ export function createCoachTools(ctx: CoachToolContext): ToolSet {
         try {
           const athlete = await fetchAthlete(accessToken);
           return {
-            name: [athlete.firstname, athlete.lastname].filter(Boolean).join(" "),
+            name: [athlete.firstname, athlete.lastname]
+              .filter(Boolean)
+              .join(" "),
             city: athlete.city,
             country: athlete.country,
             sex: athlete.sex,
@@ -394,7 +406,11 @@ export function createCoachTools(ctx: CoachToolContext): ToolSet {
         "days they can run, or an injury. Only pass the fields that changed; " +
         "pass null to clear one.",
       inputSchema: z.object({
-        race_name: z.string().max(120).nullish().describe("e.g. Casablanca Half"),
+        race_name: z
+          .string()
+          .max(120)
+          .nullish()
+          .describe("e.g. Casablanca Half"),
         race_date: z
           .string()
           .regex(/^\d{4}-\d{2}-\d{2}$/)
@@ -527,7 +543,9 @@ export function createCoachTools(ctx: CoachToolContext): ToolSet {
             first_half_pace: pace(mean(0, half)),
             second_half_pace: pace(mean(half, splits.length)),
             /** Positive means the back half was slower. */
-            fade_seconds_per_km: Math.round(mean(half, splits.length) - mean(0, half)),
+            fade_seconds_per_km: Math.round(
+              mean(half, splits.length) - mean(0, half),
+            ),
             decoupling_pct: decoupling(streams),
             avg_heartrate: run.average_heartrate,
             max_heartrate: run.max_heartrate,
@@ -647,7 +665,9 @@ export function createCoachTools(ctx: CoachToolContext): ToolSet {
                   race: context.race_name,
                   distance: goalPrediction.name,
                   today: goalPrediction.time,
-                  target: context.target_seconds ? clock(context.target_seconds) : null,
+                  target: context.target_seconds
+                    ? clock(context.target_seconds)
+                    : null,
                   /** Seconds the athlete still has to find. Negative = ahead of target. */
                   gap_seconds: context.target_seconds
                     ? goalPrediction.seconds - context.target_seconds
@@ -687,11 +707,17 @@ export function createCoachTools(ctx: CoachToolContext): ToolSet {
                 .string()
                 .max(40)
                 .describe("Recovery, Easy, 8 × 400, Tempo, Long, Rest."),
-              km: z.number().min(0).max(200).describe("Kilometres; 0 for rest."),
+              km: z
+                .number()
+                .min(0)
+                .max(200)
+                .describe("Kilometres; 0 for rest."),
               pace: z
                 .string()
                 .max(40)
-                .describe("Target pace like '6:05 /km', or a note like 'legs up'."),
+                .describe(
+                  "Target pace like '6:05 /km', or a note like 'legs up'.",
+                ),
               key: z
                 .boolean()
                 .describe("True for the sessions the week is built around."),

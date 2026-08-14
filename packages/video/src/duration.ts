@@ -44,7 +44,10 @@ function estimateSeconds(id: TemplateId, input: TemplateInput): number | null {
   }
 }
 
-export function estimateDurationInFrames(id: TemplateId, input: TemplateInput): number {
+export function estimateDurationInFrames(
+  id: TemplateId,
+  input: TemplateInput,
+): number {
   const template = getTemplate(id);
   const seconds = estimateSeconds(id, input);
   if (seconds == null) return template.durationInFrames;

@@ -1,7 +1,13 @@
 import { useMemo } from "react";
 import { AbsoluteFill, useCurrentFrame, useVideoConfig } from "remotion";
 import { formatDay } from "../../core/format";
-import { CANVAS_HEIGHT, CANVAS_WIDTH, PAGE_INSET, SAFE_TOP, TYPE } from "../../core/layout";
+import {
+  CANVAS_HEIGHT,
+  CANVAS_WIDTH,
+  PAGE_INSET,
+  SAFE_TOP,
+  TYPE,
+} from "../../core/layout";
 import { MetricValue } from "../../core/numerals";
 import { hashSeed } from "../../core/seed";
 import { MetricLabel, Stage } from "../../core/Stage";
@@ -41,7 +47,11 @@ export type LivingPosterProps = {
  * Pure geometry — no basemap, no tiles, no labels. Overlapping out-and-back
  * segments stay opaque, because that is what a real route looks like.
  */
-export function LivingPoster({ activity, streams, theme: themeName }: LivingPosterProps) {
+export function LivingPoster({
+  activity,
+  streams,
+  theme: themeName,
+}: LivingPosterProps) {
   const frame = useCurrentFrame();
   const { fps, durationInFrames } = useVideoConfig();
   const theme = getTheme(themeName);
@@ -56,22 +66,46 @@ export function LivingPoster({ activity, streams, theme: themeName }: LivingPost
   const title = findBeat(plan.beats, "title");
   const stats = findBeat(plan.beats, "stats");
 
-  const gridIn = canvas ? easeOutCubic(ramp(frame, canvas.from, canvas.to - canvas.from)) : 1;
+  const gridIn = canvas
+    ? easeOutCubic(ramp(frame, canvas.from, canvas.to - canvas.from))
+    : 1;
   // Ease-in-out with the settle at the end that a hand-drawn line has: it leaves
   // the start line, travels, and arrives — it does not scroll past at a rate.
   const draw = route
     ? easeInOutCubic(ramp(frame, route.from, route.to - route.from))
     : 1;
-  const markerIn = markers ? ramp(frame, markers.from, secondsToFrames(0.45, fps)) : 0;
-  const finishIn = markers ? ramp(frame, markers.from + secondsToFrames(0.3, fps), secondsToFrames(0.45, fps)) : 0;
-  const titleIn = title ? easeOutCubic(ramp(frame, title.from, title.to - title.from)) : 0;
+  const markerIn = markers
+    ? ramp(frame, markers.from, secondsToFrames(0.45, fps))
+    : 0;
+  const finishIn = markers
+    ? ramp(
+        frame,
+        markers.from + secondsToFrames(0.3, fps),
+        secondsToFrames(0.45, fps),
+      )
+    : 0;
+  const titleIn = title
+    ? easeOutCubic(ramp(frame, title.from, title.to - title.from))
+    : 0;
 
   return (
     <Stage theme={theme} seed={hashSeed(activity.id, "living-poster")}>
       <Grid theme={theme} opacity={gridIn * 0.5} />
-      <Route plan={plan} theme={theme} draw={draw} markerIn={markerIn} finishIn={finishIn} />
+      <Route
+        plan={plan}
+        theme={theme}
+        draw={draw}
+        markerIn={markerIn}
+        finishIn={finishIn}
+      />
       <Title activity={activity} theme={theme} reveal={titleIn} />
-      <Stats plan={plan} theme={theme} frame={frame} fps={fps} from={stats?.from ?? 0} />
+      <Stats
+        plan={plan}
+        theme={theme}
+        frame={frame}
+        fps={fps}
+        from={stats?.from ?? 0}
+      />
     </Stage>
   );
 }
@@ -84,10 +118,26 @@ function Grid({ theme, opacity }: { theme: Theme; opacity: number }) {
     <AbsoluteFill style={{ opacity }}>
       <svg width={CANVAS_WIDTH} height={CANVAS_HEIGHT}>
         {columns.map((x) => (
-          <line key={`c${x}`} x1={x} y1={SAFE_TOP} x2={x} y2={rows[rows.length - 1]} stroke={theme.hairline} strokeWidth={1} />
+          <line
+            key={`c${x}`}
+            x1={x}
+            y1={SAFE_TOP}
+            x2={x}
+            y2={rows[rows.length - 1]}
+            stroke={theme.hairline}
+            strokeWidth={1}
+          />
         ))}
         {rows.map((y) => (
-          <line key={`r${y}`} x1={PAGE_INSET} y1={y} x2={CANVAS_WIDTH - PAGE_INSET} y2={y} stroke={theme.hairline} strokeWidth={1} />
+          <line
+            key={`r${y}`}
+            x1={PAGE_INSET}
+            y1={y}
+            x2={CANVAS_WIDTH - PAGE_INSET}
+            y2={y}
+            stroke={theme.hairline}
+            strokeWidth={1}
+          />
         ))}
       </svg>
     </AbsoluteFill>
@@ -109,7 +159,9 @@ function Route({
   finishIn: number;
 }) {
   if (plan.projected.length < 2) return null;
-  const path = plan.projected.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
+  const path = plan.projected
+    .map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`)
+    .join(" ");
   const [startX, startY] = plan.projected[0];
   const [endX, endY] = plan.projected[plan.projected.length - 1];
   const startScale = easeOutBack(markerIn);
@@ -232,7 +284,9 @@ function Stats({
       }}
     >
       {plan.stats.map((stat, index) => {
-        const enter = easeOutCubic(ramp(frame, from + index * step, secondsToFrames(0.4, fps)));
+        const enter = easeOutCubic(
+          ramp(frame, from + index * step, secondsToFrames(0.4, fps)),
+        );
         if (enter <= 0) return null;
         return (
           <div

@@ -45,9 +45,7 @@ export function createPageMetadata({
     alternates: {
       canonical: paths[locale],
       languages: {
-        ...Object.fromEntries(
-          LOCALES.map((other) => [other, paths[other]]),
-        ),
+        ...Object.fromEntries(LOCALES.map((other) => [other, paths[other]])),
         "x-default": paths.en,
       },
     },

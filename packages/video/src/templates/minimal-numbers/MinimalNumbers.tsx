@@ -44,7 +44,10 @@ export type MinimalNumbersProps = {
  * activity carries: this is what renders when a run has nothing, and it has to
  * look like the choice rather than the fallback.
  */
-export function MinimalNumbers({ activity, theme: themeName }: MinimalNumbersProps) {
+export function MinimalNumbers({
+  activity,
+  theme: themeName,
+}: MinimalNumbersProps) {
   const frame = useCurrentFrame();
   const { fps, durationInFrames } = useVideoConfig();
   const theme = getTheme(themeName);
@@ -67,9 +70,16 @@ export function MinimalNumbers({ activity, theme: themeName }: MinimalNumbersPro
           beat={findBeat(plan.beats, moment.id)}
         />
       ))}
-      {final && frame >= final.from - secondsToFrames(HANDOVER_SECONDS, fps) && (
-        <FinalCard activity={activity} theme={theme} frame={frame} fps={fps} from={final.from} />
-      )}
+      {final &&
+        frame >= final.from - secondsToFrames(HANDOVER_SECONDS, fps) && (
+          <FinalCard
+            activity={activity}
+            theme={theme}
+            frame={frame}
+            fps={fps}
+            from={final.from}
+          />
+        )}
     </Stage>
   );
 }
@@ -118,7 +128,10 @@ function Moment({
   const opacity = entering * (1 - leaving);
   if (opacity <= 0) return null;
 
-  const count = beatProgress(frame, { ...beat, to: beat.from + secondsToFrames(COUNT_SECONDS, fps) });
+  const count = beatProgress(frame, {
+    ...beat,
+    to: beat.from + secondsToFrames(COUNT_SECONDS, fps),
+  });
   const value = countUpValue(moment.value, count, moment.from);
   const box = momentBox(moment.anchor);
 
@@ -144,7 +157,11 @@ function Moment({
       <div style={{ display: "flex", alignItems: "baseline", gap: 24 }}>
         {/* The unit rides beside the numeral, so the measure it is fitted to is
             the one it actually has. */}
-        <Numeral theme={theme} maxWidth={SAFE_WIDTH - (moment.unit ? 150 : 0)} maxSize={TYPE.display}>
+        <Numeral
+          theme={theme}
+          maxWidth={SAFE_WIDTH - (moment.unit ? 150 : 0)}
+          maxSize={TYPE.display}
+        >
           {spell(value, moment.format)}
         </Numeral>
         {moment.unit && (
@@ -153,7 +170,11 @@ function Moment({
           </Unit>
         )}
       </div>
-      <MetricLabel theme={theme} size={34} align={moment.anchor === "right" ? "right" : "left"}>
+      <MetricLabel
+        theme={theme}
+        size={34}
+        align={moment.anchor === "right" ? "right" : "left"}
+      >
         {moment.label}
       </MetricLabel>
     </div>
@@ -174,16 +195,32 @@ function FinalCard({
   fps: number;
   from: number;
 }) {
-  const enter = easeOutCubic(ramp(frame, from - secondsToFrames(HANDOVER_SECONDS, fps), secondsToFrames(0.5, fps)));
+  const enter = easeOutCubic(
+    ramp(
+      frame,
+      from - secondsToFrames(HANDOVER_SECONDS, fps),
+      secondsToFrames(0.5, fps),
+    ),
+  );
   const heartrate = activity.average_heartrate;
   // Only the tiles this run has. A grid that prints "0 m" of climb to fill its
   // fourth cell is the template admitting it wanted four.
   const tiles = [
     { label: "Distance", value: formatKm(activity.distance), unit: "km" },
     { label: "Moving time", value: formatClock(activity.moving_time) },
-    { label: "Average pace", value: formatPace(averagePace(activity)), unit: "/km" },
+    {
+      label: "Average pace",
+      value: formatPace(averagePace(activity)),
+      unit: "/km",
+    },
     ...(heartrate != null && heartrate > 0
-      ? [{ label: "Avg heart rate", value: String(Math.round(heartrate)), unit: "bpm" }]
+      ? [
+          {
+            label: "Avg heart rate",
+            value: String(Math.round(heartrate)),
+            unit: "bpm",
+          },
+        ]
       : activity.total_elevation_gain > 0
         ? [
             {
@@ -220,7 +257,14 @@ function FinalCard({
 
       <Rule theme={theme} margin="56px 0" />
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", rowGap: 48, columnGap: 24 }}>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr",
+          rowGap: 48,
+          columnGap: 24,
+        }}
+      >
         {tiles.map((tile) => (
           <MetricValue
             key={tile.label}

@@ -15,7 +15,9 @@ export function ModeToggle() {
       // Named rather than interpolated: "light" and "dark" are words, and a
       // sentence assembled from a translated frame and an English noun is the
       // classic way a localised label comes out half-English.
-      aria-label={next === "dark" ? t("theme.switchToDark") : t("theme.switchToLight")}
+      aria-label={
+        next === "dark" ? t("theme.switchToDark") : t("theme.switchToLight")
+      }
       onClick={() => setTheme(next)}
     >
       <SunIcon className="hidden dark:block" />

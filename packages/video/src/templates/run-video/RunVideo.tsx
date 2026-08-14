@@ -1,6 +1,18 @@
-import { AbsoluteFill, Easing, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
+import {
+  AbsoluteFill,
+  Easing,
+  interpolate,
+  useCurrentFrame,
+  useVideoConfig,
+} from "remotion";
 import type { VideoActivity, VideoStreams } from "../../types";
-import { avatarSource, DRAW_END, DRAW_START, fadeAt, metricsAtProgress } from "./data";
+import {
+  avatarSource,
+  DRAW_END,
+  DRAW_START,
+  fadeAt,
+  metricsAtProgress,
+} from "./data";
 import { RouteOverlay, StoryProgress, TYPE, Watermark } from "./overlay";
 import { RunMap } from "./RunMap";
 import { RouteFallback } from "./RouteFallback";
@@ -83,7 +95,8 @@ export function RunVideo({
             left: 0,
             right: 0,
             height: 560,
-            background: "linear-gradient(to bottom, rgba(0,0,0,0.88), rgba(0,0,0,0))",
+            background:
+              "linear-gradient(to bottom, rgba(0,0,0,0.88), rgba(0,0,0,0))",
           }}
         />
         <div
@@ -93,7 +106,8 @@ export function RunVideo({
             left: 0,
             right: 0,
             height: 780,
-            background: "linear-gradient(to top, rgba(0,0,0,0.92), rgba(0,0,0,0))",
+            background:
+              "linear-gradient(to top, rgba(0,0,0,0.92), rgba(0,0,0,0))",
           }}
         />
 

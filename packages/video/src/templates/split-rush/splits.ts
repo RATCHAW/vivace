@@ -57,7 +57,10 @@ const finite = (value: number | undefined): number =>
  * With no usable streams — a treadmill upload that carries only totals — the run
  * is split at its average pace, which is what it actually was.
  */
-export function computeSplits(activity: VideoActivity, streams: VideoStreams): Split[] {
+export function computeSplits(
+  activity: VideoActivity,
+  streams: VideoStreams,
+): Split[] {
   const distance = streams.distance?.data;
   const time = streams.time?.data;
   const samples = Math.min(distance?.length ?? 0, time?.length ?? 0);
@@ -72,7 +75,9 @@ export function computeSplits(activity: VideoActivity, streams: VideoStreams): S
     index,
     label: formatSplitLabel(split.distanceMeters, index, split.partial),
     paceSecondsPerKm:
-      split.distanceMeters > 0 ? (split.seconds * SPLIT_METERS) / split.distanceMeters : 0,
+      split.distanceMeters > 0
+        ? (split.seconds * SPLIT_METERS) / split.distanceMeters
+        : 0,
   }));
 }
 
@@ -100,7 +105,11 @@ function splitsFromStreams(
     while (splitMeters + remaining >= SPLIT_METERS) {
       const needed = SPLIT_METERS - splitMeters;
       const share = (needed / remaining) * seconds;
-      splits.push({ distanceMeters: SPLIT_METERS, seconds: splitSeconds + share, partial: false });
+      splits.push({
+        distanceMeters: SPLIT_METERS,
+        seconds: splitSeconds + share,
+        partial: false,
+      });
       remaining -= needed;
       seconds -= share;
       splitMeters = 0;
@@ -147,7 +156,10 @@ function evenSplits(activity: VideoActivity): RawSplit[] {
  * them. A ratio outside a factor of two means the streams are describing a
  * different activity, and then the streams win.
  */
-function scaleToMovingTime(splits: RawSplit[], activity: VideoActivity): RawSplit[] {
+function scaleToMovingTime(
+  splits: RawSplit[],
+  activity: VideoActivity,
+): RawSplit[] {
   const total = splits.reduce((sum, split) => sum + split.seconds, 0);
   const moving = activity.moving_time;
   if (total <= 0 || moving <= 0) return splits;
@@ -194,15 +206,20 @@ export function encodeSplits(splits: Split[]): SplitEncoding {
   if (splits.length === 0) return { widths: [], fastestIndex: -1, flat: true };
   const full = splits.filter((split) => !split.partial);
   const pool = full.length > 0 ? full : splits;
-  const speed = (split: Split) => (split.seconds > 0 ? split.distanceMeters / split.seconds : 0);
+  const speed = (split: Split) =>
+    split.seconds > 0 ? split.distanceMeters / split.seconds : 0;
   const speeds = pool.map(speed);
   const fastest = Math.max(...speeds);
   const slowest = Math.min(...speeds);
-  const mean = speeds.reduce((sum, value) => sum + value, 0) / Math.max(1, speeds.length);
+  const mean =
+    speeds.reduce((sum, value) => sum + value, 0) / Math.max(1, speeds.length);
   const flat = mean <= 0 || (fastest - slowest) / mean < FLAT_SPREAD;
 
   const widths = splits.map((split) => {
-    const normalised = flat ? FLAT_BAR : MIN_BAR + ((speed(split) - slowest) / (fastest - slowest)) * (1 - MIN_BAR);
+    const normalised = flat
+      ? FLAT_BAR
+      : MIN_BAR +
+        ((speed(split) - slowest) / (fastest - slowest)) * (1 - MIN_BAR);
     // A partial split's bar is cut to the distance it covered: a 400 m tail that
     // drew a full-width bar would claim a kilometre that wasn't run.
     const fraction = split.partial ? split.distanceMeters / SPLIT_METERS : 1;
@@ -213,7 +230,9 @@ export function encodeSplits(splits: Split[]): SplitEncoding {
     ? -1
     : splits.reduce(
         (best, split, index) =>
-          split.partial || (best >= 0 && speed(splits[best]) >= speed(split)) ? best : index,
+          split.partial || (best >= 0 && speed(splits[best]) >= speed(split))
+            ? best
+            : index,
         -1,
       );
 
@@ -250,9 +269,11 @@ export function splitStats(splits: Split[]): SplitStats {
   const full = splits.filter((split) => !split.partial);
   const pool = full.length > 0 ? full : splits;
   const paces = pool.map((split) => split.paceSecondsPerKm);
-  const mean = paces.reduce((sum, pace) => sum + pace, 0) / Math.max(1, paces.length);
+  const mean =
+    paces.reduce((sum, pace) => sum + pace, 0) / Math.max(1, paces.length);
   const variance =
-    paces.reduce((sum, pace) => sum + (pace - mean) ** 2, 0) / Math.max(1, paces.length);
+    paces.reduce((sum, pace) => sum + (pace - mean) ** 2, 0) /
+    Math.max(1, paces.length);
 
   const half = Math.floor(pool.length / 2);
   const average = (from: number, to: number) => {
@@ -299,7 +320,10 @@ export function splitStats(splits: Split[]): SplitStats {
  * yet" — that claim needs the athlete's last ten runs, and this template is
  * handed exactly one.
  */
-export function chooseVerdict(splits: Split[], activity: VideoActivity): Verdict {
+export function chooseVerdict(
+  splits: Split[],
+  activity: VideoActivity,
+): Verdict {
   const fallback: Verdict = {
     id: "average-pace",
     headline: `Average pace — ${formatPace(averagePace(activity))}`,
@@ -315,8 +339,13 @@ export function chooseVerdict(splits: Split[], activity: VideoActivity): Verdict
   // split; it ran the pace it was set to, and saying so is the whole verdict.
   if (encoding.flat) return fallback;
 
-  if (stats.firstHalfPace > 0 && stats.secondHalfPace <= stats.firstHalfPace * 0.99) {
-    const gain = Math.round((1 - stats.secondHalfPace / stats.firstHalfPace) * 100);
+  if (
+    stats.firstHalfPace > 0 &&
+    stats.secondHalfPace <= stats.firstHalfPace * 0.99
+  ) {
+    const gain = Math.round(
+      (1 - stats.secondHalfPace / stats.firstHalfPace) * 100,
+    );
     return {
       id: "negative-split",
       headline: "Negative split",
@@ -342,7 +371,11 @@ export function chooseVerdict(splits: Split[], activity: VideoActivity): Verdict
   }
 
   const fastest = splits[encoding.fastestIndex];
-  if (fastest && stats.meanPace > 0 && fastest.paceSecondsPerKm <= stats.meanPace * 0.9) {
+  if (
+    fastest &&
+    stats.meanPace > 0 &&
+    fastest.paceSecondsPerKm <= stats.meanPace * 0.9
+  ) {
     return {
       id: "fastest-split",
       headline: `Fastest km — ${formatPace(fastest.paceSecondsPerKm)}`,
@@ -395,7 +428,10 @@ const SPAN = {
 
 /** Seconds of film for a given run — variable by design. A five-kilometre run
  *  has less to say than a marathon and shouldn't be padded to the same length. */
-export function splitRushSeconds(activity: VideoActivity, streams: VideoStreams): number {
+export function splitRushSeconds(
+  activity: VideoActivity,
+  streams: VideoStreams,
+): number {
   const splits = computeSplits(activity, streams);
   const encoding = encodeSplits(splits);
   // Nothing to isolate and nothing to compare: the film is the totals, so it
@@ -427,9 +463,11 @@ export function splitRushPlan(
   const encoding = encodeSplits(splits);
   const verdict = chooseVerdict(splits, activity);
   const stats = splitStats(splits);
-  const mode: SplitRushMode = splits.length > CASCADE_LIMIT ? "strip" : "cascade";
+  const mode: SplitRushMode =
+    splits.length > CASCADE_LIMIT ? "strip" : "cascade";
 
-  const byIndex = (index: number) => splits.find((split) => split.index === index) ?? null;
+  const byIndex = (index: number) =>
+    splits.find((split) => split.index === index) ?? null;
   const full = splits.filter((split) => !split.partial);
   const heroes =
     mode === "strip"
@@ -437,8 +475,10 @@ export function splitRushPlan(
           byIndex(encoding.fastestIndex),
           full[full.length - 1] ?? null,
           byIndex(stats.breakawayIndex),
-        ].filter((split, index, list) =>
-          Boolean(split) && list.findIndex((other) => other?.index === split?.index) === index,
+        ].filter(
+          (split, index, list) =>
+            Boolean(split) &&
+            list.findIndex((other) => other?.index === split?.index) === index,
         ) as Split[])
       : [];
 
@@ -451,29 +491,31 @@ export function splitRushPlan(
   const rows: SplitRow[] = splits.map((_, index) => ({
     top: top + index * height,
     height,
-    barHeight: Math.max(6, Math.round(height * (mode === "cascade" ? 0.42 : 0.5))),
+    barHeight: Math.max(
+      6,
+      Math.round(height * (mode === "cascade" ? 0.42 : 0.5)),
+    ),
   }));
 
-  const spans =
-    encoding.flat
+  const spans = encoding.flat
+    ? [
+        { id: "title", seconds: SPAN.title },
+        { id: "splits", seconds: 3.5 },
+        { id: "verdict", seconds: SPAN.verdict },
+      ]
+    : mode === "strip"
       ? [
           { id: "title", seconds: SPAN.title },
-          { id: "splits", seconds: 3.5 },
+          { id: "splits", seconds: SPAN.strip },
+          { id: "heroes", seconds: SPAN.hero * Math.max(1, heroes.length) },
           { id: "verdict", seconds: SPAN.verdict },
         ]
-      : mode === "strip"
-        ? [
-            { id: "title", seconds: SPAN.title },
-            { id: "splits", seconds: SPAN.strip },
-            { id: "heroes", seconds: SPAN.hero * Math.max(1, heroes.length) },
-            { id: "verdict", seconds: SPAN.verdict },
-          ]
-        : [
-            { id: "title", seconds: SPAN.title },
-            { id: "splits", seconds: splits.length * SPAN.cascadeStep },
-            { id: "isolate", seconds: SPAN.isolate },
-            { id: "verdict", seconds: SPAN.verdict },
-          ];
+      : [
+          { id: "title", seconds: SPAN.title },
+          { id: "splits", seconds: splits.length * SPAN.cascadeStep },
+          { id: "isolate", seconds: SPAN.isolate },
+          { id: "verdict", seconds: SPAN.verdict },
+        ];
 
   return {
     splits,
@@ -487,13 +529,20 @@ export function splitRushPlan(
 }
 
 /** The frame a given split's row enters on. */
-export function splitEntryFrame(plan: SplitRushPlan, index: number, fps: number): number {
+export function splitEntryFrame(
+  plan: SplitRushPlan,
+  index: number,
+  fps: number,
+): number {
   const beat = plan.beats.find((entry) => entry.id === "splits");
   if (!beat) return 0;
   const step =
     plan.mode === "strip"
       ? secondsToFrames(0.04, fps)
-      : Math.max(1, Math.floor((beat.to - beat.from) / Math.max(1, plan.splits.length)));
+      : Math.max(
+          1,
+          Math.floor((beat.to - beat.from) / Math.max(1, plan.splits.length)),
+        );
   return beat.from + index * step;
 }
 

@@ -60,8 +60,7 @@ const en: Record<ContentPageKey, ContentPage> = {
       "Vivace turns Strava runs into shareable vertical films with an animated route, live effort and a clean summary.",
     eyebrow: "About Vivace",
     heading: "Runs deserve a finish line after the finish line.",
-    lead:
-      "Vivace turns the activity already in Strava into a short vertical film that feels worth watching and sharing.",
+    lead: "Vivace turns the activity already in Strava into a short vertical film that feels worth watching and sharing.",
     sections: [
       {
         heading: "What Vivace makes",
@@ -91,8 +90,7 @@ const en: Record<ContentPageKey, ContentPage> = {
       "Contact Vivace for product support, privacy and Strava data requests, or partnership questions.",
     eyebrow: "Contact",
     heading: "Talk to a human.",
-    lead:
-      "Questions, rough edges and privacy requests all reach the same inbox: hello@vivace.run.",
+    lead: "Questions, rough edges and privacy requests all reach the same inbox: hello@vivace.run.",
     sections: [
       {
         heading: "Product support",
@@ -139,8 +137,7 @@ const en: Record<ContentPageKey, ContentPage> = {
       "How Vivace collects, uses, stores and deletes account, Strava, video, coach and analytics data.",
     eyebrow: "Privacy",
     heading: "Privacy, in plain language.",
-    lead:
-      "Vivace uses your information to show your own activities, make your films and provide the features you choose. We do not sell your personal data.",
+    lead: "Vivace uses your information to show your own activities, make your films and provide the features you choose. We do not sell your personal data.",
     updated: "Last updated 14 August 2026",
     sections: [
       {
@@ -192,8 +189,7 @@ const en: Record<ContentPageKey, ContentPage> = {
       "The terms for using the Vivace alpha, connecting Strava and creating shareable run replay videos.",
     eyebrow: "Terms",
     heading: "Terms for the Vivace alpha.",
-    lead:
-      "These terms describe the current alpha service. By using Vivace, you agree to use it responsibly and only with accounts and activity data you are allowed to access.",
+    lead: "These terms describe the current alpha service. By using Vivace, you agree to use it responsibly and only with accounts and activity data you are allowed to access.",
     updated: "Last updated 14 August 2026",
     sections: [
       {
@@ -248,8 +244,7 @@ const en: Record<ContentPageKey, ContentPage> = {
       "Which Strava permissions Vivace requests, what activity data it reads, and how to disconnect or request deletion.",
     eyebrow: "Strava data use",
     heading: "Your Strava data stays about you.",
-    lead:
-      "Vivace reads the data needed to show your history, make your films and answer your own training questions. It does not write to your Strava account.",
+    lead: "Vivace reads the data needed to show your history, make your films and answer your own training questions. It does not write to your Strava account.",
     updated: "Last updated 14 August 2026",
     sections: [
       {
@@ -304,8 +299,7 @@ const fr: Record<ContentPageKey, ContentPage> = {
       "Vivace transforme les courses Strava en films verticaux à partager, avec tracé animé, effort en direct et bilan clair.",
     eyebrow: "À propos de Vivace",
     heading: "Une course mérite une suite après la ligne d’arrivée.",
-    lead:
-      "Vivace transforme l’activité déjà présente dans Strava en un court film vertical qui mérite d’être regardé et partagé.",
+    lead: "Vivace transforme l’activité déjà présente dans Strava en un court film vertical qui mérite d’être regardé et partagé.",
     sections: [
       {
         heading: "Ce que crée Vivace",
@@ -335,8 +329,7 @@ const fr: Record<ContentPageKey, ContentPage> = {
       "Contactez Vivace pour l’assistance produit, les demandes de confidentialité et de données Strava, ou les partenariats.",
     eyebrow: "Contact",
     heading: "Parlez à une personne.",
-    lead:
-      "Questions, problèmes et demandes de confidentialité arrivent dans la même boîte : hello@vivace.run.",
+    lead: "Questions, problèmes et demandes de confidentialité arrivent dans la même boîte : hello@vivace.run.",
     sections: [
       {
         heading: "Assistance produit",
@@ -383,8 +376,7 @@ const fr: Record<ContentPageKey, ContentPage> = {
       "Comment Vivace collecte, utilise, conserve et supprime les données de compte, Strava, vidéo, coach et analytics.",
     eyebrow: "Confidentialité",
     heading: "La confidentialité, sans détour.",
-    lead:
-      "Vivace utilise vos informations pour afficher vos propres activités, créer vos films et fournir les fonctions que vous choisissez. Nous ne vendons pas vos données personnelles.",
+    lead: "Vivace utilise vos informations pour afficher vos propres activités, créer vos films et fournir les fonctions que vous choisissez. Nous ne vendons pas vos données personnelles.",
     updated: "Dernière mise à jour : 14 août 2026",
     sections: [
       {
@@ -436,8 +428,7 @@ const fr: Record<ContentPageKey, ContentPage> = {
       "Les conditions d’utilisation de l’alpha Vivace, de la connexion à Strava et de la création de replays de course à partager.",
     eyebrow: "Conditions",
     heading: "Les conditions de l’alpha Vivace.",
-    lead:
-      "Ces conditions décrivent le service alpha actuel. En utilisant Vivace, vous acceptez de le faire de manière responsable et uniquement avec des comptes et activités auxquels vous avez le droit d’accéder.",
+    lead: "Ces conditions décrivent le service alpha actuel. En utilisant Vivace, vous acceptez de le faire de manière responsable et uniquement avec des comptes et activités auxquels vous avez le droit d’accéder.",
     updated: "Dernière mise à jour : 14 août 2026",
     sections: [
       {
@@ -492,8 +483,7 @@ const fr: Record<ContentPageKey, ContentPage> = {
       "Les autorisations Strava demandées par Vivace, les données d’activité lues et les moyens de se déconnecter ou demander une suppression.",
     eyebrow: "Données Strava",
     heading: "Vos données Strava restent centrées sur vous.",
-    lead:
-      "Vivace lit les données nécessaires pour afficher votre historique, créer vos films et répondre à vos propres questions d’entraînement. Rien n’est écrit sur votre compte Strava.",
+    lead: "Vivace lit les données nécessaires pour afficher votre historique, créer vos films et répondre à vos propres questions d’entraînement. Rien n’est écrit sur votre compte Strava.",
     updated: "Dernière mise à jour : 14 août 2026",
     sections: [
       {

@@ -11,10 +11,9 @@ import type { Locale } from "@/i18n/config";
  * of them and docker-compose supplies two — and an empty string is not nullish,
  * so `??` would hand the fallback back and let `""` through.
  */
-const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "http://localhost:5173").replace(
-  /\/$/,
-  "",
-);
+const appUrl = (
+  process.env.NEXT_PUBLIC_APP_URL || "http://localhost:5173"
+).replace(/\/$/, "");
 
 /**
  * Strava is the only way in — the app redirects straight to OAuth from here.

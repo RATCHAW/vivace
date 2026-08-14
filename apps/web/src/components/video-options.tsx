@@ -1,5 +1,11 @@
 import { useTranslation } from "react-i18next";
-import { getTemplate, THEMES, THEME_NAMES, type TemplateId, type ThemeName } from "@repo/video";
+import {
+  getTemplate,
+  THEMES,
+  THEME_NAMES,
+  type TemplateId,
+  type ThemeName,
+} from "@repo/video";
 import { useVideoLabels } from "@/i18n/video";
 import { MonoLabel } from "@/components/mono";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -52,7 +58,10 @@ export function VideoOptions({
   if (!themeSupported && !avatarSupported) return null;
 
   return (
-    <section aria-label={t("videoOptions.section")} className="mt-5 flex flex-col gap-3">
+    <section
+      aria-label={t("videoOptions.section")}
+      className="mt-5 flex flex-col gap-3"
+    >
       <MonoLabel>{t("videoOptions.section")}</MonoLabel>
 
       {themeSupported && <ThemePicker theme={theme} onChange={onThemeChange} />}
@@ -62,10 +71,15 @@ export function VideoOptions({
         <div className="bg-muted/40 flex items-center gap-4 rounded-md border px-5 py-4">
           <Avatar className="ph-no-capture size-9">
             <AvatarImage src={avatarUrl || undefined} alt="" />
-            <AvatarFallback>{name.charAt(0).toUpperCase() || "?"}</AvatarFallback>
+            <AvatarFallback>
+              {name.charAt(0).toUpperCase() || "?"}
+            </AvatarFallback>
           </Avatar>
 
-          <Label htmlFor="show-avatar" className="flex min-w-0 flex-col items-start gap-1">
+          <Label
+            htmlFor="show-avatar"
+            className="flex min-w-0 flex-col items-start gap-1"
+          >
             <span className="text-body-sm font-semibold">
               {t("videoOptions.runAsAvatar")}
             </span>
@@ -123,7 +137,9 @@ function ThemePicker({
             onClick={() => onChange(name)}
             className={cn(
               "text-body-sm focus-visible:ring-ring/50 inline-flex h-12 items-center gap-2.5 rounded-full border px-4 font-semibold outline-none focus-visible:ring-3",
-              name === theme ? "bg-muted border-transparent" : "text-muted-foreground hover:bg-muted/40",
+              name === theme
+                ? "bg-muted border-transparent"
+                : "text-muted-foreground hover:bg-muted/40",
             )}
           >
             {/* The swatch is the theme's own canvas and accent — the only place
