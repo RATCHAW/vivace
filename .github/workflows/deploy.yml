@@ -13,11 +13,11 @@ name: Deploy
 #      build time, so a second commit landing mid-build would deploy something
 #      CI never saw. Pinning `git_commit_sha` first removes that gap.
 #
-# Coolify's pre/post-deployment command must be EMPTY too (Application ->
-# Advanced). It ran `pnpm --filter @repo/api auth:migrate` inside the container,
-# which the hardened image cannot execute: no pnpm, and no migration CLI in a
-# `--prod` install. The API migrates the schema itself before it binds the port —
-# see apps/api/src/db/migrate.ts.
+# Coolify's pre-deployment command is cleared by this workflow rather than left
+# to the UI — see "Point Coolify at this commit". It ran
+# `pnpm --filter @repo/api auth:migrate`, which the hardened image cannot
+# execute: no pnpm, and no migration CLI in a `--prod` install. The API migrates
+# the schema itself before it binds the port — see apps/api/src/db/migrate.ts.
 #
 # apps/web and apps/landing are deliberately not here: they go to Vercel through
 # its own git integration, which has no env coupling to sequence and gives
@@ -185,13 +185,35 @@ jobs:
           SHA: ${{ needs.check.outputs.sha }}
         run: |
           set -euo pipefail
-          # Without this, the build takes whatever is at the branch head when it
-          # starts, which is not necessarily what the check job just validated.
+
+          # The pre-deployment command lives in Coolify's own database, so no
+          # commit can change it and no review can see it. It held
+          # `pnpm --filter @repo/api auth:migrate`, which the hardened image
+          # cannot run — no pnpm, no migration CLI in a `--prod` install — and
+          # every deploy died on it at exit 127 before a container ever started.
+          #
+          # The schema now migrates inside the API, in front of `serve`
+          # (apps/api/src/db/migrate.ts), so the field must be empty. Clearing it
+          # here rather than in the UI makes this file the source of truth for
+          # it: restore the app from a backup, or point this at a second
+          # environment, and the setting cannot come back wrong.
+          previous=$(curl -sS -f \
+            "$COOLIFY_URL/api/v1/applications/$APP_UUID" \
+            -H "Authorization: Bearer $COOLIFY_TOKEN" \
+            | jq -r '.pre_deployment_command // ""')
+          if [ -n "$previous" ]; then
+            echo "::warning::Cleared a pre-deployment command set outside this repository: $previous"
+          fi
+
+          # `git_commit_sha`: without it the build takes whatever is at the
+          # branch head when it starts, which is not necessarily what the check
+          # job just validated.
           curl -sS -f -X PATCH \
             "$COOLIFY_URL/api/v1/applications/$APP_UUID" \
             -H "Authorization: Bearer $COOLIFY_TOKEN" \
             -H 'Content-Type: application/json' \
-            --data "$(jq -nc --arg sha "$SHA" '{git_commit_sha:$sha}')" >/dev/null
+            --data "$(jq -nc --arg sha "$SHA" \
+              '{git_commit_sha:$sha, pre_deployment_command:""}')" >/dev/null
           echo "pinned to $SHA"
 
       - name: Push the render variables to Coolify
