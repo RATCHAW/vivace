@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import { Trans, useTranslation } from "react-i18next";
 import { ArrowLeftIcon, Loader2Icon } from "lucide-react";
+import { useFormatters } from "@/i18n/format";
 // Fully typed off the API's OpenAPI document — see apps/web/src/api.
 import {
   getRunsOptions,
@@ -40,24 +42,17 @@ import {
 // route canvas in the meantime.
 const MAPBOX_TOKEN: string = import.meta.env.VITE_MAPBOX_TOKEN ?? "";
 
-/** Sports the filter row will one day hold. Runs are the only live one. */
-const FUTURE_FILTERS = ["Rides", "Weights"];
-
-/** start_date_local carries the local clock with a Z suffix — format in UTC. */
-function runDate(run: Run): string {
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    timeZone: "UTC",
-  }).format(new Date(run.start_date_local));
-}
+/** Sports the filter row will one day hold. Runs are the only live one.
+ *  Catalogue keys, not words — `t` isn't in scope at module level. */
+const FUTURE_FILTERS = ["sports.rides", "sports.weights"] as const;
 
 function averagePaceSeconds(run: Run): number | null {
   return run.average_speed > 0 ? 1000 / run.average_speed : null;
 }
 
 export function Runs() {
+  const { t } = useTranslation();
+  const format = useFormatters();
   // The selected run lives in the URL, so a replay can be linked to — the
   // Overview's "Replay →" rows and the player's Share button both point here.
   const [params, setParams] = useSearchParams();
@@ -105,29 +100,29 @@ export function Runs() {
           <Button
             variant="subtle"
             size="icon"
-            aria-label="Back to overview"
+            aria-label={t("runs.backToOverview")}
             render={<Link to="/" />}
           >
             <ArrowLeftIcon />
           </Button>
-          <h1 className="font-heading text-display-lg">Your runs</h1>
+          <h1 className="font-heading text-display-lg">{t("runs.title")}</h1>
           {runs && (
             <MonoLabel className="ml-auto">
-              {runs.length} activities · synced from Strava
+              {t("runs.syncCount", { count: runs.length })}
             </MonoLabel>
           )}
         </header>
 
         <div className="mb-7 flex flex-wrap gap-2">
           <span className="bg-muted text-body-sm inline-flex h-9 items-center rounded-full px-4 font-semibold">
-            Runs
+            {t("sports.runs")}
           </span>
           {FUTURE_FILTERS.map((filter) => (
             <span
               key={filter}
               className="text-body-sm text-muted-foreground/60 inline-flex h-9 items-center gap-2 rounded-full border px-3.5 font-semibold"
             >
-              {filter}
+              {t(filter)}
               <SoonBadge />
             </span>
           ))}
@@ -141,10 +136,10 @@ export function Runs() {
         >
           {/* Theatre mode gives the 9:16 the whole row rather than shrinking
               the list beside it. */}
-          <section aria-label="Runs" className={cn(expanded && "hidden")}>
+          <section aria-label={t("runs.listLabel")} className={cn(expanded && "hidden")}>
             {runsError && (
               <Alert variant="destructive">
-                <AlertTitle>Could not load your runs</AlertTitle>
+                <AlertTitle>{t("runs.errorTitle")}</AlertTitle>
                 <AlertDescription>{runsError.error}</AlertDescription>
               </Alert>
             )}
@@ -165,7 +160,7 @@ export function Runs() {
             {runs && runs.length === 0 && (
               <Card className="bg-background">
                 <CardContent className="text-muted-foreground py-10 text-center">
-                  No runs yet — go log one on Strava and come back.
+                  {t("runs.noRuns")}
                 </CardContent>
               </Card>
             )}
@@ -195,15 +190,18 @@ export function Runs() {
                     <span className="flex min-w-0 flex-col gap-1.5">
                       <span className="text-body-md font-semibold">{run.name}</span>
                       <span className="text-caption text-muted-foreground truncate">
-                        {runDate(run)} · {formatClock(run.moving_time)} ·{" "}
-                        {formatPace(averagePaceSeconds(run))} /km
+                        {format.runDate(run.start_date_local)} ·{" "}
+                        {formatClock(run.moving_time)} ·{" "}
+                        {formatPace(averagePaceSeconds(run))} {t("common.perKm")}
                       </span>
                     </span>
                     <span className="ml-auto flex shrink-0 items-baseline gap-1 tabular-nums">
                       <span className="text-heading-sm">
                         {(run.distance / 1000).toFixed(2)}
                       </span>
-                      <span className="text-caption text-stone">km</span>
+                      <span className="text-caption text-stone">
+                        {t("common.km")}
+                      </span>
                     </span>
                   </button>
                 ))}
@@ -212,7 +210,7 @@ export function Runs() {
           </section>
 
           <section
-            aria-label="Run replay"
+            aria-label={t("runs.replayLabel")}
             className={cn(!expanded && "lg:sticky lg:top-10")}
           >
             {/* Theatre mode hides the list and centres the film; everything
@@ -236,11 +234,11 @@ export function Runs() {
               {!selected || (!streams && !streamsError) ? (
                 <div className="flex aspect-9/16 w-full items-center justify-center rounded-lg border bg-black">
                   <Loader2Icon className="text-muted-foreground size-6 animate-spin" />
-                  <span className="sr-only">Loading run replay…</span>
+                  <span className="sr-only">{t("runs.loadingReplay")}</span>
                 </div>
               ) : streamsError ? (
                 <Alert variant="destructive">
-                  <AlertTitle>Could not load this run</AlertTitle>
+                  <AlertTitle>{t("runs.loadRunError")}</AlertTitle>
                   <AlertDescription>{streamsError.error}</AlertDescription>
                 </Alert>
               ) : (
@@ -308,9 +306,10 @@ export function Runs() {
 
               {!MAPBOX_TOKEN && getTemplate(template).usesMap && (
                 <p className="text-caption text-stone mt-4">
-                  No Mapbox token configured — the replay draws the route on a
-                  plain canvas. Set <code>VITE_MAPBOX_TOKEN</code> in{" "}
-                  <code>apps/web/.env</code> to get the full map.
+                  {/* The two <code> spans are part of the sentence, so the
+                      translation owns where they fall — a French clause puts
+                      the filename somewhere an English one does not. */}
+                  <Trans i18nKey="runs.noMapboxToken" components={{ code: <code /> }} />
                 </p>
               )}
             </div>

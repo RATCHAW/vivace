@@ -4,6 +4,9 @@ Turborepo + pnpm workspaces. `apps/api` (Hono), `apps/web` (Vite + React),
 `apps/landing` (Next.js marketing page), `packages/strava-api` (generated Strava
 SDK), `packages/video` (Remotion templates). See [README](./README.md) for setup.
 
+Both front ends ship in English and French — no user-facing string is written
+inline. See [Copy](#copy--english-and-french-never-inline).
+
 ## API contract — generated, never hand-written
 
 Three artifacts are produced by codegen and **committed**. Never edit them by hand;
@@ -259,10 +262,62 @@ session, no generated API client, no router. It links to the app, it never calls
   light token set with `.band-light` (see the two `<section>`s that use it).
   Consequence: `dark:` variants never fire — style with tokens only.
 - **Links out go through `src/lib/site.ts`.** `NEXT_PUBLIC_APP_URL` is inlined at
-  build time, so it is a Docker build arg, not a runtime env var.
+  build time, so it is a Docker build arg, not a runtime env var. `signInUrl` is
+  a *function* of the locale — see the i18n section below.
+- **Every page lives under `app/[locale]`.** `generateStaticParams` prerenders
+  `/en` and `/fr`; `src/proxy.ts` is the only per-request code and all it does is
+  redirect `/`. A new route goes inside the segment, or it has no language.
 - Hero-replay maths lives in `src/lib/replay.ts` as pure functions of `t` and is
   unit-tested. Keep it pure — the server and the first client frame must agree, or
   React logs a hydration mismatch.
+
+## Copy — English and French, never inline
+
+Both apps ship EN and FR. A user-facing string belongs in a catalogue, and the
+two catalogues are typed against each other so a missing translation is a
+`pnpm typecheck` failure rather than an English sentence in a French screen.
+
+The two apps use **different machinery on purpose** — they have different
+rendering models, and the same rule about the module graph applies here as to
+`button.tsx`: they share a vocabulary, not a package.
+
+| | `apps/web` | `apps/landing` |
+| --- | --- | --- |
+| Machinery | i18next + react-i18next | a plain typed dictionary |
+| Catalogue | `src/i18n/messages/{en,fr}.ts` | `src/i18n/messages/{en,fr}.ts` |
+| Reaching it | `const { t } = useTranslation()` | `copy` prop, from `getDictionary(locale)` |
+| Choosing it | detector: `?lang=` → localStorage → browser | `src/proxy.ts`: cookie → `Accept-Language` |
+| Switcher | `<LanguageToggle>` (menu, client) | `<LanguageSwitcher>` (two links, server) |
+
+- **`apps/landing` gets no i18n runtime, deliberately.** The page is Server
+  Components end to end and has to stay prerenderable, so the dictionary is read
+  on the server and only rendered strings reach the browser. Sections take a
+  `copy` prop — context would need a client boundary, which is the thing being
+  avoided. Reach for `next-intl` when the copy needs plurals or dates, not before.
+- **`fr.ts` is typed `Translated<Messages>`** — the English catalogue's shape with
+  its literals widened to `string`. Add a key in English and the French file stops
+  compiling, which is the point. `messages.test.ts` catches what the type cannot:
+  an empty string, a dropped `{{placeholder}}`, an array that lost an entry.
+- **Dates go through `src/i18n/format.ts` (web), never `Intl` at a call site.**
+  Every formatter reads its locale from the language in force and formats in UTC —
+  `start_date_local` carries the athlete's wall clock with a `Z` suffix, so a run
+  at 23:30 on New Year's Eve lands in the wrong year otherwise.
+- **The two apps hand the language over in the URL.** A landing CTA leaves for
+  `/login?lang=fr`, and `?lang=` is the first thing web's detector reads. That is
+  the whole handoff: no shared cookie, no shared origin assumption.
+- **`packages/video` keeps its English.** It is React-free and it runs on Lambda,
+  where no catalogue is loaded. `apps/web` translates the catalogue *by id*
+  through `src/i18n/video.ts` and falls back to the package's own words, so a
+  template added without a translation still renders. Eligibility reasons carry a
+  `reasonKey` for the same reason — matching on the English sentence would break
+  silently the first time it was reworded.
+- **A chip that is also a question is one string.** The coach's suggestion chips
+  are stored as catalogue *keys* and translated at render, because the same text
+  is shown on the chip and sent to the model — a French athlete's question should
+  reach the coach in French.
+- **Server-generated copy is not covered.** Coach answers, card sentences, signal
+  labels and API error messages are written in `apps/api` and are English in both
+  languages. Localising those is an API change, not a front-end one.
 
 ## Checks
 

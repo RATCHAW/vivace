@@ -5,10 +5,13 @@
 // opens the handful of questions asked over and over, and the chips underneath
 // follow whatever the coach just drew.
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { AtSignIcon, XIcon } from "lucide-react";
 import { toast } from "sonner";
 import type { ChatStatus } from "ai";
 import type { Run } from "@/api";
+import { useFormatters, type Formatters } from "@/i18n/format";
+import type { TranslationKey } from "@/i18n";
 import {
   PromptInput,
   PromptInputActionAddAttachments,
@@ -48,30 +51,21 @@ const MAX_FILES = 4;
 /** How many recent runs the `@` picker offers before you have to scroll. */
 const PICKER_RUNS = 8;
 
-/** The five questions worth a keystroke. */
-export const SLASH_COMMANDS = [
-  { name: "/week", desc: "Write the next seven days", ask: "Plan my week" },
-  {
-    name: "/review",
-    desc: "Read my last long run split by split",
-    ask: "Read my last long run split by split",
-  },
-  {
-    name: "/race",
-    desc: "Predict my races from best efforts",
-    ask: "What could I race today?",
-  },
-  {
-    name: "/load",
-    desc: "Check my volume ramp and load ratio",
-    ask: "Am I ramping too fast?",
-  },
-  {
-    name: "/goal",
-    desc: "Set or change the goal race",
-    ask: "I want to change my goal race",
-  },
-] as const;
+/**
+ * The five questions worth a keystroke.
+ *
+ * The trigger itself is translated along with the description — `/semaine`
+ * rather than `/week` — because a shortcut nobody can guess is not a shortcut.
+ * The filter below matches on whatever string the catalogue supplies, so
+ * nothing else has to know which language is in force.
+ */
+const SLASH_COMMANDS = [
+  { key: "composer.commands.week", ask: "coach.suggestions.planWeek" },
+  { key: "composer.commands.review", ask: "coach.suggestions.readLongRunSplits" },
+  { key: "composer.commands.race", ask: "coach.followUps.raceToday" },
+  { key: "composer.commands.load", ask: "coach.followUps.rampingTooFast" },
+  { key: "composer.commands.goal", ask: "rail.askChangeGoal" },
+] as const satisfies readonly { key: string; ask: TranslationKey }[];
 
 /** The run a message is about, as the chip renders it. */
 export interface RunMention {
@@ -81,27 +75,26 @@ export interface RunMention {
   date: string;
 }
 
-/** `Aug 5 · 15.02 km` — how a run reads in a chip or a picker row. */
-export function runLabel(run: Run): string {
-  const date = new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    timeZone: "UTC",
-  }).format(new Date(run.start_date_local));
-  return `${date} · ${(run.distance / 1000).toFixed(2)} km`;
+/** `5 Aug · 15.02 km` — how a run reads in a chip or a picker row. */
+export function runLabel(run: Run, format: Formatters): string {
+  return `${format.shortDate(run.start_date_local)} · ${(
+    run.distance / 1000
+  ).toFixed(2)} km`;
 }
 
 export function toMention(run: Run): RunMention {
   return { id: run.id, name: run.name, date: run.start_date_local.slice(0, 10) };
 }
 
-/** `Aug 5` from a mention's stored date, without re-reading the run. */
-export function mentionLabel(mention: RunMention): string {
-  return `${mention.name} · ${new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    timeZone: "UTC",
-  }).format(new Date(`${mention.date}T00:00:00Z`))}`;
+/**
+ * `Evening Run · 5 Aug` from a mention's stored date, without re-reading the run.
+ *
+ * A hook rather than a plain function: the chip it renders sits in two
+ * components, and both want the date in the language on screen.
+ */
+export function useMentionLabel(): (mention: RunMention) => string {
+  const format = useFormatters();
+  return (mention) => `${mention.name} · ${format.shortDate(`${mention.date}T00:00:00Z`)}`;
 }
 
 /** The attachments queued in the composer, above the textarea. */
@@ -157,16 +150,22 @@ export function CoachComposer({
   status,
   onStop,
 }: CoachComposerProps) {
+  const { t } = useTranslation();
+  const format = useFormatters();
+  const mentionLabel = useMentionLabel();
   const isBusy = status === "submitted" || status === "streaming";
 
-  // `/lo` narrows to /load; a bare `/` shows the lot.
+  // `/ch` narrows to /charge; a bare `/` shows the lot.
   const commands = useMemo(() => {
     const typed = draft.trim();
     if (!typed.startsWith("/")) return [];
-    return SLASH_COMMANDS.filter((command) =>
-      command.name.startsWith(typed.split(/\s/)[0]),
-    );
-  }, [draft]);
+    const head = typed.split(/\s/)[0];
+    return SLASH_COMMANDS.map((command) => ({
+      ask: command.ask,
+      name: t(`${command.key}.name`),
+      desc: t(`${command.key}.desc`),
+    })).filter((command) => command.name.startsWith(head));
+  }, [draft, t]);
 
   return (
     <div className="flex flex-col gap-3">
@@ -178,7 +177,7 @@ export function CoachComposer({
                 className="hover:bg-muted focus-visible:ring-ring/50 flex w-full items-center gap-3.5 px-4 py-2.5 text-left outline-none focus-visible:ring-3 focus-visible:ring-inset"
                 onClick={() => {
                   onDraftChange("");
-                  onAsk(command.ask);
+                  onAsk(t(command.ask));
                 }}
                 type="button"
               >
@@ -212,11 +211,11 @@ export function CoachComposer({
                       {run.name}
                     </span>
                     <MonoLabel className="text-mono-badge ml-auto shrink-0">
-                      {runLabel(run)} ·{" "}
+                      {runLabel(run, format)} ·{" "}
                       {formatPace(
                         run.average_speed > 0 ? 1000 / run.average_speed : null,
                       )}
-                      /km
+                      {t("common.perKm")}
                     </MonoLabel>
                   </button>
                 </li>
@@ -224,7 +223,7 @@ export function CoachComposer({
             </ul>
           ) : (
             <p className="text-caption text-muted-foreground px-4 py-3">
-              No runs synced from Strava yet.
+              {t("composer.noRunsSynced")}
             </p>
           )}
         </div>
@@ -248,7 +247,7 @@ export function CoachComposer({
             <AtSignIcon className="size-3" />
             {mentionLabel(attached)}
             <button
-              aria-label="Remove the attached run"
+              aria-label={t("composer.removeAttached")}
               className="bg-foreground/10 hover:bg-foreground/20 focus-visible:ring-ring/50 flex size-5 items-center justify-center rounded-full outline-none focus-visible:ring-2"
               onClick={() => onAttach(null)}
               type="button"
@@ -273,23 +272,23 @@ export function CoachComposer({
           <PromptInputTextarea
             disabled={isBusy}
             onChange={(event) => onDraftChange(event.target.value)}
-            placeholder="Ask about a run, or / for commands"
+            placeholder={t("composer.placeholder")}
             value={draft}
           />
         </PromptInputBody>
         <PromptInputFooter>
           <PromptInputTools>
             <PromptInputButton
-              aria-label="Attach a run"
+              aria-label={t("composer.attachRun")}
               className={cn(pickerOpen && "bg-muted text-foreground")}
               onClick={() => onPickerOpenChange(!pickerOpen)}
               variant="ghost"
             >
               <AtSignIcon />
-              <span className="sr-only sm:not-sr-only">Run</span>
+              <span className="sr-only sm:not-sr-only">{t("composer.runShort")}</span>
             </PromptInputButton>
             <PromptInputActionMenu>
-              <PromptInputActionMenuTrigger tooltip="Attach a file" />
+              <PromptInputActionMenuTrigger tooltip={t("composer.attachFile")} />
               <PromptInputActionMenuContent>
                 <PromptInputActionAddAttachments />
               </PromptInputActionMenuContent>

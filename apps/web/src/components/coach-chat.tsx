@@ -7,8 +7,11 @@ import {
   isToolUIPart,
   type UIMessage,
 } from "ai";
+import { useTranslation } from "react-i18next";
 import { CheckIcon, CopyIcon, RefreshCcwIcon, SparklesIcon } from "lucide-react";
 import { toast } from "sonner";
+import { useFormatters } from "@/i18n/format";
+import type { TranslationKey } from "@/i18n";
 import {
   acceptCoachPlanMutation,
   COACH_CHAT_PATH,
@@ -50,7 +53,7 @@ import {
 } from "@/components/coach/coach-cards";
 import {
   CoachComposer,
-  mentionLabel,
+  useMentionLabel,
   type RunMention,
 } from "@/components/coach/coach-composer";
 import { MonoLabel } from "@/components/mono";
@@ -58,46 +61,76 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-/** Openers for a thread with nothing in it yet. */
+/**
+ * The chips, as catalogue keys.
+ *
+ * They are keys rather than sentences because these arrays are module-level
+ * and `t` is a hook's return value — and because the text is sent to the coach
+ * as well as shown on the chip, so the athlete's question reaches the model in
+ * the language they asked it in.
+ */
 const SUGGESTIONS = [
-  "How has my training looked over the last month?",
-  "Plan my week",
-  "Are my easy runs too fast?",
-  "Read my last long run split by split",
-];
+  "coach.suggestions.month",
+  "coach.suggestions.planWeek",
+  "coach.suggestions.easyTooFast",
+  "coach.suggestions.readLongRunSplits",
+] as const;
 
 /** Where a conversation goes next, given what the coach just drew. */
-const NEXT_QUESTIONS: Record<CoachCard["card"], string[]> = {
-  "run-debrief": ["Read it split by split", "Plan my week", "Am I ramping too fast?"],
-  "run-splits": ["Why did I fade?", "Plan my week", "What could I race today?"],
-  "training-volume": ["Cap next week", "Plan my week", "Am I in race shape?"],
-  "week-plan": [
-    "What if I miss Wednesday?",
-    "Show me my volume ramp",
-    "What could I race today?",
+const NEXT_QUESTIONS: Record<CoachCard["card"], readonly TranslationKey[]> = {
+  "run-debrief": [
+    "coach.followUps.readSplitBySplit",
+    "coach.suggestions.planWeek",
+    "coach.followUps.rampingTooFast",
   ],
-  "race-prediction": ["Write my taper", "Plan my week", "What pace for Sunday?"],
+  "run-splits": [
+    "coach.followUps.whyFade",
+    "coach.suggestions.planWeek",
+    "coach.followUps.raceToday",
+  ],
+  "training-volume": [
+    "coach.followUps.capNextWeek",
+    "coach.suggestions.planWeek",
+    "coach.followUps.raceShape",
+  ],
+  "week-plan": [
+    "coach.followUps.missWednesday",
+    "coach.followUps.volumeRamp",
+    "coach.followUps.raceToday",
+  ],
+  "race-prediction": [
+    "coach.followUps.writeTaper",
+    "coach.suggestions.planWeek",
+    "coach.followUps.paceSunday",
+  ],
 };
 
 const DEFAULT_QUESTIONS = [
-  "Plan my week",
-  "Read my last long run",
-  "Am I ramping too fast?",
-];
+  "coach.suggestions.planWeek",
+  "coach.followUps.readLongRun",
+  "coach.followUps.rampingTooFast",
+] as const;
 
-/** What the coach is doing while it is doing it. */
-const TOOL_TITLES: Record<string, string> = {
-  getAthleteProfile: "Reading your profile",
-  getAthleteContext: "Checking what you're training for",
-  setAthleteContext: "Remembering that",
-  listRuns: "Reading your recent runs",
-  summariseTraining: "Adding up your weeks",
-  getRunDebrief: "Reading that run",
-  getRunSplits: "Reading it split by split",
-  getTrainingSignals: "Measuring your training",
-  predictRaces: "Reading your best efforts",
-  proposeWeek: "Writing your week",
-};
+/** The tools the API exposes, in catalogue order. A tool absent from this list
+ *  falls back to its own name, which is what an older transcript may carry. */
+const TOOL_NAMES = [
+  "getAthleteProfile",
+  "getAthleteContext",
+  "setAthleteContext",
+  "listRuns",
+  "summariseTraining",
+  "getRunDebrief",
+  "getRunSplits",
+  "getTrainingSignals",
+  "predictRaces",
+  "proposeWeek",
+] as const;
+
+type ToolName = (typeof TOOL_NAMES)[number];
+
+function isToolName(value: string): value is ToolName {
+  return (TOOL_NAMES as readonly string[]).includes(value);
+}
 
 /** The run attached to a message, if the athlete attached one. */
 function mentionOf(message: UIMessage): RunMention | null {
@@ -185,12 +218,13 @@ function readableError(error: Error): string {
 }
 
 function CopyAction({ text }: { text: string }) {
+  const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
 
   return (
     <MessageAction
-      label="Copy"
-      tooltip={copied ? "Copied" : "Copy"}
+      label={t("coach.copy")}
+      tooltip={copied ? t("coach.copied") : t("coach.copy")}
       onClick={async () => {
         await navigator.clipboard.writeText(text);
         setCopied(true);
@@ -229,11 +263,13 @@ function Sources({
   runs: Run[];
   onOpen: (run: Run) => void;
 }) {
+  const { t } = useTranslation();
+  const format = useFormatters();
   if (runs.length === 0) return null;
 
   return (
     <div className="flex flex-wrap items-center gap-1.5">
-      <MonoLabel className="text-mono-badge mr-1">From</MonoLabel>
+      <MonoLabel className="text-mono-badge mr-1">{t("coach.sources")}</MonoLabel>
       {runs.map((run) => (
         <Button
           key={run.id}
@@ -242,12 +278,8 @@ function Sources({
           variant="subtle"
         >
           <span className="bg-brand size-1.5 rounded-full" />
-          {new Intl.DateTimeFormat("en-US", {
-            month: "short",
-            day: "numeric",
-            timeZone: "UTC",
-          }).format(new Date(run.start_date_local))}{" "}
-          · {(run.distance / 1000).toFixed(2)} km
+          {format.shortDate(run.start_date_local)} ·{" "}
+          {(run.distance / 1000).toFixed(2)} {t("common.km")}
         </Button>
       ))}
     </div>
@@ -290,6 +322,8 @@ export function CoachChat({
   registerAsk,
   onOpenRun,
 }: CoachChatProps) {
+  const { t } = useTranslation();
+  const mentionLabel = useMentionLabel();
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState("");
   const [attached, setAttached] = useState<RunMention | null>(initialMention);
@@ -337,7 +371,7 @@ export function CoachChat({
     ...acceptCoachPlanMutation(),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: getCoachBriefingQueryKey() });
-      toast.success("That's your week. It's in the rail now.");
+      toast.success(t("coach.planAccepted"));
     },
     onError: (err) => toast.error(err.error),
   });
@@ -388,13 +422,13 @@ export function CoachChat({
    */
   const { working, workingLabel } = useMemo(() => {
     if (status === "submitted") {
-      return { working: true, workingLabel: "Reading your Strava history" };
+      return { working: true, workingLabel: t("coach.workingReading") };
     }
     if (status !== "streaming") return { working: false, workingLabel: "" };
 
     const latest = messages.at(-1);
     if (latest?.role !== "assistant") {
-      return { working: true, workingLabel: "Reading your Strava history" };
+      return { working: true, workingLabel: t("coach.workingReading") };
     }
 
     const covered = latest.parts.some(
@@ -405,18 +439,23 @@ export function CoachChat({
           part.state !== "output-available" &&
           part.state !== "output-error"),
     );
-    return { working: !covered, workingLabel: "Writing" };
-  }, [status, messages]);
+    return { working: !covered, workingLabel: t("coach.workingWriting") };
+  }, [status, messages, t]);
 
   // Chips follow the last thing drawn, so the next question is one tap away.
+  // Translated here rather than in the tables above, so switching language
+  // re-labels the chips that are already on screen.
   const suggestions = useMemo(() => {
-    if (messages.length === 0) return SUGGESTIONS;
-    for (let i = messages.length - 1; i >= 0; i--) {
-      const card = cardsOf(messages[i]).at(-1);
-      if (card) return NEXT_QUESTIONS[card.card];
-    }
-    return DEFAULT_QUESTIONS;
-  }, [messages]);
+    const keys = (() => {
+      if (messages.length === 0) return SUGGESTIONS;
+      for (let i = messages.length - 1; i >= 0; i--) {
+        const card = cardsOf(messages[i]).at(-1);
+        if (card) return NEXT_QUESTIONS[card.card];
+      }
+      return DEFAULT_QUESTIONS;
+    })();
+    return keys.map((key) => t(key));
+  }, [messages, t]);
 
   const actions: CardActions = {
     onAsk: ask,
@@ -442,11 +481,10 @@ export function CoachChat({
                 <SparklesIcon className="size-5" />
               </span>
               <h2 className="font-heading text-display-md text-balance">
-                What are we training for?
+                {t("coach.emptyTitle")}
               </h2>
               <p className="text-body-lg text-muted-foreground max-w-[460px]">
-                Ask for a plan, a taper, or an honest read on last week. I can
-                see every run you&rsquo;ve synced from Strava.
+                {t("coach.emptyBody")}
               </p>
             </div>
           )}
@@ -497,12 +535,12 @@ export function CoachChat({
 
                   if (isToolUIPart(part)) {
                     const name = getToolName(part);
-                    const title = TOOL_TITLES[name] ?? name;
+                    const title = isToolName(name) ? t(`coach.tools.${name}`) : name;
 
                     if (part.state === "output-error") {
                       return (
                         <p className="text-caption text-destructive" key={key}>
-                          {title} failed: {part.errorText}
+                          {t("coach.toolFailed", { title, error: part.errorText })}
                         </p>
                       );
                     }
@@ -557,9 +595,9 @@ export function CoachChat({
                           .join("\n\n")}
                       />
                       <MessageAction
-                        label="Try again"
+                        label={t("coach.tryAgain")}
                         onClick={() => regenerate({ messageId: message.id })}
-                        tooltip="Try again"
+                        tooltip={t("coach.tryAgain")}
                       >
                         <RefreshCcwIcon />
                       </MessageAction>
@@ -578,7 +616,7 @@ export function CoachChat({
 
           {error && (
             <Alert variant="destructive">
-              <AlertTitle>The coach could not answer</AlertTitle>
+              <AlertTitle>{t("coach.errorTitle")}</AlertTitle>
               <AlertDescription>{readableError(error)}</AlertDescription>
             </Alert>
           )}
@@ -602,9 +640,7 @@ export function CoachChat({
           suggestions={suggestions}
         />
 
-        <MonoLabel className="mt-3 block">
-          Grounded in your Strava history · check anything that matters
-        </MonoLabel>
+        <MonoLabel className="mt-3 block">{t("coach.grounded")}</MonoLabel>
       </div>
     </div>
   );

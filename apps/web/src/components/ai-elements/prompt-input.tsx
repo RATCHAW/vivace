@@ -27,6 +27,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { i18n } from "@/i18n";
+import { useTranslation } from "react-i18next";
 import type { ChatStatus, FileUIPart } from "ai";
 import {
   ArrowUpIcon,
@@ -171,7 +173,7 @@ export const PromptInput = ({
       if (incoming.length && accepted.length === 0) {
         onError?.({
           code: "accept",
-          message: "No files match the accepted types.",
+          message: i18n.t("ai.filesNotAccepted"),
         });
         return;
       }
@@ -182,7 +184,7 @@ export const PromptInput = ({
       if (accepted.length > 0 && sized.length === 0) {
         onError?.({
           code: "max_file_size",
-          message: "All files exceed the maximum size.",
+          message: i18n.t("ai.filesTooLarge"),
         });
         return;
       }
@@ -197,7 +199,7 @@ export const PromptInput = ({
         if (typeof capacity === "number" && sized.length > capacity) {
           onError?.({
             code: "max_files",
-            message: "Too many files. Some were not added.",
+            message: i18n.t("ai.tooManyFiles"),
           });
         }
         return [
@@ -316,7 +318,7 @@ export const PromptInput = ({
     <AttachmentsContextValue.Provider value={attachments}>
       <input
         accept={accept}
-        aria-label="Upload files"
+        aria-label={i18n.t("ai.uploadFiles")}
         className="hidden"
         multiple={multiple}
         onChange={handleChange}
@@ -350,7 +352,7 @@ export type PromptInputTextareaProps = ComponentProps<typeof InputGroupTextarea>
 export const PromptInputTextarea = ({
   onKeyDown,
   className,
-  placeholder = "Ask your coach anything…",
+  placeholder,
   ...props
 }: PromptInputTextareaProps) => {
   const attachments = usePromptInputAttachments();
@@ -525,17 +527,19 @@ export type PromptInputActionAddAttachmentsProps = ComponentProps<
 };
 
 export const PromptInputActionAddAttachments = ({
-  label = "Add photos or files",
+  label,
   ...props
 }: PromptInputActionAddAttachmentsProps) => {
+  const { t } = useTranslation();
   const attachments = usePromptInputAttachments();
+  const text = label ?? t("ai.addAttachments");
 
   return (
     // Base UI menu items act on click and close themselves; there is no Radix
     // `onSelect` here.
     <DropdownMenuItem {...props} onClick={() => attachments.openFileDialog()}>
       <ImageIcon />
-      {label}
+      {text}
     </DropdownMenuItem>
   );
 };
@@ -584,7 +588,7 @@ export const PromptInputSubmit = ({
 
   return (
     <InputGroupButton
-      aria-label={isGenerating ? "Stop" : "Send"}
+      aria-label={isGenerating ? i18n.t("ai.stop") : i18n.t("ai.send")}
       className={cn("rounded-full", className)}
       onClick={handleClick}
       size={size}

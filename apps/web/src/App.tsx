@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Loader2Icon } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import { trackEvent } from "@/lib/logger";
@@ -18,10 +19,12 @@ const Coach = lazy(() =>
 );
 
 function FullPageSpinner() {
+  const { t } = useTranslation();
+
   return (
     <main className="flex min-h-svh items-center justify-center bg-muted/40 p-6">
       <Loader2Icon className="size-6 animate-spin text-muted-foreground" />
-      <span className="sr-only">Loading…</span>
+      <span className="sr-only">{t("common.loading")}</span>
     </main>
   );
 }

@@ -1,30 +1,15 @@
 import { MonoLabel } from "@/components/mono";
+import type { Copy } from "@/i18n/dictionaries";
 
-const steps = [
-  {
-    step: "01",
-    title: "Connect Strava",
-    body: "One tap. It's the only sign-in — no second password to remember.",
-  },
-  {
-    step: "02",
-    title: "Pick a run",
-    body: "Your whole history lands in a list — GPS, splits and heart rate included.",
-  },
-  {
-    step: "03",
-    title: "Watch it back",
-    body: "The replay renders in seconds. Watch it, download the MP4, post it.",
-  },
-];
+export function HowItWorks({ copy }: { copy: Copy }) {
+  const t = copy.howItWorks;
 
-export function HowItWorks() {
   return (
-    <section aria-label="How it works" className="px-6 pb-20 sm:px-8 sm:pb-30">
+    <section aria-label={t.label} className="px-6 pb-20 sm:px-8 sm:pb-30">
       {/* The 1px gutters are the border showing through, not three bordered
           cards — DESIGN.md: elevation is hairlines, never shadow. */}
       <div className="bg-border mx-auto grid w-full max-w-[1200px] gap-px overflow-hidden rounded-lg border sm:grid-cols-3">
-        {steps.map((step) => (
+        {t.steps.map((step) => (
           <div
             key={step.step}
             className="bg-background flex flex-col gap-3.5 px-9 py-10"

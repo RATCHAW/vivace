@@ -17,8 +17,18 @@ export function MonoLabel({
   );
 }
 
-/** The stamp on a sport we can replay, but not yet. */
-export function SoonBadge({ className, ...props }: React.ComponentProps<"span">) {
+/**
+ * The stamp on a sport we can replay, but not yet.
+ *
+ * The word is a child rather than baked in: this file has no access to the
+ * dictionary — the page reads it once at the top and hands it down — so the
+ * caller supplies `copy.soon`.
+ */
+export function SoonBadge({
+  className,
+  children,
+  ...props
+}: React.ComponentProps<"span">) {
   return (
     <span
       className={cn(
@@ -27,7 +37,7 @@ export function SoonBadge({ className, ...props }: React.ComponentProps<"span">)
       )}
       {...props}
     >
-      Soon
+      {children}
     </span>
   );
 }

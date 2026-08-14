@@ -4,15 +4,15 @@
 // Everything here comes from GET /api/coach/briefing in one request — see
 // apps/api/src/briefing.ts. Nothing is computed twice: a signal shown here and
 // the same signal quoted in an answer are literally the same object.
+import { useTranslation } from "react-i18next";
 import type { CoachBriefing, CoachSignal, CoachTone, PlanProgress } from "@/api";
+import { useMessages } from "@/i18n";
+import { useFormatters } from "@/i18n/format";
 import { MonoLabel } from "@/components/mono";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatClock } from "@repo/video";
 import { cn } from "@/lib/utils";
-
-const DAY_SHORT = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
-const DAY_INITIAL = ["M", "T", "W", "T", "F", "S", "S"] as const;
 
 /** A measurement outside its band shouts; one drifting towards it murmurs. */
 function toneClass(tone: CoachTone): string {
@@ -33,16 +33,6 @@ function weeksAway(raceDate: string | null): number | null {
       86_400_000,
   );
   return days < 0 ? null : Math.ceil(days / 7);
-}
-
-/** `Sun 18 Oct` — the way a race day is written on a start list. */
-function raceDay(date: string): string {
-  return new Intl.DateTimeFormat("en-GB", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    timeZone: "UTC",
-  }).format(new Date(`${date}T00:00:00Z`));
 }
 
 function RailSection({
@@ -72,21 +62,19 @@ function GoalRace({
   context: CoachBriefing["context"];
   onAsk: (text: string) => void;
 }) {
+  const { t } = useTranslation();
+  const format = useFormatters();
+  const messages = useMessages();
+
   if (!context.race_name) {
     return (
-      <RailSection title="Goal race">
+      <RailSection title={t("rail.goalRace")}>
         <div className="border-border flex flex-col gap-3.5 rounded-md border p-5">
           <p className="text-caption text-muted-foreground leading-relaxed">
-            The coach plans around a date. Tell it what you&rsquo;re training for
-            once and every thread starts knowing.
+            {t("rail.goalRaceEmpty")}
           </p>
-          <Button
-            onClick={() =>
-              onAsk("I'm training for a race — let me tell you about it")
-            }
-            size="sm"
-          >
-            Set a goal race
+          <Button onClick={() => onAsk(t("rail.askGoalRace"))} size="sm">
+            {t("rail.setGoalRace")}
           </Button>
         </div>
       </RailSection>
@@ -96,15 +84,15 @@ function GoalRace({
   const weeks = weeksAway(context.race_date);
   return (
     <RailSection
-      title="Goal race"
+      title={t("rail.goalRace")}
       action={
         <Button
           className="h-auto px-0 font-semibold"
-          onClick={() => onAsk("I want to change my goal race")}
+          onClick={() => onAsk(t("rail.askChangeGoal"))}
           size="xs"
           variant="ghost"
         >
-          Change
+          {t("rail.change")}
         </Button>
       }
     >
@@ -112,44 +100,49 @@ function GoalRace({
         <div className="flex flex-col gap-1.5">
           <span className="text-body-md font-semibold">{context.race_name}</span>
           <span className="text-caption text-stone">
-            {context.race_date ? raceDay(context.race_date) : "No date yet"}
+            {context.race_date
+              ? format.raceDay(context.race_date)
+              : t("rail.noDate")}
             {context.race_distance_m
-              ? ` · ${(context.race_distance_m / 1000).toFixed(1)} km`
+              ? ` · ${(context.race_distance_m / 1000).toFixed(1)} ${t("common.km")}`
               : ""}
           </span>
         </div>
         <dl className="border-border flex gap-5 border-t pt-3.5">
           <div className="flex flex-col gap-1.5">
             <dt>
-              <MonoLabel className="text-mono-badge">To go</MonoLabel>
+              <MonoLabel className="text-mono-badge">{t("rail.toGo")}</MonoLabel>
             </dt>
             <dd className="text-heading-sm font-semibold tabular-nums">
-              {weeks !== null ? `${weeks} wk` : "—"}
+              {weeks !== null
+                ? t("rail.weeks", { count: weeks })
+                : t("common.dash")}
             </dd>
           </div>
           <div className="flex flex-col gap-1.5">
             <dt>
-              <MonoLabel className="text-mono-badge">Target</MonoLabel>
+              <MonoLabel className="text-mono-badge">{t("rail.target")}</MonoLabel>
             </dt>
             <dd className="text-heading-sm font-semibold tabular-nums">
-              {context.target_seconds ? formatClock(context.target_seconds) : "—"}
+              {context.target_seconds
+                ? formatClock(context.target_seconds)
+                : t("common.dash")}
             </dd>
           </div>
           <div className="flex flex-col gap-1.5">
             <dt>
-              <MonoLabel className="text-mono-badge">Long day</MonoLabel>
+              <MonoLabel className="text-mono-badge">{t("rail.longDay")}</MonoLabel>
             </dt>
             <dd className="text-heading-sm font-semibold">
               {context.long_run_day !== null
-                ? DAY_SHORT[context.long_run_day]
-                : "—"}
+                ? messages.days.short[context.long_run_day]
+                : t("common.dash")}
             </dd>
           </div>
         </dl>
       </div>
       <p className="text-caption text-stone leading-relaxed">
-        The coach remembers this in every thread — you never re-explain what
-        you&rsquo;re training for.
+        {t("rail.remembers")}
       </p>
     </RailSection>
   );
@@ -162,16 +155,18 @@ function ThisWeek({
   plan: PlanProgress | null;
   onAsk: (text: string) => void;
 }) {
+  const { t } = useTranslation();
+  const messages = useMessages();
+
   if (!plan) {
     return (
-      <RailSection title="This week">
+      <RailSection title={t("rail.thisWeek")}>
         <div className="border-border flex flex-col gap-3.5 rounded-md border p-5">
           <p className="text-caption text-muted-foreground leading-relaxed">
-            No week accepted yet. Ask for one and it lands here as sessions, not
-            a paragraph.
+            {t("rail.noWeek")}
           </p>
-          <Button onClick={() => onAsk("Plan my week")} size="sm">
-            Plan my week
+          <Button onClick={() => onAsk(t("rail.planMyWeek"))} size="sm">
+            {t("rail.planMyWeek")}
           </Button>
         </div>
       </RailSection>
@@ -181,14 +176,19 @@ function ThisWeek({
   const peak = Math.max(...plan.days.map((day) => Math.max(day.planned_km, day.actual_km)), 1);
 
   return (
-    <RailSection title="This week">
+    <RailSection title={t("rail.thisWeek")}>
       <div className="border-border flex flex-col gap-4 rounded-md border p-5">
         <div className="flex h-[92px] items-end gap-2">
           {plan.days.map((day) => (
             <div
               className="flex h-full flex-1 flex-col gap-1.5"
               key={day.day}
-              title={`${DAY_SHORT[day.day]} · ${day.type} · ${day.actual_km} of ${day.planned_km} km`}
+              title={t("rail.dayTooltip", {
+                day: messages.days.short[day.day],
+                type: day.type,
+                actual: day.actual_km,
+                planned: day.planned_km,
+              })}
             >
               {/* The planned bar is the track; the actual run fills it. Both
                   are absolute inside a flexible plot area — as a flex sibling
@@ -209,16 +209,19 @@ function ThisWeek({
                 </span>
               </div>
               <MonoLabel className="text-mono-badge block text-center">
-                {DAY_INITIAL[day.day]}
+                {messages.days.initial[day.day]}
               </MonoLabel>
             </div>
           ))}
         </div>
         <p className="text-caption border-border border-t pt-3.5">
-          {plan.actual_km} of {plan.planned_km} km ·{" "}
+          {t("rail.weekProgress", {
+            actual: plan.actual_km,
+            planned: plan.planned_km,
+          })}
           {plan.remaining === 0
-            ? "week complete"
-            : `${plan.remaining} session${plan.remaining === 1 ? "" : "s"} left`}
+            ? t("rail.weekComplete")
+            : t("rail.sessionsLeft", { count: plan.remaining })}
         </p>
       </div>
     </RailSection>
@@ -232,10 +235,11 @@ function Signals({
   signals: CoachSignal[];
   onAsk: (text: string) => void;
 }) {
+  const { t } = useTranslation();
   if (signals.length === 0) return null;
 
   return (
-    <RailSection title="Signals">
+    <RailSection title={t("rail.signals")}>
       <div className="flex flex-col">
         {signals.map((signal) => (
           <button
@@ -261,7 +265,7 @@ function Signals({
           </button>
         ))}
       </div>
-      <p className="text-caption text-stone">Tap a signal to ask about it.</p>
+      <p className="text-caption text-stone">{t("rail.tapSignal")}</p>
     </RailSection>
   );
 }
@@ -307,11 +311,12 @@ export interface CoachQueueProps {
  * carries a thread is one the coach already answered on its own, and opens it.
  */
 export function CoachQueue({ queue, onAsk, onOpenThread }: CoachQueueProps) {
+  const { t } = useTranslation();
   if (!queue || queue.length === 0) return null;
 
   return (
     <div className="flex flex-col gap-2.5">
-      <MonoLabel className="pl-1.5">Coach queue</MonoLabel>
+      <MonoLabel className="pl-1.5">{t("rail.queue")}</MonoLabel>
       {queue.map((item) => (
         <button
           className="border-border hover:bg-muted focus-visible:ring-ring/50 flex gap-2.5 rounded-md border p-3 text-left outline-none focus-visible:ring-3 focus-visible:ring-inset"

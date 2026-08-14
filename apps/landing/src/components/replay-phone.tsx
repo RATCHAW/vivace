@@ -10,6 +10,10 @@ import {
   RUN_SUMMARY,
   START_PHASE,
 } from "@/lib/replay";
+import type { Copy } from "@/i18n/dictionaries";
+
+/** The words on the plate. Everything else it draws is a number. */
+export type ReplayCopy = Copy["hero"]["replay"];
 
 // The route is deterministic, so it is built once for the module rather than
 // per render — and the server and the client draw the same path.
@@ -23,7 +27,7 @@ const route = buildRoute();
  * DESIGN.md {component.product-mockup-band}: the asset carries its own depth.
  * No shadow, no glow — a hairline and a black plate.
  */
-export function ReplayPhone() {
+export function ReplayPhone({ copy }: { copy: ReplayCopy }) {
   const [t, setT] = useState(START_PHASE);
 
   useEffect(() => {
@@ -51,7 +55,7 @@ export function ReplayPhone() {
       <div
         className="bg-background relative aspect-[340/604] w-[340px] max-w-full overflow-hidden rounded-xl border"
         role="img"
-        aria-label="A vertical replay of a 3.16 km evening run: the route draws itself while distance, time, pace and heart rate count up, then the summary card lands."
+        aria-label={copy.alt}
       >
         {/* Chapter 2 — the map and the line. */}
         <div
@@ -103,8 +107,8 @@ export function ReplayPhone() {
           className="absolute inset-0 flex flex-col px-6 py-8"
           style={{ opacity: frame.hudOpacity }}
         >
-          <MonoLabel className="text-muted-foreground">Aug 5, 2026</MonoLabel>
-          <span className="text-heading-md mt-2">Evening Run</span>
+          <MonoLabel className="text-muted-foreground">{copy.date}</MonoLabel>
+          <span className="text-heading-md mt-2">{copy.title}</span>
 
           <div className="mt-auto flex items-baseline gap-2">
             <span className="text-display-lg font-semibold tabular-nums">
@@ -116,9 +120,9 @@ export function ReplayPhone() {
           </div>
           <div className="bg-foreground/15 my-4 h-px" />
           <div className="grid grid-cols-3 gap-2.5">
-            <Metric label="Time" value={frame.live.time} />
-            <Metric label="Pace" value={frame.live.pace} />
-            <Metric label="BPM" value={frame.live.hr} />
+            <Metric label={copy.time} value={frame.live.time} />
+            <Metric label={copy.pace} value={frame.live.pace} />
+            <Metric label={copy.bpm} value={frame.live.hr} />
           </div>
         </div>
 
@@ -128,14 +132,14 @@ export function ReplayPhone() {
           style={{ opacity: frame.summaryOpacity }}
         >
           <MonoLabel className="text-muted-foreground">
-            {RUN_SUMMARY.date}
+            {copy.summaryDate}
           </MonoLabel>
-          <span className="text-heading-md mt-2.5">{RUN_SUMMARY.title}</span>
+          <span className="text-heading-md mt-2.5">{copy.title}</span>
           <div className="mt-auto grid grid-cols-2 gap-x-4 gap-y-6">
-            <Metric label="Distance" value={RUN_SUMMARY.distance} large />
-            <Metric label="Time" value={RUN_SUMMARY.time} large />
-            <Metric label="Pace" value={RUN_SUMMARY.pace} large />
-            <Metric label="Elev gain" value={RUN_SUMMARY.elevation} large />
+            <Metric label={copy.distance} value={RUN_SUMMARY.distance} large />
+            <Metric label={copy.time} value={RUN_SUMMARY.time} large />
+            <Metric label={copy.pace} value={RUN_SUMMARY.pace} large />
+            <Metric label={copy.elevation} value={RUN_SUMMARY.elevation} large />
           </div>
           <div className="mt-7 flex items-center gap-2 border-t pt-4.5">
             <span className="bg-brand size-2 rounded-full" />
@@ -161,7 +165,7 @@ export function ReplayPhone() {
         </div>
       </div>
 
-      <MonoLabel>9:16 · Ready for stories</MonoLabel>
+      <MonoLabel>{copy.format}</MonoLabel>
     </div>
   );
 }

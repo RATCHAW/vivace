@@ -21,16 +21,36 @@ export interface TemplateInput {
   streams: VideoStreams;
 }
 
+/**
+ * Why a template can't have this run, named rather than spelled.
+ *
+ * The catalogue is React-free and also runs on Lambda, where no message
+ * catalogue is loaded — so it keeps its English. `apps/web` translates by this
+ * key and falls back to `reason`, which means a rule added here without a
+ * translation still says something true.
+ */
+export type EligibilityReason =
+  | "needs-route"
+  | "needs-two-km"
+  | "needs-distance-time";
+
 export interface Eligibility {
   eligible: boolean;
   /** Shown in the picker, in the athlete's terms — "Needs a GPS route", not
    *  "latlng stream absent". Present only when `eligible` is false. */
   reason?: string;
+  /** The same thing, as a key a translation can be looked up by. Always
+   *  present when `reason` is. */
+  reasonKey?: EligibilityReason;
 }
 
 const OK: Eligibility = { eligible: true };
 
-const no = (reason: string): Eligibility => ({ eligible: false, reason });
+const no = (reasonKey: EligibilityReason, reason: string): Eligibility => ({
+  eligible: false,
+  reason,
+  reasonKey,
+});
 
 /** Split Rush needs two kilometres to have anything to compare. */
 const MIN_SPLIT_RUSH_METERS = 2 * SPLIT_METERS;
@@ -43,21 +63,25 @@ const RULES: Record<TemplateId, (input: TemplateInput) => Eligibility> = {
   "run-video": ({ streams }) =>
     (streams.latlng?.data?.length ?? 0) >= 2
       ? OK
-      : no("Needs a GPS route — this run has none"),
+      : no("needs-route", "Needs a GPS route — this run has none"),
 
   "split-rush": ({ activity, streams }) => {
-    if (activity.distance < MIN_SPLIT_RUSH_METERS) return no("Needs at least 2 km");
+    if (activity.distance < MIN_SPLIT_RUSH_METERS) {
+      return no("needs-two-km", "Needs at least 2 km");
+    }
     const samples = Math.min(
       streams.distance?.data?.length ?? 0,
       streams.time?.data?.length ?? 0,
     );
-    return samples >= 2 ? OK : no("Needs distance and time from the watch");
+    return samples >= 2
+      ? OK
+      : no("needs-distance-time", "Needs distance and time from the watch");
   },
 
   "living-poster": ({ streams }) =>
     cleanRoute(streams.latlng?.data ?? [], streams.time?.data).length >= MIN_ROUTE_POINTS
       ? OK
-      : no("Needs a GPS route — this run has none"),
+      : no("needs-route", "Needs a GPS route — this run has none"),
 
   // The universal fallback. This one must never be ineligible: it is what
   // renders when a run has nothing, and something always has to render.

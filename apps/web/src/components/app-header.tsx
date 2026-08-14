@@ -1,28 +1,33 @@
 import { Link, useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { authClient } from "@/lib/auth-client";
 import { flushClientLogs, trackEvent } from "@/lib/logger";
 import { resetPostHog } from "@/lib/posthog";
 import { Wordmark } from "@/components/wordmark";
+import { LanguageToggle } from "@/components/language-toggle";
 import { ModeToggle } from "@/components/mode-toggle";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 
+/** The three surfaces, by route. The label is a key — see `nav` in the
+ *  catalogue — because this array is module-level and `t` is not. */
 const NAV = [
-  { to: "/", label: "Overview" },
-  { to: "/runs", label: "Activities" },
-  { to: "/coach", label: "Coach" },
+  { to: "/", label: "nav.overview" },
+  { to: "/runs", label: "nav.activities" },
+  { to: "/coach", label: "nav.coach" },
 ] as const;
 
 /** The signed-in chrome: wordmark, the three surfaces, and who you are.
  *  A hairline rule carries it — DESIGN.md has no elevation shadows. */
 export function AppHeader() {
+  const { t } = useTranslation();
   const { pathname } = useLocation();
   const { data: session } = authClient.useSession();
   const name = session?.user.name ?? "";
 
   return (
     <header className="flex h-16 items-center gap-4 border-b px-8 sm:gap-8">
-      <Link to="/" aria-label="Vivace home">
+      <Link to="/" aria-label={t("nav.home")}>
         <Wordmark />
       </Link>
 
@@ -36,7 +41,7 @@ export function AppHeader() {
             aria-current={pathname === item.to ? "page" : undefined}
             render={<Link to={item.to} />}
           >
-            {item.label}
+            {t(item.label)}
           </Button>
         ))}
       </nav>
@@ -49,6 +54,7 @@ export function AppHeader() {
           <AvatarImage src={session?.user.image ?? undefined} alt="" />
           <AvatarFallback>{name.charAt(0).toUpperCase() || "?"}</AvatarFallback>
         </Avatar>
+        <LanguageToggle />
         <ModeToggle />
         <Button
           size="sm"
@@ -63,7 +69,7 @@ export function AppHeader() {
             void authClient.signOut();
           }}
         >
-          Sign out
+          {t("nav.signOut")}
         </Button>
       </div>
     </header>

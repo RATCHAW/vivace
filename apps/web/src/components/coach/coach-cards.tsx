@@ -6,8 +6,12 @@
 // Change a tool's output shape and the matching card has to move with it.
 import { type ReactNode } from "react";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import { ArrowRightIcon, CheckIcon } from "lucide-react";
 import type { PlannedSession } from "@/api";
+import { useMessages } from "@/i18n";
+import { useFormatters } from "@/i18n/format";
 import { MonoLabel } from "@/components/mono";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -207,6 +211,8 @@ export function RunDebrief({
   card: DebriefCard;
   actions: CardActions;
 }) {
+  const { t } = useTranslation();
+
   return (
     <CardShell>
       <div className="border-border flex items-center gap-2.5 border-b px-5 py-3.5">
@@ -245,9 +251,9 @@ export function RunDebrief({
         ) : (
           <div className="border-border bg-background flex size-[108px] shrink-0 items-center justify-center rounded-md border">
             <MonoLabel className="text-mono-badge text-center">
-              No
+              {t("cards.noRouteLine1")}
               <br />
-              route
+              {t("cards.noRouteLine2")}
             </MonoLabel>
           </div>
         )}
@@ -275,15 +281,15 @@ export function RunDebrief({
       <div className="border-border flex flex-wrap gap-2 border-t px-5 py-3.5">
         {/* Base UI composes with `render`, not Radix's `asChild`. */}
         <Button render={<Link to={`/runs?run=${card.run_id}`} />} size="sm">
-          Watch the replay
+          {t("cards.watchReplay")}
           <ArrowRightIcon data-icon="inline-end" />
         </Button>
         <Button
-          onClick={() => actions.onAsk("Read this run split by split", card.run_id)}
+          onClick={() => actions.onAsk(t("cards.askReadSplits"), card.run_id)}
           size="sm"
           variant="subtle"
         >
-          Read it split by split
+          {t("cards.readSplitBySplit")}
         </Button>
       </div>
     </CardShell>
@@ -296,6 +302,7 @@ export function RunDebrief({
 const FADE_SECONDS = 12;
 
 export function RunSplits({ card }: { card: SplitsCard; actions: CardActions }) {
+  const { t } = useTranslation();
   const paces = card.splits.map((split) => split.seconds_per_km);
   const fastest = Math.min(...paces);
   const slowest = Math.max(...paces);
@@ -332,12 +339,12 @@ export function RunSplits({ card }: { card: SplitsCard; actions: CardActions }) 
           <span className="text-stone flex items-center gap-3.5">
             <span className="flex items-center gap-1.5">
               <span className="bg-brand size-2 rounded-[2px]" />
-              <MonoLabel className="text-mono-badge">Pace</MonoLabel>
+              <MonoLabel className="text-mono-badge">{t("cards.pace")}</MonoLabel>
             </span>
             {hrPath && (
               <span className="flex items-center gap-1.5">
                 <span className="bg-chart-3 h-0.5 w-2" />
-                <MonoLabel className="text-mono-badge">HR</MonoLabel>
+                <MonoLabel className="text-mono-badge">{t("cards.hr")}</MonoLabel>
               </span>
             )}
           </span>
@@ -349,9 +356,18 @@ export function RunSplits({ card }: { card: SplitsCard; actions: CardActions }) 
           <span
             className="flex h-full flex-1 flex-col justify-end"
             key={split.km}
-            title={`Km ${split.km} · ${split.pace_per_km} /km${
-              split.avg_heartrate ? ` · ${split.avg_heartrate} bpm` : ""
-            }`}
+            title={
+              split.avg_heartrate
+                ? t("cards.splitTooltipHr", {
+                    km: split.km,
+                    pace: split.pace_per_km ?? "",
+                    bpm: split.avg_heartrate,
+                  })
+                : t("cards.splitTooltip", {
+                    km: split.km,
+                    pace: split.pace_per_km ?? "",
+                  })
+            }
           >
             <span
               className={cn(
@@ -386,25 +402,24 @@ export function RunSplits({ card }: { card: SplitsCard; actions: CardActions }) 
       </div>
 
       <div className="text-stone flex justify-between">
-        <MonoLabel className="text-mono-badge">Km 1</MonoLabel>
+        <MonoLabel className="text-mono-badge">{t("cards.kmFirst")}</MonoLabel>
         <MonoLabel className="text-mono-badge">
-          {card.first_half_pace} → {card.second_half_pace} /km
+          {card.first_half_pace} → {card.second_half_pace} {t("common.perKm")}
         </MonoLabel>
-        <MonoLabel className="text-mono-badge">Km {card.splits.length}</MonoLabel>
+        <MonoLabel className="text-mono-badge">
+          {t("cards.kmLast", { n: card.splits.length })}
+        </MonoLabel>
       </div>
 
       <Callout tone={fade >= FADE_SECONDS ? "alert" : "brand"}>
         {fade >= 3
-          ? `The back half ran ${fade} s/km slower than the front.`
+          ? t("cards.fadeSlower", { seconds: fade })
           : fade <= -3
-            ? `A negative split — the back half ran ${Math.abs(fade)} s/km quicker.`
-            : "Even pacing front to back."}
+            ? t("cards.negativeSplit", { seconds: Math.abs(fade) })
+            : t("cards.evenPacing")}
         {drift !== null &&
-          ` Aerobic decoupling of ${drift.toFixed(1)}%${
-            drift > 5
-              ? " — heart rate kept climbing to hold that pace."
-              : ", which is a well-held aerobic effort."
-          }`}
+          t("cards.decoupling", { pct: drift.toFixed(1) }) +
+            (drift > 5 ? t("cards.decouplingHigh") : t("cards.decouplingOk"))}
       </Callout>
     </CardShell>
   );
@@ -416,6 +431,8 @@ export function RunSplits({ card }: { card: SplitsCard; actions: CardActions }) 
 const RAMP_LIMIT = 10;
 
 export function TrainingVolume({ card }: { card: VolumeCard; actions: CardActions }) {
+  const { t } = useTranslation();
+  const format = useFormatters();
   // Oldest on the left: a ramp reads left to right.
   const weeks = [...card.weeks].reverse();
   const peak = Math.max(...weeks.map((week) => week.km), 1);
@@ -425,10 +442,10 @@ export function TrainingVolume({ card }: { card: VolumeCard; actions: CardAction
   return (
     <CardShell className="flex flex-col gap-5 p-5">
       <CardHeading
-        title={`Weekly volume · ${weeks.length} weeks`}
+        title={t("cards.weeklyVolume", { count: weeks.length })}
         aside={
           <MonoLabel className="text-mono-badge">
-            Safe ramp · under {RAMP_LIMIT}% / week
+            {t("cards.safeRamp", { limit: RAMP_LIMIT })}
           </MonoLabel>
         }
       />
@@ -462,7 +479,7 @@ export function TrainingVolume({ card }: { card: VolumeCard; actions: CardAction
               {week.km}
             </span>
             <MonoLabel className="text-mono-badge block text-center">
-              {formatWeek(week.week_starting)}
+              {format.weekStamp(week.week_starting)}
             </MonoLabel>
           </div>
         ))}
@@ -470,23 +487,20 @@ export function TrainingVolume({ card }: { card: VolumeCard; actions: CardAction
 
       <Callout tone={spike || (load && load.ratio > 1.3) ? "alert" : "brand"}>
         {load
-          ? `Acute:chronic load is ${load.ratio.toFixed(2)} — ${load.acute_km} km this week against a ${load.chronic_km} km four-week average.`
-          : "Not enough history yet for a load ratio."}
-        {spike && ` The week of ${formatWeek(spike.week_starting)} jumped ${spike.ramp_pct}%.`}
+          ? t("cards.loadRatio", {
+              ratio: load.ratio.toFixed(2),
+              acute: load.acute_km,
+              chronic: load.chronic_km,
+            })
+          : t("cards.notEnoughHistory")}
+        {spike &&
+          t("cards.weekJumped", {
+            week: format.weekStamp(spike.week_starting),
+            pct: spike.ramp_pct ?? 0,
+          })}
       </Callout>
     </CardShell>
   );
-}
-
-/** `AUG 3` — the mono stamp under a bar. */
-function formatWeek(date: string): string {
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    timeZone: "UTC",
-  })
-    .format(new Date(`${date}T00:00:00Z`))
-    .toUpperCase();
 }
 
 // --- the race prediction ------------------------------------------------------
@@ -498,6 +512,7 @@ export function RacePrediction({
   card: PredictionCard;
   actions: CardActions;
 }) {
+  const { t } = useTranslation();
   const goal = card.goal;
   const headline = goal
     ? card.predictions.find((p) => p.name === goal.distance)
@@ -506,9 +521,11 @@ export function RacePrediction({
   return (
     <CardShell className="flex flex-col gap-5 p-5">
       <CardHeading
-        title="Race prediction"
+        title={t("cards.racePrediction")}
         aside={
-          <MonoLabel className="text-mono-badge">From Strava best efforts</MonoLabel>
+          <MonoLabel className="text-mono-badge">
+            {t("cards.fromBestEfforts")}
+          </MonoLabel>
         }
       />
 
@@ -530,7 +547,7 @@ export function RacePrediction({
                 effort.pr ? "text-brand font-semibold" : "text-stone",
               )}
             >
-              {effort.pr ? `PR · ${effort.date}` : effort.date}
+              {effort.pr ? t("cards.pr", { date: effort.date }) : effort.date}
             </span>
           </div>
         ))}
@@ -540,7 +557,7 @@ export function RacePrediction({
         <div className="border-border bg-border grid grid-cols-2 gap-px overflow-hidden rounded-md border">
           <div className="bg-background flex flex-col gap-2 p-4">
             <MonoLabel className="text-mono-badge">
-              {headline.name}, today
+              {t("cards.headlineToday", { name: headline.name })}
             </MonoLabel>
             <span className="text-heading-lg font-semibold tabular-nums">
               {headline.time}
@@ -548,10 +565,10 @@ export function RacePrediction({
           </div>
           <div className="bg-background flex flex-col gap-2 p-4">
             <MonoLabel className="text-mono-badge text-brand">
-              {goal?.target ? "Your target" : "Goal pace"}
+              {goal?.target ? t("cards.yourTarget") : t("cards.goalPace")}
             </MonoLabel>
             <span className="text-heading-lg text-brand font-semibold tabular-nums">
-              {goal?.target ?? `${headline.pace_per_km} /km`}
+              {goal?.target ?? `${headline.pace_per_km} ${t("common.perKm")}`}
             </span>
           </div>
         </div>
@@ -560,26 +577,30 @@ export function RacePrediction({
       {goal?.gap_seconds != null ? (
         <Callout tone={goal.gap_seconds > 0 ? "warn" : "brand"}>
           {goal.gap_seconds > 0
-            ? `${formatGap(goal.gap_seconds)} to find${
-                goal.weeks_to_race ? ` in ${goal.weeks_to_race} weeks` : ""
-              }, off ${headline?.from.name} in ${headline?.from.time} on ${headline?.from.date}.`
-            : `You are ${formatGap(-goal.gap_seconds)} ahead of target already.`}
+            ? t("cards.gapToFind", {
+                gap: formatGap(goal.gap_seconds, t),
+                window: goal.weeks_to_race
+                  ? String(t("cards.gapWindow", { count: goal.weeks_to_race }))
+                  : "",
+                name: headline?.from.name ?? "",
+                time: headline?.from.time ?? "",
+                date: headline?.from.date ?? "",
+              })
+            : t("cards.aheadOfTarget", {
+                gap: formatGap(-goal.gap_seconds, t),
+              })}
         </Callout>
       ) : (
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-caption text-stone">
-            Riegel from your best effort, not a guess.
-          </span>
+          <span className="text-caption text-stone">{t("cards.riegel")}</span>
           {!goal && (
             <Button
               className="ml-auto"
-              onClick={() =>
-                actions.onAsk("I'm training for a race — let me tell you about it")
-              }
+              onClick={() => actions.onAsk(t("cards.askGoalRace"))}
               size="sm"
               variant="subtle"
             >
-              Set a goal race
+              {t("cards.setGoalRace")}
             </Button>
           )}
         </div>
@@ -588,27 +609,17 @@ export function RacePrediction({
   );
 }
 
-/** `3:50` — a gap in minutes and seconds. */
-function formatGap(seconds: number): string {
+/** `3:50` — a gap in minutes and seconds. Under a minute it is spelled out,
+ *  which is the only part of it that needs a language. */
+function formatGap(seconds: number, t: TFunction): string {
   const minutes = Math.floor(seconds / 60);
   const rest = Math.round(seconds % 60);
   return minutes
     ? `${minutes}:${String(rest).padStart(2, "0")}`
-    : `${rest} seconds`;
+    : t("cards.gapSeconds", { count: rest });
 }
 
 // --- the week plan ------------------------------------------------------------
-
-const DAY_NAMES = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"] as const;
-const DAY_LABELS = [
-  "Monday",
-  "Tuesday",
-  "Wednesday",
-  "Thursday",
-  "Friday",
-  "Saturday",
-  "Sunday",
-] as const;
 
 export function WeekPlan({
   card,
@@ -617,6 +628,13 @@ export function WeekPlan({
   card: PlanCard;
   actions: CardActions;
 }) {
+  const { t } = useTranslation();
+  const format = useFormatters();
+  // Weekday names come off the catalogue rather than `t()`: they are a list,
+  // and `days.short` is uppercased here because it stamps a mono eyebrow.
+  const messages = useMessages();
+  const dayStamps = messages.days.short;
+  const dayNames = messages.days.long;
   // The card is stored in the transcript, so `accepted` is only true of the
   // week as it stood when the tool ran. The live answer is the briefing's.
   const accepted =
@@ -636,11 +654,11 @@ export function WeekPlan({
     <CardShell className="max-w-[720px]">
       <div className="flex items-baseline justify-between gap-4 px-5 pt-5 pb-4">
         <span className="text-body-sm font-semibold">
-          Week of {formatWeek(card.week_starting)}
+          {t("cards.weekOf", { week: format.weekStamp(card.week_starting) })}
           {card.label ? ` · ${card.label}` : ""}
         </span>
         <MonoLabel className="text-mono-badge">
-          {card.total_km} km · {card.quality} key
+          {t("cards.weekTotals", { km: card.total_km, quality: card.quality })}
         </MonoLabel>
       </div>
 
@@ -658,13 +676,15 @@ export function WeekPlan({
             <MonoLabel
               className={cn("text-mono-badge", session.key && "text-brand")}
             >
-              {DAY_NAMES[session.day]}
+              {dayStamps[session.day]}
             </MonoLabel>
             <span className="text-caption leading-tight font-semibold">
               {session.type}
             </span>
             <span className="text-body-md leading-none font-semibold tabular-nums">
-              {session.km > 0 ? `${session.km} km` : "—"}
+              {session.km > 0
+                ? `${session.km} ${t("common.km")}`
+                : t("common.dash")}
             </span>
             <MonoLabel className="text-mono-badge">{session.pace}</MonoLabel>
           </li>
@@ -675,7 +695,7 @@ export function WeekPlan({
         {accepted ? (
           <span className="bg-brand/15 text-brand text-mono-badge inline-flex h-9 items-center gap-2 rounded-full px-4 font-mono uppercase">
             <CheckIcon className="size-3.5" />
-            Accepted · in your week
+            {t("cards.accepted")}
           </span>
         ) : (
           <Button
@@ -683,29 +703,29 @@ export function WeekPlan({
             onClick={() => actions.onAcceptPlan(card)}
             size="sm"
           >
-            Accept this week
+            {t("cards.acceptWeek")}
           </Button>
         )}
         {quality && (
           <Button
             onClick={() =>
-              actions.onAsk(`Swap ${DAY_LABELS[quality.day]} for something else`)
+              actions.onAsk(t("cards.askSwapDay", { day: dayNames[quality.day] }))
             }
             size="sm"
             variant="subtle"
           >
-            Swap {DAY_LABELS[quality.day]}
+            {t("cards.swapDay", { day: dayNames[quality.day] })}
           </Button>
         )}
         {longRun && (
           <Button
             onClick={() =>
-              actions.onAsk(`Move the long run to ${DAY_LABELS[moveTo]}`)
+              actions.onAsk(t("cards.askMoveLongRun", { day: dayNames[moveTo] }))
             }
             size="sm"
             variant="subtle"
           >
-            Long run → {DAY_LABELS[moveTo]}
+            {t("cards.longRunTo", { day: dayNames[moveTo] })}
           </Button>
         )}
       </div>

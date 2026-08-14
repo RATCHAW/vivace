@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { ChevronDownIcon, Loader2Icon } from "lucide-react";
 import {
   createCoachThreadMutation,
@@ -28,9 +29,9 @@ import { Button } from "@/components/ui/button";
  * prompt and the volume tool's default.
  */
 const RANGES = [
-  { label: "Last 6 weeks", weeks: 6 },
-  { label: "Last 12 weeks", weeks: 12 },
-  { label: "This season", weeks: 52 },
+  { label: "coach.range6", weeks: 6 },
+  { label: "coach.range12", weeks: 12 },
+  { label: "coach.rangeSeason", weeks: 52 },
 ] as const;
 
 /**
@@ -43,6 +44,7 @@ const RANGES = [
  * travels from a replay.
  */
 export function Coach() {
+  const { t } = useTranslation();
   const [params, setParams] = useSearchParams();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -112,7 +114,7 @@ export function Coach() {
 
   const threadTitle =
     threads?.find((candidate) => candidate.id === selectedId)?.title ??
-    "New conversation";
+    t("coach.newConversation");
 
   return (
     <>
@@ -128,14 +130,17 @@ export function Coach() {
           />
         </aside>
 
-        <section aria-label="Coach" className="flex min-h-0 flex-col">
+        <section aria-label={t("coach.section")} className="flex min-h-0 flex-col">
           <header className="border-border flex h-[68px] shrink-0 items-center gap-4 border-b px-6">
             <div className="flex min-w-0 flex-col gap-0.5">
               <span className="text-body-md truncate font-semibold">
                 {threadTitle}
               </span>
               <MonoLabel className="text-mono-badge">
-                Reading {runs?.length ?? 0} runs · {range.label}
+                {t("coach.reading", {
+                  count: runs?.length ?? 0,
+                  range: t(range.label),
+                })}
               </MonoLabel>
             </div>
             <Button
@@ -144,20 +149,20 @@ export function Coach() {
               size="sm"
               variant="subtle"
             >
-              {range.label}
+              {t(range.label)}
               <ChevronDownIcon data-icon="inline-end" />
             </Button>
           </header>
 
           {error ? (
             <Alert className="mt-6" variant="destructive">
-              <AlertTitle>Could not open this conversation</AlertTitle>
+              <AlertTitle>{t("coach.openError")}</AlertTitle>
               <AlertDescription>{error.error}</AlertDescription>
             </Alert>
           ) : !selectedId || isPending || !thread ? (
             <div className="flex flex-1 items-center justify-center">
               <Loader2Icon className="text-muted-foreground size-6 animate-spin" />
-              <span className="sr-only">Loading your conversation…</span>
+              <span className="sr-only">{t("coach.loadingConversation")}</span>
             </div>
           ) : (
             // Keyed so switching threads rebuilds the chat rather than replaying
@@ -181,7 +186,7 @@ export function Coach() {
         <aside className="border-border hidden overflow-y-auto border-l px-5 py-6 xl:block">
           {briefingError ? (
             <Alert variant="destructive">
-              <AlertTitle>Could not read your training</AlertTitle>
+              <AlertTitle>{t("coach.briefingError")}</AlertTitle>
               <AlertDescription>{briefingError.error}</AlertDescription>
             </Alert>
           ) : (

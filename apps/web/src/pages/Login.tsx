@@ -1,7 +1,9 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { authClient } from "@/lib/auth-client";
 import { trackError, trackEvent } from "@/lib/logger";
 import { StravaIcon } from "@/components/icons";
+import { LanguageToggle } from "@/components/language-toggle";
 import { MonoLabel } from "@/components/mono";
 import { Wordmark } from "@/components/wordmark";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -11,6 +13,7 @@ import { Button } from "@/components/ui/button";
 // single {component.button-primary} pill as the loudest pixel on the canvas.
 // Facing it, the thing being sold — one 9:16 replay, standing on its own plate.
 export function Login() {
+  const { t } = useTranslation();
   const [error, setError] = useState<string | null>(null);
 
   async function signInWithStrava() {
@@ -26,51 +29,57 @@ export function Login() {
       errorCallbackURL: `${window.location.origin}/login`,
     });
     if (error) {
-      trackError("auth.sign_in_failed", error.message ?? "Sign-in failed", {
+      // The message comes off the wire in whatever language the auth server
+      // speaks; only our own fallback is ours to translate.
+      const message = error.message ?? t("login.failedFallback");
+      trackError("auth.sign_in_failed", message, {
         provider: "strava",
         status: error.status ?? null,
       });
-      setError(error.message ?? "Sign-in failed");
+      setError(message);
     }
   }
 
   return (
     <main className="grid min-h-svh items-stretch lg:grid-cols-2">
       <div className="flex flex-col justify-between gap-16 px-6 py-12 sm:px-18 sm:py-14">
-        <Wordmark size="lg" />
+        {/* The only screen with no AppHeader, so the language picker has to
+            stand beside the wordmark — a French athlete who arrives here
+            otherwise has nowhere to say so. */}
+        <div className="flex items-center justify-between gap-4">
+          <Wordmark size="lg" />
+          <LanguageToggle />
+        </div>
 
         <div className="flex max-w-[520px] flex-col gap-8">
           <h1 className="font-heading text-display-xl text-balance">
-            Every run,
+            {t("login.titleLine1")}
             <br />
-            a story.
+            {t("login.titleLine2")}
           </h1>
           <p className="text-body-lg text-muted-foreground max-w-[420px] text-balance">
-            Your Strava activities, replayed as a vertical film you can watch and
-            share. Nothing to log, nothing to set up.
+            {t("login.body")}
           </p>
 
           <div className="flex flex-col items-start gap-4">
             <Button size="lg" onClick={signInWithStrava}>
               <StravaIcon className="text-strava" />
-              Continue with Strava
+              {t("login.continueWithStrava")}
             </Button>
-            <span className="text-caption text-stone">
-              Strava is the only way in. We never post on your behalf.
-            </span>
+            <span className="text-caption text-stone">{t("login.footnote")}</span>
           </div>
 
           {error && (
             <Alert variant="destructive" className="max-w-sm">
-              <AlertTitle>Sign-in failed</AlertTitle>
+              <AlertTitle>{t("login.failedTitle")}</AlertTitle>
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
         </div>
 
         <div className="text-caption text-stone flex gap-6">
-          <span>Runs today</span>
-          <span className="opacity-60">Rides, lifts &amp; swims soon</span>
+          <span>{t("login.runsToday")}</span>
+          <span className="opacity-60">{t("login.moreSoon")}</span>
         </div>
       </div>
 
@@ -90,7 +99,7 @@ export function Login() {
             className="from-brand/25 absolute inset-0 bg-radial-[at_50%_35%] to-transparent to-70%"
           />
           <div className="relative flex flex-col gap-3.5">
-            <MonoLabel>9:16 replay</MonoLabel>
+            <MonoLabel>{t("login.plateLabel")}</MonoLabel>
             <span className="text-display-lg font-semibold">
               3.16
               <span className="text-body-lg ml-2 font-medium tracking-[0.08em] text-white/70">
@@ -99,7 +108,7 @@ export function Login() {
             </span>
             <div className="h-px bg-white/15" />
             <span className="text-caption text-white/70">
-              Evening Run · Aug 5, 2026
+              {t("login.plateCaption")}
             </span>
           </div>
         </div>

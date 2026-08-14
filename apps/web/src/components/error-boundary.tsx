@@ -1,10 +1,35 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { trackError } from "@/lib/logger";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 
 interface ErrorBoundaryProps {
   children: ReactNode;
+}
+
+/**
+ * The fallback, split out because the boundary itself has to be a class and a
+ * class cannot call `useTranslation`. Cheaper than the `withTranslation` HOC,
+ * and it keeps the crash screen following a language change like everything
+ * else does.
+ */
+function CrashScreen() {
+  const { t } = useTranslation();
+
+  return (
+    <main className="flex min-h-svh items-center justify-center bg-muted/40 p-6">
+      <div className="flex max-w-sm flex-col gap-4">
+        <Alert variant="destructive">
+          <AlertTitle>{t("errorBoundary.title")}</AlertTitle>
+          <AlertDescription>{t("errorBoundary.body")}</AlertDescription>
+        </Alert>
+        <Button onClick={() => window.location.reload()}>
+          {t("errorBoundary.reload")}
+        </Button>
+      </div>
+    </main>
+  );
 }
 
 interface ErrorBoundaryState {
@@ -33,19 +58,6 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   render(): ReactNode {
     if (!this.state.failed) return this.props.children;
 
-    return (
-      <main className="flex min-h-svh items-center justify-center bg-muted/40 p-6">
-        <div className="flex max-w-sm flex-col gap-4">
-          <Alert variant="destructive">
-            <AlertTitle>Something went wrong</AlertTitle>
-            <AlertDescription>
-              The page stopped working. We've logged what happened — reloading
-              usually gets you moving again.
-            </AlertDescription>
-          </Alert>
-          <Button onClick={() => window.location.reload()}>Reload the app</Button>
-        </div>
-      </main>
-    );
+    return <CrashScreen />;
   }
 }

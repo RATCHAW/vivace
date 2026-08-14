@@ -1,4 +1,6 @@
+import { useTranslation } from "react-i18next";
 import { getTemplate, THEMES, THEME_NAMES, type TemplateId, type ThemeName } from "@repo/video";
+import { useVideoLabels } from "@/i18n/video";
 import { MonoLabel } from "@/components/mono";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Label } from "@/components/ui/label";
@@ -43,14 +45,15 @@ export function VideoOptions({
   showAvatar: boolean;
   onShowAvatarChange: (next: boolean) => void;
 }) {
+  const { t } = useTranslation();
   const themeSupported = getTemplate(template).supportsTheme;
   // A template that honours neither option has no panel — the picker above the
   // player is the whole of its configuration.
   if (!themeSupported && !avatarSupported) return null;
 
   return (
-    <section aria-label="Video options" className="mt-5 flex flex-col gap-3">
-      <MonoLabel>Video options</MonoLabel>
+    <section aria-label={t("videoOptions.section")} className="mt-5 flex flex-col gap-3">
+      <MonoLabel>{t("videoOptions.section")}</MonoLabel>
 
       {themeSupported && <ThemePicker theme={theme} onChange={onThemeChange} />}
 
@@ -63,15 +66,17 @@ export function VideoOptions({
           </Avatar>
 
           <Label htmlFor="show-avatar" className="flex min-w-0 flex-col items-start gap-1">
-            <span className="text-body-sm font-semibold">Run as your avatar</span>
+            <span className="text-body-sm font-semibold">
+              {t("videoOptions.runAsAvatar")}
+            </span>
             <span className="text-caption text-muted-foreground font-normal">
               {avatarUrl
-                ? "Your Strava photo leads the route instead of the dot."
+                ? t("videoOptions.avatarReady")
                 : pending
-                  ? "Checking your Strava profile…"
+                  ? t("videoOptions.avatarPending")
                   : failed
-                    ? "Your Strava profile could not be read."
-                    : "Add a photo on Strava to use this."}
+                    ? t("videoOptions.avatarFailed")
+                    : t("videoOptions.avatarMissing")}
             </span>
           </Label>
 
@@ -100,8 +105,15 @@ function ThemePicker({
   theme: ThemeName;
   onChange: (next: ThemeName) => void;
 }) {
+  const { t } = useTranslation();
+  const labels = useVideoLabels();
+
   return (
-    <div role="group" aria-label="Video theme" className="flex flex-col gap-2.5">
+    <div
+      role="group"
+      aria-label={t("videoOptions.themeGroup")}
+      className="flex flex-col gap-2.5"
+    >
       <div className="flex flex-wrap gap-2">
         {THEME_NAMES.map((name) => (
           <button
@@ -125,11 +137,13 @@ function ThemePicker({
                 borderColor: THEMES[name].accent,
               }}
             />
-            {THEMES[name].label}
+            {labels.themeLabel(name)}
           </button>
         ))}
       </div>
-      <p className="text-caption text-muted-foreground">{THEMES[theme].description}</p>
+      <p className="text-caption text-muted-foreground">
+        {labels.themeDescription(theme)}
+      </p>
     </div>
   );
 }

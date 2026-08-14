@@ -23,5 +23,8 @@ export default defineConfig({
   },
   test: {
     environment: "jsdom",
+    // i18next has to be initialised before the first component renders, the
+    // same as it is in main.tsx.
+    setupFiles: ["./src/test-setup.ts"],
   },
 });

@@ -1,7 +1,10 @@
 import { useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import { DownloadIcon, FilmIcon, Loader2Icon } from "lucide-react";
-import { getTemplate, THEMES, type TemplateId, type ThemeName } from "@repo/video";
+import { getTemplate, type TemplateId, type ThemeName } from "@repo/video";
+import { useVideoLabels, type VideoLabels } from "@/i18n/video";
 import {
   getRunRenderOptions,
   getRunRenderQueryKey,
@@ -53,6 +56,8 @@ export function RenderControls({
   showAvatar: boolean;
   theme: ThemeName;
 }) {
+  const { t } = useTranslation();
+  const labels = useVideoLabels();
   const queryClient = useQueryClient();
   // On unless PostHog says otherwise, so no key (or no flag) changes nothing.
   const renderEnabled = useFeatureFlag(RENDER_FLAG, true);
@@ -89,7 +94,7 @@ export function RenderControls({
   if (loadError) {
     return (
       <Alert variant="destructive" className="mt-4">
-        <AlertTitle>Could not load the render state</AlertTitle>
+        <AlertTitle>{t("render.loadErrorTitle")}</AlertTitle>
         <AlertDescription>{loadError.error}</AlertDescription>
       </Alert>
     );
@@ -100,9 +105,9 @@ export function RenderControls({
       <Progress
         className="mt-5 px-1"
         value={Math.round(render.progress * 100)}
-        aria-label="Video render progress"
+        aria-label={t("render.progressLabel")}
       >
-        <ProgressLabel>Rendering video…</ProgressLabel>
+        <ProgressLabel>{t("render.rendering")}</ProgressLabel>
         <ProgressValue />
       </Progress>
     );
@@ -119,7 +124,7 @@ export function RenderControls({
         render={<a href={download} download />}
       >
         <DownloadIcon />
-        Download video
+        {t("render.downloadVideo")}
       </Button>
     );
   }
@@ -133,7 +138,7 @@ export function RenderControls({
   if (!renderEnabled) {
     return (
       <p className="text-caption text-muted-foreground mt-4 text-center">
-        Video rendering is paused right now. Check back shortly.
+        {t("render.paused")}
       </p>
     );
   }
@@ -142,13 +147,15 @@ export function RenderControls({
     <div className="mt-4 flex flex-col gap-3">
       {failure && (
         <Alert variant="destructive">
-          <AlertTitle>Render failed</AlertTitle>
+          <AlertTitle>{t("render.failedTitle")}</AlertTitle>
           <AlertDescription>{failure}</AlertDescription>
         </Alert>
       )}
       {previous && render && (
         <p className="text-caption text-muted-foreground">
-          Your last video was rendered {describeOptions(template, render)}.
+          {t("render.lastRendered", {
+            options: describeOptions(template, render, t, labels),
+          })}
         </p>
       )}
       <Button
@@ -167,10 +174,10 @@ export function RenderControls({
       >
         {start.isPending ? <Loader2Icon className="animate-spin" /> : <FilmIcon />}
         {render?.status === "error"
-          ? "Retry render"
+          ? t("render.retry")
           : previous
-            ? "Render again"
-            : "Render video"}
+            ? t("render.again")
+            : t("render.start")}
       </Button>
       {/* Rendering replaces the stored file, so the one that already exists is
           offered while it is still there. */}
@@ -182,7 +189,7 @@ export function RenderControls({
           render={<a href={previous} download />}
         >
           <DownloadIcon />
-          Download the last video
+          {t("render.downloadLast")}
         </Button>
       )}
     </div>
@@ -197,12 +204,24 @@ export function RenderControls({
  */
 // `RunRender` carries the `| null` of the state wrapper it is generated from;
 // the caller has already checked, so this takes the render itself.
-function describeOptions(template: TemplateId, render: NonNullable<RunRender>): string {
+//
+// `t` and the label lookups are passed rather than reached for: this is a
+// string builder, not a component, and hooks are the caller's business.
+function describeOptions(
+  template: TemplateId,
+  render: NonNullable<RunRender>,
+  t: TFunction,
+  labels: VideoLabels,
+): string {
   const entry = getTemplate(template);
   const parts: string[] = [];
-  if (entry.supportsTheme) parts.push(`in ${THEMES[render.theme].label}`);
-  if (entry.supportsAvatar) {
-    parts.push(render.show_avatar ? "with your avatar" : "with the plain dot");
+  if (entry.supportsTheme) {
+    parts.push(t("render.optionTheme", { theme: labels.themeLabel(render.theme) }));
   }
-  return parts.join(", ") || "with different options";
+  if (entry.supportsAvatar) {
+    parts.push(
+      render.show_avatar ? t("render.optionAvatar") : t("render.optionDot"),
+    );
+  }
+  return parts.join(", ") || t("render.optionOther");
 }

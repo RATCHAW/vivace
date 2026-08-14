@@ -155,9 +155,12 @@ export function replayFrame(t: number, route: Route) {
 }
 
 /** The finished run, as the summary card states it. */
+/**
+ * The numbers on the summary card. The date and the run's name used to sit
+ * here too; they are words, so they moved to the message catalogue and reach
+ * the plate as props — see `hero.replay` in `src/i18n/messages/en.ts`.
+ */
 export const RUN_SUMMARY = {
-  date: "WED AUG 5 · 8:18 PM",
-  title: "Evening Run",
   distance: RUN.km.toFixed(2),
   time: "19:29",
   pace: "6:10",
