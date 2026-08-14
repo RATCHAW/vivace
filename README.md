@@ -8,21 +8,6 @@ signals, race predictions, plans and post-run debriefs.
 Runs are the live activity type today. Rides, strength sessions, swims and hikes
 appear in the product as coming next, but are not implemented yet.
 
-## What is in the product today
-
-- A Strava-authenticated overview with season totals, the latest activities and
-  athlete details.
-- A runs catalogue with linkable activities, four 9:16 video formats, live pace
-  and heart-rate metrics, themes, an optional athlete avatar and a theatre view.
-- Optional Remotion Lambda rendering to a downloadable MP4 in S3, with progress
-  streamed to the browser and render history stored in Postgres.
-- A persistent AI coach with athlete memory, Strava-backed tools, visual cards,
-  accepted weekly plans, image/PDF attachments and run mentions.
-- Automatic post-run debriefs when a Strava webhook is configured.
-- A separate, statically rendered marketing site.
-- Structured logging and provisioned Grafana dashboards, plus optional PostHog
-  analytics, replay, error tracking, feature flags and AI traces.
-
 ## Stack
 
 | Piece | Choice |
@@ -39,9 +24,8 @@ appear in the product as coming next, but are not implemented yet.
 | Strava client | Generated from Strava's own Swagger (`packages/strava-api`) |
 | Video | A template catalogue in `packages/video`, previewed with Remotion Player and rendered on [Remotion Lambda](https://www.remotion.dev/lambda) → MP4 in S3 |
 | AI coach | [AI SDK](https://ai-sdk.dev) on both ends — Gemini 2.5 Flash, [AI Elements](https://elements.ai-sdk.dev) UI |
-| Logging | [pino](https://getpino.io) → [Grafana Loki](https://grafana.com/oss/loki/), dashboards in `ops/grafana` |
+| Logging | [pino](https://getpino.io) → [Grafana Loki](https://grafana.com/oss/loki/) |
 | Product analytics | [PostHog](https://posthog.com) — events, replay, flags, error tracking, LLM traces |
-| Deployment | Web + landing on Vercel; API on Coolify; render workers and bundles on AWS Lambda/S3 |
 | Tests | [Vitest](https://vitest.dev) + TypeScript checks |
 
 ## Prerequisites
@@ -104,7 +88,6 @@ only the downloadable MP4 render is unavailable.
 | `apps/landing` | Public Next.js marketing site |
 | `packages/strava-api` | Generated SDK for Strava's API |
 | `packages/video` | Shared Remotion template catalogue, Player code and Lambda entry |
-| `ops/loki`, `ops/grafana` | Local log storage and provisioned dashboards |
 
 ## Database
 
@@ -120,24 +103,11 @@ pnpm db:generate     # writes apps/api/drizzle/NNNN_*.sql + the snapshot
 pnpm db:migrate      # applies it (the API also does this itself at boot)
 ```
 
-Three things about this setup are not obvious:
-
-- **The API migrates before it binds the port.** `src/db/migrate.ts` runs at
-  startup, behind a Postgres advisory lock so two containers overlapping during a
-  deploy can't both apply the same file. It fails closed — a process that served
-  requests against the wrong schema would look healthy while answering 500s.
-  There is no deployment step and no migration CLI in the production image.
-- **A database that already existed is adopted, not rebuilt.** Every table used
-  to be created lazily by the store that read it. `0000_init` describes exactly
-  what that produced, so on a database that predates Drizzle the migrator records
-  it as applied instead of running it, and carries on from `0001`. A local
-  database *older* than the last release is refused with a message telling you to
-  run `pnpm db:reset`, rather than adopted at a schema it doesn't have.
-- **better-auth's columns are camelCase and must stay that way.** Its Kysely
-  adapter quoted its own field names when it created those tables, so production
-  holds `"userId"`, not `user_id`. `auth:generate` emits snake_case — it writes
-  to a gitignored scratch file so nobody pastes it over the real schema, and
-  `src/db/schema.test.ts` fails if the two ever disagree.
+One thing is not obvious: **better-auth's columns are camelCase and must stay
+that way.** Its Kysely adapter quoted its own field names when it created those
+tables, so production holds `"userId"`, not `user_id`. `auth:generate` emits
+snake_case — it writes to a gitignored scratch file so nobody pastes it over the
+real schema, and `src/db/schema.test.ts` fails if the two ever disagree.
 
 `pnpm db:seed` truncates and refills with deterministic fixtures
 ([`drizzle-seed`](https://orm.drizzle.team/docs/seed-overview)) — three athletes
@@ -249,7 +219,7 @@ All generated output is committed, so a fresh clone builds without running codeg
 A test in `apps/api/src/openapi.test.ts` fails if `openapi.json` drifts from the
 routes — if it does, run `pnpm generate`.
 
-## Rendering run videos on Lambda
+## Run videos
 
 Each run's story video (the one the `<Player>` previews on `/runs`) can be
 rendered to a real MP4 on [Remotion Lambda](https://www.remotion.dev/docs/lambda)
@@ -284,108 +254,50 @@ The catalogue today:
 | **Route poster** | The route drawn on a bare plate, north up, then held still for two and a half seconds. | A GPS route |
 | **Minimal numbers** | One number at a time, filling the screen, counting up. | Nothing but a distance and a time |
 
-The three new ones share `packages/video/src/core/` — safe area, type ramp,
-themes, formatters, route geometry, beats — and are cut for **mute playback** on
-a story: nothing informational outside y=250…1600, tabular numerals on anything
-that animates, and a hard 15s ceiling because Instagram cuts a segment there.
-Their length is a property of the *run*, not the catalogue: a marathon's Split
-rush is longer than a parkrun's, and a run with three numbers is a shorter
-Minimal numbers than one with five. `estimateDurationInFrames` is what Remotion's
-`calculateMetadata` returns on Lambda and what sizes the `<Player>`, so the file
-and the preview are the same cut.
+The last three share `packages/video/src/core/` — safe area, type ramp, themes,
+formatters, route geometry, beats — and are cut for mute playback on a story. A
+film's length is a property of the *run*, not the catalogue: a marathon's Split
+rush is longer than a parkrun's.
 
 A run that can't have a template sees it **greyed with the reason** rather than
 gone ("Needs a GPS route — this run has none"). Minimal numbers is eligible for
 everything by construction: it is what renders when a run has nothing.
 
-A serve URL is a *bundle*, not a video: one site holds every composition and
-`renderMediaOnLambda` picks one by id, so N templates is N chunks, not N
-deployments. Each is a separate webpack chunk (`lazyComponent`), so a render only
-downloads the template it asked for — which matters because Lambda re-fetches the
-bundle on every cold start.
-
-What *does* split is the function. `RENDER_PROFILES` describes the iron: the
-`map` profile is 2GB with software OpenGL and a 120s frame budget because it
-rasterises map tiles; `light` is 1GB with neither. The deploy script creates one
-function per profile actually in use, and Lambda bills GB-seconds, so a template
-that only lays out type never pays the map template's memory.
-
-Two optional overrides in `apps/api/.env` are checked before the shared values,
-which is what makes both of those a config change rather than a refactor:
-
-| Variable | Use |
-| --- | --- |
-| `REMOTION_FUNCTION_NAME_<PROFILE>` | Send one profile to its own function |
-| `REMOTION_SERVE_URL_<TEMPLATE>` | Send one template to its own bundle — to canary it, or to keep heavy dependencies out of every other template's cold start |
-
 ### Options
 
-Which template is playing is asked **above the player**, in a dropdown that
-names each one and explains it in a line — including the ones this run can't
-have, which are listed disabled with the reason in place of the description.
-
-**Video options** sit between the player and the render button and change the
-film rather than which film it is. The **theme** is one — Charcoal, Cream or
-Cobalt, three looks shared by every template that has one, and no generated
-palettes; it is offered by templates whose `supportsTheme` is true, which the
-route replay isn't, because its plate is a Mapbox style rather than ours to
-re-tint. *Run as your avatar* is the other: it swaps the dot at the head of the
-route for the athlete's Strava picture — three times the size, with the camera
-widened to keep it in frame — and is offered only by templates whose
-`supportsAvatar` is true. A template that honours neither has no panel at all.
-The `<Player>` updates as each choice is made, and the same choices travel with
-the render request.
+Two options sit between the player and the render button: the **theme**
+(Charcoal, Cream or Cobalt) and *Run as your avatar*, which swaps the dot at the
+head of the route for the athlete's Strava picture. Each is offered only by
+templates whose `supportsTheme` / `supportsAvatar` says so — a template that
+honours neither has no panel at all.
 
 Template and options are part of a render's identity (a `props_hash` on the row),
 so a run already rendered with a different answer offers **Render again** (and
 the previous MP4) instead of passing the old file off as the new choice. Because
-the template is part of the *key*, though, switching template doesn't discard the
-video made with the last one — a run holds one render per template. An athlete
-who never set a Strava picture gets the dot, and the switch says so.
+the template is part of the *key*, switching template doesn't discard the video
+made with the last one — a run holds one render per template.
 
-### Setup
+### Enabling renders locally
 
-One-time (all optional — without it the render button returns a 503 and the rest
-of the app is unaffected):
+Optional — without it the render button returns a 503 and the rest of the app is
+unaffected.
 
 ```sh
 # 1. AWS credentials for Remotion — https://www.remotion.dev/docs/lambda/setup
-#    (create the role, policies and IAM user described there), then put
-#    REMOTION_AWS_ACCESS_KEY_ID / REMOTION_AWS_SECRET_ACCESS_KEY in apps/api/.env
+#    then put REMOTION_AWS_ACCESS_KEY_ID / REMOTION_AWS_SECRET_ACCESS_KEY
+#    in apps/api/.env
 
-# 2. Deploy a Lambda function per profile + the site bundle to S3
+# 2. Deploy a Lambda function per render profile + the site bundle to S3
 pnpm video:deploy
-#    → prints REMOTION_AWS_REGION / REMOTION_FUNCTION_NAME / REMOTION_SERVE_URL
-#      (plus any REMOTION_FUNCTION_NAME_<PROFILE> it created);
-#      put them in apps/api/.env. Optionally add MAPBOX_TOKEN for the full map.
+#    → prints the REMOTION_* values to paste into apps/api/.env.
+#      Optionally add MAPBOX_TOKEN for the full map.
 ```
 
 Redeploy after changing a composition (`packages/video/src/`) — the site bundle
-is what Lambda renders, not your local code. Sites are named after the commit
-they were built from (`vivace-<sha>`), so a deploy adds a bundle rather than
-overwriting the one a shipped video came from, and rolling back is pointing
-`REMOTION_SERVE_URL` at the previous one. After a Remotion version upgrade the
-functions must be redeployed too; all `remotion`/`@remotion/*` packages are
-pinned to the same exact version for this reason.
-
-`pnpm --filter @repo/video bundle:check` compiles that same bundle locally, with
-no AWS involved — worth running after adding a template, since `deploySite` is
-otherwise the first thing that would find a broken import. It also prints the
-entry/lazy split, which is the number that matters: the entry chunk is
-downloaded on every Lambda cold start, a template's own chunk only when that
-template renders. Today that's 1.2MB entry against 10.2MB lazy — Mapbox is not in
-the entry, so a future template that needs no map won't pay for it.
-
-How it flows: `POST /api/runs/{id}/render` resolves the template's function and
-bundle, fetches the run + streams from Strava — plus the athlete, when the avatar
-option is on, so the picture baked into the video is read from Strava rather than
-named by the browser — calls `renderMediaOnLambda()`, and stores the render row
-with the template, options and the function it ran on.
-`GET /api/runs/{id}/render/progress?template=…` (SSE) polls that same function —
-off the row, not the environment, so a template moving between profiles can't
-strand a render in flight — persists each update, and streams it to the browser.
-`GET /api/runs/{id}/render?template=…` serves the stored state. The MP4 lands in
-the Remotion S3 bucket with a public download URL.
+is what Lambda renders, not your local code.
+`pnpm --filter @repo/video bundle:check` compiles that same bundle locally with
+no AWS involved, which is worth running after adding a template: `deploySite` is
+otherwise the first thing that would find a broken import.
 
 ## The AI coach
 
@@ -430,15 +342,12 @@ How it flows, and why it looks like this:
 - **Conversations live in Postgres** (`coach_thread`, `coach_message`). The
   sidebar on `/coach` lists them; the open
   one is in the URL (`?thread=`), so it survives a reload and can be linked.
-- **The browser sends one message, not the transcript.**
-  `prepareSendMessagesRequest` trims the request to what was just typed; the API
-  loads the history it already has, streams the answer, and persists it in
-  `onEnd`. The server, not the tab, is the source of truth.
+- **The browser sends one message, not the transcript.** The API loads the
+  history it already has, streams the answer, and persists it — the server, not
+  the tab, is the source of truth.
 - **`POST /api/coach/chat` is documented but not generated against.** Like the
   render-progress SSE route, its response is a stream — `useChat` consumes it
   directly. The thread CRUD routes beside it use the generated client as normal.
-- **Reasoning is on.** Gemini streams its thinking (`includeThoughts`), which the
-  UI collapses above each answer.
 - Attachments (images and PDFs, ≤8 MB) ride along as `UIMessage` file parts.
 - **A run can be attached to a question.** The composer's `@` picker puts the run
   on the message's `metadata`, which reaches the model as a line in the system
@@ -448,17 +357,11 @@ How it flows, and why it looks like this:
 
 With a [push subscription](https://developers.strava.com/docs/webhooks/), a
 finished run becomes a debrief in the athlete's "Post-run debriefs" thread
-without anyone asking:
+without anyone asking. It needs `STRAVA_WEBHOOK_VERIFY_TOKEN` and
+`STRAVA_WEBHOOK_SIGNING_SECRET` in `apps/api/.env`, and the API publicly
+reachable:
 
 ```sh
-# 1. Any random string, in apps/api/.env — the API echoes Strava's challenge
-#    only when it matches.
-STRAVA_WEBHOOK_VERIFY_TOKEN=$(openssl rand -hex 16)
-# Copy the webhook signing secret assigned to your Strava application too.
-STRAVA_WEBHOOK_SIGNING_SECRET=...
-
-# 2. With the API publicly reachable (in development, a tunnel:
-#    cloudflared tunnel --url http://localhost:3000)
 pnpm --filter @repo/api webhook subscribe https://<host>/api/strava/webhook
 pnpm --filter @repo/api webhook view
 pnpm --filter @repo/api webhook delete <id>
@@ -471,12 +374,6 @@ over the exact request body, then acknowledges and works afterwards. The HMAC
 rejects forged or replayed deliveries; `strava_webhook_event` absorbs Strava's
 legitimate retries, and `coach_debrief` makes sure a run is never debriefed
 twice even if a redelivery arrives long after those rows are pruned.
-
-The card in an automatic debrief is a **`data-` part, not a tool part** — nothing
-called a tool, and a function call at the head of a thread with no question in
-front of it makes the athlete's *next* message fail. `convertToModelMessages`
-drops data parts, so the card stays UI and the written read is what the model
-sees. There is a test pinning that (`debrief.test.ts`).
 
 Unset the verify token and the callback refuses to validate. Unset the signing
 secret and event POSTs fail closed with 503; nothing else in the app changes.
@@ -503,12 +400,8 @@ hand-rolling markup or writing bespoke CSS.
 
 ```sh
 # add a component (button, dialog, table, …) — see https://ui.shadcn.com/docs/components
+# what is already installed: ls apps/web/src/components/ui
 pnpm --filter @repo/web ui:add table
-
-# already installed
-# alert  avatar  badge  button  card  collapsible  dialog  dropdown-menu
-# hover-card  input  input-group  label  progress  select  separator  skeleton
-# slider  sonner  spinner  switch  textarea  tooltip
 ```
 
 The chat surfaces in `apps/web/src/components/ai-elements/` come from
@@ -533,90 +426,47 @@ its own. It has no session, no API client and no generated code: it never talks 
 
 - **Static localized routes** — `/en` and `/fr` compose the marketing sections;
   each language also prerenders localized About, Contact, Privacy, Terms and
-  Strava-data pages. The language switcher keeps equivalent pages paired.
-- **Search discovery** — the landing app emits `robots.txt`, `sitemap.xml`,
-  canonical and `hreflang` links, social-card metadata and WebSite/Organization
-  structured data. `NEXT_PUBLIC_SITE_URL` must use the final public origin.
+  Strava-data pages, plus `robots.txt`, `sitemap.xml` and structured data.
+  `NEXT_PUBLIC_SITE_URL` must use the final public origin.
 - **Where the buttons go** — every "Connect Strava" leaves for
   `${NEXT_PUBLIC_APP_URL}/login`. `NEXT_PUBLIC_*` is inlined at build time, so the
-  app's origin is a *build* input, including in `apps/landing/Dockerfile`.
-- **The hero replay** (`src/components/replay-phone.tsx`) is the primary client
-  component. Its maths lives in `src/lib/replay.ts` as pure functions of `t`, so the
-  server and the first client frame agree, and it is tested without a DOM. The frame
-  is served mid-run: no JS, or `prefers-reduced-motion`, still shows a running replay.
-  The only other client boundary initializes analytics, and dynamically imports
-  PostHog only when a project key is configured.
-- **Tokens** — `src/styles.css` mirrors `apps/web/src/styles.css` and
-  [`apps/web/DESIGN.md`](./apps/web/DESIGN.md); keep the two in step. The one
-  deliberate difference: the app switches canvas by theme (`.dark`), the landing page
-  switches it by band — `:root` is the dark canvas and a white catalogue band
-  re-declares the light token set with `.band-light`.
+  app's origin is a *build* input.
+- **`src/styles.css` mirrors `apps/web/src/styles.css`** and
+  [`apps/web/DESIGN.md`](./apps/web/DESIGN.md); keep the two in step.
 - The coach waitlist has no backend; the form posts a mail draft to
   `NEXT_PUBLIC_WAITLIST_EMAIL`. Swap the `action` when there is an endpoint.
 
-## Logging and Grafana
+## Logging
 
-Every log line is JSON on stdout. Set `LOKI_URL` and the same lines are pushed to
+Every log line is JSON on stdout, written through pino
+(`apps/api/src/logger.ts`) — never `console.log`. Each line carries a dotted,
+low-cardinality `event` name (`render.started`, `strava.request_failed`,
+`ui.page_view`); ids and other variable values go in sibling fields. The API
+writes one `http_request` line per request with `route`, status, `durationMs`,
+`userId` and `requestId`, and every response carries the matching
+`x-request-id`. The browser batches its own actions and crashes to
+`POST /api/logs`, which re-logs them server-side with `source: "web"`.
+
+Set `LOKI_URL` and the same lines are pushed to
 [Loki](https://grafana.com/oss/loki/), where two provisioned Grafana dashboards
-read them — one for what users are doing, one for what is breaking.
+read them — one for what users are doing, one for what is breaking:
 
 ```sh
-# 1. Start Loki + Grafana (db comes along; the app profile starts these too)
-docker compose --profile observability up -d
-
-# 2. Point the API at Loki — in apps/api/.env
-#    LOKI_URL=http://localhost:3100
-pnpm dev
+pnpm logs:up   # Postgres + Loki + Grafana
+#              → LOKI_URL=http://localhost:3100 in apps/api/.env
 ```
 
 Grafana is at <http://localhost:3002> — anonymous read-only access, no login. Open
 **Vivace — user activity** or **Vivace — errors & health**.
-
-**What gets logged.** The API writes one `http_request` line per request
-(method, `route`, status, `durationMs`, `userId`, `requestId`) plus a domain
-event for anything worth counting on its own: `render.started`,
-`render.finished`, `strava.request_failed`, `auth.strava_token_refresh_failed`,
-`request.invalid`, `unhandled_error`. The browser reports its own actions and
-crashes — `ui.page_view`, `ui.render_clicked`, `auth.sign_in_started`,
-`ui.render_crashed`, `api.query_failed` — by batching them to `POST /api/logs`,
-which re-logs them server-side with `source: "web"`. Both halves land in one
-Loki stream, so a click and the 502 it caused sit next to each other.
-
-**Following one request.** Every response carries `x-request-id`, every line
-from that request carries the same `requestId`, and the Loki datasource turns it
-into a link: click it on any line to pull up everything else that request did.
-
-```logql
-{app="vivace"} | json | requestId = "…"          # one request, end to end
-{app="vivace"} | json | userId = "…"             # one athlete's whole session
-{app="vivace", level="error"}                    # everything that broke
-{app="vivace"} | json | event =~ "^ui\\..*$"     # what people clicked
-```
-
-Note that label-filter regexes in LogQL match the **whole** value: write
-`event =~ "^render\\..*$"`, not `event =~ "render.*"` — the latter also matches
-`ui.render_crashed`.
-
-**Configuration** (`apps/api/.env`, all optional):
-
-| Variable | Effect |
-| --- | --- |
-| `LOKI_URL` | Where to push. Unset = stdout only |
-| `LOKI_USERNAME` / `LOKI_PASSWORD` | Basic auth, for Grafana Cloud |
-| `LOG_LEVEL` | `trace`…`fatal`, default `info` (`/health` logs at `debug`) |
-| `APP_ENV` | The `env` label in Loki — keeps staging out of production's panels |
-| `LOG_PRETTY` | Force human-readable (`true`) or JSON (`false`); defaults to a TTY check |
-
-For **Grafana Cloud**, skip the containers: point `LOKI_URL` at the hosted push
-URL, set the user id / API token, and import the two files in
-`ops/grafana/dashboards`.
 
 ## PostHog
 
 Grafana answers "is the server healthy"; PostHog answers "is the product
 working for the people using it". Both are fed from the *same* call sites —
 `trackEvent`/`trackError` in the browser, `track`/`trackError` in the API — so
-an event can't reach one and miss the other.
+an event can't reach one and miss the other. Product analytics, web analytics,
+session replay, error tracking, feature flags and the coach's LLM traces all
+come from those helpers; nothing else imports the SDKs.
 
 Set a project API key and it turns on. Leave it unset — the default, and the
 state of every test run — and none of it loads.
@@ -634,30 +484,13 @@ The key is the *project* key, which is public by design — it can only write
 events. Add `POSTHOG_HOST=https://eu.i.posthog.com` (and the matching
 `VITE_`/`NEXT_PUBLIC_` variants) for an EU or self-hosted project.
 
-What each product is wired to:
-
-| Product | Where it comes from |
-| --- | --- |
-| **Product analytics** | `trackEvent` in the browser and `track()` in the API — `ui.render_clicked`, `render.started`, `coach.turn_started`, … |
-| **Web analytics** | `$pageview` / `$pageleave` and autocapture, on the app *and* the landing page — which is where the sign-up funnel actually starts |
-| **Session replay** | On, inputs masked. The athlete's name and avatar carry `ph-no-capture` |
-| **Error tracking** | Every `trackError`, the React `ErrorBoundary`, `window.onerror`, the React Query caches, and the API's `onError` |
-| **Feature flags** | `useFeatureFlag()` in the browser, `isFeatureEnabledFor()` in the API. `video-render` is a real one — see below |
-| **AI observability** | One `$ai_trace` per coach turn, an `$ai_generation` per model call inside it and an `$ai_span` per tool call — see below |
-| **Surveys** | Enabled in the SDK; author and target them in PostHog against the events above — no deploy needed |
-
 ### The `video-render` flag
 
 A Lambda render is the one click here that costs real money, so it has a kill
-switch. The browser hides the button and the API refuses to start a render —
-the second is what enforces it.
-
-It **defaults to on**: no PostHog, no flag, or an unreachable PostHog all mean
+switch: the browser hides the button and the API refuses to start a render. It
+**defaults to on** — no PostHog, no flag, or an unreachable PostHog all mean
 "behave exactly as the app shipped". Create a `video-render` flag in PostHog and
-roll it to 0% to switch rendering off without a deploy. Note that this is why
-the API reads `getFlag()` rather than `isEnabled()` — the latter reports a flag
-that doesn't exist as *off*, which would disable the feature the moment PostHog
-was switched on.
+roll it to 0% to switch rendering off without a deploy.
 
 ### AI observability
 
@@ -708,13 +541,6 @@ link to and no conversation to sit in: nobody asked for it.
 - `person_profiles: "identified_only"`, so anonymous traffic doesn't create a
   person for every visitor.
 
-### Not wired up
-
-PostHog's **Logs** and **Metrics** products ingest over OTLP and would duplicate
-the Loki pipeline above — one log store is enough, and Grafana already has the
-dashboards. **MCP analytics** needs an MCP server, which this repo doesn't have.
-**Support** is configured in PostHog rather than in code.
-
 ## Commands
 
 ```sh
@@ -742,118 +568,17 @@ pnpm --filter @repo/web test
 pnpm --filter @repo/landing dev   # landing page only, on :3001
 ```
 
-## Linting and formatting
+## Checks
 
-One ESLint flat config (`eslint.config.mjs`) and one Prettier config
-(`prettier.config.mjs`) at the root cover all five workspaces — no workspace has
-its own lint toolchain. `eslint-config-prettier` is last in the ESLint config, so
-the two tools can never disagree about a line break.
-
-Prettier runs on its defaults; the repository was already 80 columns, semicolons,
-double quotes and trailing commas, which is Prettier's output exactly.
-
-What is deliberately **not** formatted or linted, and why:
-
-| Excluded | Reason |
-| --- | --- |
-| `apps/api/openapi.json`, both `src/generated/` trees, `strava-swagger.json` | Written by `pnpm generate` with its own formatter. Reformatting them would make every regeneration a diff. |
-| `.agents/`, `.claude/` | Vendored agent skills, pinned by content hash in `skills-lock.json`. Editing a byte invalidates the lock. |
-| `**/*.md` | Prettier's Markdown printer rewrote the continuation line `+ template` (in `run_render`'s key, `user + activity + template`) into a list bullet, `- template`. Formatting prose is not worth changing what it says. |
-
-Three ESLint choices are worth knowing about:
-
-- **Type-aware rules are scoped to `src/` and `scripts/`** — the directories a
-  workspace tsconfig actually claims. They cost a TypeScript program, and they
-  earn it: `no-floating-promises` and `await-thenable` catch the unawaited
-  promise in a Hono handler that no syntactic rule can see.
-- **`no-misused-promises` does not check void-return positions.**
-  `onClick={async () => …}` is how React is written, react-router's `navigate`
-  returns an ignored promise, and `FormEventHandler` is typed `=> void`. Those
-  positions flag the framework's shape, not a bug. Conditions, spreads and
-  arguments are still checked.
-- **`no-console` is an error in `src/`.** It encodes the logging rule in
-  CLAUDE.md — pino in the API, the batching `@/lib/logger` in the browser. There
-  were zero violations when it was switched on. Scripts and tests are exempt.
-
-`eslint-plugin-react-refresh` was tried and dropped: it wants component files to
-export nothing but components, and this codebase colocates helpers and hooks with
-the components that use them, in both vendored registry files and its own. Its
-only payoff is faster HMR.
-
-## Git hooks
-
-`pnpm install` runs `husky` through the root `prepare` script, which points
-`core.hooksPath` at `.husky/_`. Two hooks are installed:
-
-| Hook | Runs | Rejects |
-| --- | --- | --- |
-| `pre-commit` | `pnpm lint-staged` | a staged file that is misformatted, fails ESLint, or breaks its workspace's typecheck |
-| `commit-msg` | `pnpm commitlint --edit $1` | a message that is not a [Conventional Commit](https://www.conventionalcommits.org) |
-
-`lint-staged.config.mjs` runs three things over the staged files, in the order a
-fix should happen: `prettier --write`, then `eslint --fix --max-warnings=0`, then
-`turbo run typecheck`. The first two rewrite files in place and lint-staged
-re-stages the result, so a formatting-only problem fixes itself and the commit
-goes through.
-
-Typecheck is per package rather than per file, so the staged paths are mapped
-back to the workspaces that own them — touching `apps/landing` never typechecks
-the API. Turbo caches the result; an unchanged package costs nothing on the next
-commit. lint-staged stashes unstaged work first, so every command sees the tree
-that is about to be committed rather than the one on disk.
-
-The hooks are a fast gate, not a replacement for CI — they do not run tests or
-builds, and they only ever see *staged* files. CI re-runs `format:check` and
-`lint` across the whole tree for that reason.
-`pnpm typecheck && pnpm test && pnpm build` is still what "done" means.
+`pnpm lint && pnpm format:check && pnpm typecheck && pnpm test && pnpm build` is
+what "done" means, and what CI runs. Husky hooks catch a subset earlier:
+`pre-commit` formats, lints and typechecks the staged files, and `commit-msg`
+requires a [Conventional Commit](https://www.conventionalcommits.org).
 
 ```sh
 git commit --no-verify   # skip both hooks
 HUSKY=0 git commit       # skip them for a whole shell session
 ```
-
-## Running fully in Docker
-
-```sh
-BETTER_AUTH_SECRET=... STRAVA_CLIENT_ID=... STRAVA_CLIENT_SECRET=... \
-  docker compose --profile app up --build
-```
-
-Web is served at <http://localhost:8080> (nginx proxies `/api` to the API container),
-the landing page at <http://localhost:3001>, and Grafana at <http://localhost:3002>
-— the `app` profile brings Loki and Grafana up too, and the API container is
-already pointed at them. Note: for the Docker setup, set
-`BETTER_AUTH_URL`/`WEB_ORIGIN` and the landing page's `NEXT_PUBLIC_APP_URL` build arg
-accordingly in `docker-compose.yml` if you change ports.
-
-## Production deployment
-
-Production is split by surface rather than shipped as the all-in-one Compose
-stack:
-
-| Surface | Deployment path |
-| --- | --- |
-| `apps/web` | Vercel Git integration. `apps/web/vercel.json` proxies `/api/*` to `https://api.vivace.run` and rewrites SPA routes to `index.html`. |
-| `apps/landing` | Vercel Git integration. It builds as a normal Next.js app on Vercel and uses standalone output only for self-hosted/Docker builds. |
-| `apps/api` | Coolify, deployed only by `.github/workflows/deploy.yml`. Coolify auto-deploy must remain disabled. |
-| `packages/video` | Remotion Lambda functions plus a commit-named site bundle in S3, deployed by the same workflow when video code or its lockfile changes. |
-
-Every push to `main` runs install, typecheck, tests and builds first. When the API
-needs deploying, the workflow pins Coolify to that exact tested commit, updates
-the Remotion environment when necessary, starts the deployment and waits for its
-terminal status. It reaches the private Coolify API through an ephemeral
-Tailscale node.
-
-The workflow expects these repository settings:
-
-| Kind | Names |
-| --- | --- |
-| GitHub secrets | `COOLIFY_TOKEN`, `TS_OAUTH_CLIENT_ID`, `TS_OAUTH_SECRET`, `REMOTION_AWS_ACCESS_KEY_ID`, `REMOTION_AWS_SECRET_ACCESS_KEY` |
-| GitHub variables | `COOLIFY_URL`, `COOLIFY_APP_UUID`, `REMOTION_AWS_REGION` |
-
-The Vercel projects must receive the relevant `VITE_*` and `NEXT_PUBLIC_*`
-values as build-time environment variables. The API's runtime variables are the
-settings documented in `apps/api/.env.example`.
 
 ## License
 
