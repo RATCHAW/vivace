@@ -11,7 +11,8 @@
 import { generateText } from "ai";
 import { createIdGenerator, type UIMessage } from "ai";
 import { logger } from "./logger.js";
-import { captureCoachGeneration, captureUserEvent } from "./posthog.js";
+import { captureUserEvent } from "./posthog.js";
+import { observeTurn } from "./ai-observability.js";
 import {
   buildRunDebriefCard,
   getCoachConfig,
@@ -99,51 +100,32 @@ export async function postRunDebrief(
         avg_hr: other.average_heartrate,
       })),
     )}`;
-    const startedAt = Date.now();
+    // The app's other model call, and the only one nobody is watching — so its
+    // tokens, latency and stop reason belong in the same LLM analytics as a
+    // coach turn rather than being the invisible half of the bill. No replay to
+    // link it to and no conversation to group it with: a webhook wrote this.
+    const turn = observeTurn({
+      distinctId: userId,
+      name: "post-run debrief",
+      properties: { activity_id: activityId },
+    });
 
     try {
-      const { text, usage, finishReason } = await generateText({
+      const { text } = await generateText({
         model: config.model,
         system: coachSystemPrompt(today, 6),
         prompt,
+        ...turn.callbacks,
       });
       if (text.trim()) read = text.trim();
-
-      // The app's other model call, and the only one nobody is watching — so
-      // its tokens, latency and stop reason belong in the same LLM analytics as
-      // a coach turn rather than being the invisible half of the bill.
-      captureCoachGeneration({
-        distinctId: userId,
-        modelId: config.modelId,
-        latencySeconds: (Date.now() - startedAt) / 1000,
-        inputTokens: usage.inputTokens,
-        outputTokens: usage.outputTokens,
-        input: prompt,
-        output: text,
-        finishReason,
-        properties: {
-          $ai_span_name: "post-run debrief",
-          activity_id: activityId,
-        },
-      });
+      turn.end({ input: prompt, output: text });
     } catch (err) {
       // A model that is down should cost the athlete the prose, not the card.
       log.error(
         { event: "debrief.model_failed", err },
         "Could not write the debrief",
       );
-      captureCoachGeneration({
-        distinctId: userId,
-        modelId: config.modelId,
-        latencySeconds: (Date.now() - startedAt) / 1000,
-        input: prompt,
-        output: null,
-        error: err,
-        properties: {
-          $ai_span_name: "post-run debrief",
-          activity_id: activityId,
-        },
-      });
+      turn.end({ input: prompt, error: err });
     }
   }
 

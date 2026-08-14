@@ -25,6 +25,7 @@ import {
   type Run,
 } from "@/api";
 import { trackError } from "@/lib/logger";
+import { replaySessionId } from "@/lib/posthog";
 import {
   Attachment,
   AttachmentPreview,
@@ -226,6 +227,18 @@ function readableError(error: Error): string {
   return error.message;
 }
 
+/**
+ * PostHog's own header name for the replay in progress. The API reads it off
+ * the coach turn and hangs it on every LLM event the answer produces, so a
+ * trace in AI observability links back to the session it came from.
+ *
+ * Empty when PostHog is off, which is a fresh clone and every test run.
+ */
+function sessionHeader(): Record<string, string> {
+  const session = replaySessionId();
+  return session ? { "X-POSTHOG-SESSION-ID": session } : {};
+}
+
 function CopyAction({ text }: { text: string }) {
   const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
@@ -348,24 +361,31 @@ export function CoachChat({
       // Same-origin in dev via the Vite proxy, but the session cookie has to be
       // asked for explicitly all the same.
       credentials: "include",
-      prepareSendMessagesRequest: ({ id, messages, trigger, messageId }) =>
-        trigger === "regenerate-message"
-          ? {
-              body: {
+      prepareSendMessagesRequest: ({ id, messages, trigger, messageId }) => ({
+        // Read per request, not once at mount: a replay rotates, and a trace
+        // pointing at yesterday's session is worse than one pointing at none.
+        // The API reads it as `$session_id` on the turn's LLM events, which is
+        // what makes a slow answer watchable — see ai-observability.ts.
+        //
+        // What is returned here replaces the transport's own headers, which is
+        // safe because it sets none — `Content-Type` is the SDK's own and is
+        // added after this.
+        headers: sessionHeader(),
+        body:
+          trigger === "regenerate-message"
+            ? {
                 thread_id: id,
                 trigger,
                 message_id: messageId,
                 range_weeks: rangeWeeks,
-              },
-            }
-          : {
-              body: {
+              }
+            : {
                 thread_id: id,
                 trigger,
                 message: messages.at(-1),
                 range_weeks: rangeWeeks,
               },
-            },
+      }),
     }),
     // The first message names the thread and every message reorders the list.
     onFinish: () =>
