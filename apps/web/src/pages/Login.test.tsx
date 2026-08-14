@@ -42,9 +42,15 @@ describe("Login page", () => {
     render(<Login />);
     expect(screen.getByText("Continuer avec Strava")).toBeDefined();
     // The headline is two lines around a <br>, so it reads as one accessible
-    // name rather than two text nodes.
+    // name rather than two text nodes. What the <br> itself contributes to that
+    // name is the DOM implementation's business: jsdom 30 reports `br` as
+    // `display: inline`, so dom-accessibility-api joins the two lines with
+    // nothing, where jsdom 25 left a space. Match the seam loosely — the
+    // assertion is that both lines are one heading, not how they are welded.
     expect(
-      screen.getByRole("heading", { name: "Chaque course, une histoire." }),
+      screen.getByRole("heading", {
+        name: /^Chaque course,\s*une histoire\.$/,
+      }),
     ).toBeDefined();
   });
 
