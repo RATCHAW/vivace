@@ -1,7 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { getTemplate, THEMES, THEME_NAMES, type TemplateId, type ThemeName } from "@repo/video";
 import { useVideoLabels } from "@/i18n/video";
-import { MonoLabel } from "@/components/mono";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -9,10 +8,14 @@ import { cn } from "@/lib/utils";
 
 /**
  * How the replay is cut, chosen before it is rendered. Everything here changes
- * the film itself, not the page around it — the player above updates as each
+ * the film itself, not the page around it — the player beside it updates as each
  * choice is made, and the same choices are what the Lambda render is started
  * with. *Which* film is a different question, and it is asked above the player
  * by `<TemplateSelect>`; these are the options within one.
+ *
+ * The panel around this — its heading, its border, and on a phone the sheet it
+ * collapses into — belongs to `<RunStudio>`, because the render button lives in
+ * the same box and the two must not each draw their own.
  *
  * `avatarUrl` is the athlete's Strava picture, or "" when they never set one —
  * the marker has nothing to be in that case, so the switch says so rather than
@@ -52,15 +55,13 @@ export function VideoOptions({
   if (!themeSupported && !avatarSupported) return null;
 
   return (
-    <section aria-label={t("videoOptions.section")} className="mt-5 flex flex-col gap-3">
-      <MonoLabel>{t("videoOptions.section")}</MonoLabel>
-
+    <div className="flex flex-col gap-4">
       {themeSupported && <ThemePicker theme={theme} onChange={onThemeChange} />}
 
       {avatarSupported && (
         // DESIGN.md: a hairline and a surface, no elevation shadow.
-        <div className="bg-muted/40 flex items-center gap-4 rounded-md border px-5 py-4">
-          <Avatar className="ph-no-capture size-9">
+        <div className="bg-muted/40 flex items-center gap-3 rounded-md border px-4 py-3.5">
+          <Avatar className="ph-no-capture size-8 shrink-0">
             <AvatarImage src={avatarUrl || undefined} alt="" />
             <AvatarFallback>{name.charAt(0).toUpperCase() || "?"}</AvatarFallback>
           </Avatar>
@@ -89,7 +90,7 @@ export function VideoOptions({
           />
         </div>
       )}
-    </section>
+    </div>
   );
 }
 

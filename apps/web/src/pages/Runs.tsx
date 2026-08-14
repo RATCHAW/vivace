@@ -1,40 +1,28 @@
 import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Trans, useTranslation } from "react-i18next";
-import { ArrowLeftIcon, Loader2Icon } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import { ArrowLeftIcon } from "lucide-react";
 import { useFormatters } from "@/i18n/format";
 // Fully typed off the API's OpenAPI document — see apps/web/src/api.
-import {
-  getRunsOptions,
-  getRunStreamsOptions,
-  getStravaAthleteOptions,
-  type Run,
-} from "@/api";
+import { getRunsOptions, type Run } from "@/api";
 import { AppHeader } from "@/components/app-header";
 import { MonoLabel, SoonBadge } from "@/components/mono";
-import { RunPlayer } from "@/components/run-player";
-import { TemplateSelect } from "@/components/template-select";
-import { VideoOptions } from "@/components/video-options";
-import { trackEvent } from "@/lib/logger";
+import { RunStudio } from "@/components/run-studio";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 // The theme toggle that used to sit here now lives in AppHeader.
-import { RenderControls } from "@/components/render-controls";
+import { trackEvent } from "@/lib/logger";
+import { useMediaQuery } from "@/lib/use-media-query";
 import { cn } from "@/lib/utils";
 import {
-  avatarSource,
   DEFAULT_TEMPLATE_ID,
   DEFAULT_THEME,
   formatClock,
   formatPace,
-  getTemplate,
-  recommendTemplate,
-  templateEligibility,
   type TemplateId,
-  type TemplateInput,
   type ThemeName,
 } from "@repo/video";
 
@@ -45,6 +33,11 @@ const MAPBOX_TOKEN: string = import.meta.env.VITE_MAPBOX_TOKEN ?? "";
 /** Sports the filter row will one day hold. Runs are the only live one.
  *  Catalogue keys, not words — `t` isn't in scope at module level. */
 const FUTURE_FILTERS = ["sports.rides", "sports.weights"] as const;
+
+/** Where the list stops being a column beside the film and starts being the
+ *  whole page. `64rem` is Tailwind's `lg`, so the JS branch and the `lg:`
+ *  classes below can never disagree about which layout is in force. */
+const WIDE = "(min-width: 64rem)";
 
 function averagePaceSeconds(run: Run): number | null {
   return run.average_speed > 0 ? 1000 / run.average_speed : null;
@@ -58,38 +51,26 @@ export function Runs() {
   const [params, setParams] = useSearchParams();
   const [expanded, setExpanded] = useState(false);
   // A cut of the film, not a property of the run — these outlive selecting
-  // another one, and both the player and the render request read them.
+  // another one, and both the player and the render request read them. They sit
+  // here rather than in the studio because on a phone the studio unmounts every
+  // time the athlete goes back to the list.
   const [showAvatar, setShowAvatar] = useState(false);
   const [chosen, setChosen] = useState<TemplateId>(DEFAULT_TEMPLATE_ID);
   const [theme, setTheme] = useState<ThemeName>(DEFAULT_THEME);
 
+  const wide = useMediaQuery(WIDE);
+  // Narrow is master-detail: the list, then the studio over it. A link that
+  // already names a run opens straight into the film it was shared for.
+  const [studioOpen, setStudioOpen] = useState(() => params.has("run"));
+
   const { data: runs, error: runsError } = useQuery(getRunsOptions());
-  const { data: athlete, error: athleteError } = useQuery(getStravaAthleteOptions());
-  const avatarUrl = avatarSource(athlete?.profile);
   const requested = Number(params.get("run"));
   const selected =
     runs?.find((run) => run.id === requested) ?? runs?.[0] ?? null;
 
-  const { data: streams, error: streamsError } = useQuery({
-    ...getRunStreamsOptions({ path: { id: String(selected?.id ?? 0) } }),
-    enabled: selected != null,
-  });
-
-  // What decides which templates this run can be cut with. Null until the
-  // streams are here: a treadmill run and a run whose streams are still loading
-  // look identical, and only one of them should lose the route replay.
-  const input: TemplateInput | null =
-    selected && streams ? { activity: selected, streams } : null;
-  // The athlete's choice, unless this run can't have it — clicking a treadmill
-  // run in the list must not leave the route replay selected and empty. Derived
-  // rather than stored, so their choice comes back the moment a run can serve it.
-  const template =
-    input && !templateEligibility(chosen, input).eligible ? recommendTemplate(input) : chosen;
-  // A template that draws no runner has nothing for the avatar switch to do,
-  // and one whose plate isn't ours to re-tint has nothing for the theme. Both
-  // are resolved once, so the player and the render are handed the same answers.
-  const avatarSupported = getTemplate(template).supportsAvatar;
-  const filmTheme = getTemplate(template).supportsTheme ? theme : DEFAULT_THEME;
+  // Theatre mode is a wide-screen idea, and the flag survives a resize — so the
+  // list is only ever hidden by it in the layout that can turn it off again.
+  const showList = !(wide && expanded);
 
   return (
     <>
@@ -128,15 +109,11 @@ export function Runs() {
           ))}
         </div>
 
-        <div
-          className={cn(
-            "grid items-start gap-10",
-            !expanded && "lg:grid-cols-[minmax(0,1fr)_405px]",
-          )}
-        >
-          {/* Theatre mode gives the 9:16 the whole row rather than shrinking
-              the list beside it. */}
-          <section aria-label={t("runs.listLabel")} className={cn(expanded && "hidden")}>
+        <div className="flex flex-col gap-8 lg:flex-row lg:items-start">
+          <section
+            aria-label={t("runs.listLabel")}
+            className={cn("min-w-0 lg:flex-1", !showList && "hidden")}
+          >
             {runsError && (
               <Alert variant="destructive">
                 <AlertTitle>{t("runs.errorTitle")}</AlertTitle>
@@ -167,12 +144,17 @@ export function Runs() {
 
             {runs && runs.length > 0 && (
               // DESIGN.md: hairline rules carry the row rhythm — no shadows.
-              <div className="max-h-[720px] overflow-y-auto rounded-lg ring-1 ring-border">
+              // The cap is the height of the film beside it; below the
+              // breakpoint there is no film beside it, and the list is the page.
+              <div className="overflow-y-auto rounded-lg ring-1 ring-border lg:max-h-[660px]">
                 {runs.map((run) => (
                   <button
                     key={run.id}
                     type="button"
-                    onClick={() => setParams({ run: String(run.id) }, { replace: true })}
+                    onClick={() => {
+                      setParams({ run: String(run.id) }, { replace: true });
+                      setStudioOpen(true);
+                    }}
                     aria-pressed={selected?.id === run.id}
                     className={cn(
                       "focus-visible:ring-ring/50 flex w-full items-center gap-5 border-b px-7 py-5 text-left outline-none last:border-b-0 focus-visible:ring-3 focus-visible:ring-inset",
@@ -209,111 +191,39 @@ export function Runs() {
             )}
           </section>
 
-          <section
-            aria-label={t("runs.replayLabel")}
-            className={cn(!expanded && "lg:sticky lg:top-10")}
-          >
-            {/* Theatre mode hides the list and centres the film; everything
-                stacked under it — transport, render panel, footnote — keeps to
-                the same width, or the column reads as three loose things. */}
-            <div className={cn(expanded && "mx-auto max-w-[460px]")}>
-              {/* Which cut is playing, above the film it names. */}
-              {selected && (
-                <div className="mb-3.5">
-                  <TemplateSelect
-                    template={template}
-                    input={input}
-                    onChange={(next) => {
-                      setChosen(next);
-                      trackEvent("ui.video_template_changed", { template: next });
-                    }}
-                  />
-                </div>
-              )}
-
-              {!selected || (!streams && !streamsError) ? (
-                <div className="flex aspect-9/16 w-full items-center justify-center rounded-lg border bg-black">
-                  <Loader2Icon className="text-muted-foreground size-6 animate-spin" />
-                  <span className="sr-only">{t("runs.loadingReplay")}</span>
-                </div>
-              ) : streamsError ? (
-                <Alert variant="destructive">
-                  <AlertTitle>{t("runs.loadRunError")}</AlertTitle>
-                  <AlertDescription>{streamsError.error}</AlertDescription>
-                </Alert>
-              ) : (
-                <RunPlayer
-                  // Prefixed, and it has to be: the render panel below is keyed
-                  // on the same run and template, and two siblings sharing a key
-                  // is not a warning here but a leak. React maps a parent's
-                  // children by key when one of them changes, so the duplicate
-                  // evicts the first from that map, and the fiber nobody looked
-                  // up is never deleted — the old player stayed in the DOM,
-                  // frozen, under the new one, once per switch.
-                  key={`player:${selected.id}:${template}`}
-                  template={template}
-                  activity={selected}
-                  streams={streams ?? {}}
-                  mapboxToken={MAPBOX_TOKEN}
-                  avatarUrl={showAvatar && avatarSupported ? avatarUrl : ""}
-                  theme={filmTheme}
-                  expanded={expanded}
-                  onToggleExpanded={() => setExpanded((open) => !open)}
-                />
-              )}
-
-              {selected && (
-                <VideoOptions
-                  template={template}
-                  theme={theme}
-                  onThemeChange={(next) => {
-                    setTheme(next);
-                    trackEvent("ui.video_option_changed", {
-                      option: "theme",
-                      value: next,
-                    });
-                  }}
-                  avatarSupported={avatarSupported}
-                  avatarUrl={avatarUrl}
-                  name={athlete?.firstname ?? ""}
-                  pending={athlete === undefined && athleteError == null}
-                  failed={athleteError != null}
-                  showAvatar={showAvatar}
-                  onShowAvatarChange={(next) => {
-                    setShowAvatar(next);
-                    // Which options athletes actually want is a product
-                    // question, and this switch decides what gets rendered.
-                    trackEvent("ui.video_option_changed", {
-                      option: "show_avatar",
-                      value: next,
-                    });
-                  }}
-                />
-              )}
-
-              {/* Rendering happens on Lambda from the API's copy of the run, so
-                  it stands even when the browser could not load the streams. */}
-              {selected && (
-                <RenderControls
-                  // Its own namespace — see the player's key above.
-                  key={`render:${selected.id}:${template}`}
-                  run={selected}
-                  template={template}
-                  showAvatar={showAvatar && avatarSupported}
-                  theme={filmTheme}
-                />
-              )}
-
-              {!MAPBOX_TOKEN && getTemplate(template).usesMap && (
-                <p className="text-caption text-stone mt-4">
-                  {/* The two <code> spans are part of the sentence, so the
-                      translation owns where they fall — a French clause puts
-                      the filename somewhere an English one does not. */}
-                  <Trans i18nKey="runs.noMapboxToken" components={{ code: <code /> }} />
-                </p>
-              )}
-            </div>
-          </section>
+          {selected && (wide || studioOpen) && (
+            <RunStudio
+              run={selected}
+              mapboxToken={MAPBOX_TOKEN}
+              chosen={chosen}
+              onChooseTemplate={(next) => {
+                setChosen(next);
+                trackEvent("ui.video_template_changed", { template: next });
+              }}
+              theme={theme}
+              onThemeChange={(next) => {
+                setTheme(next);
+                trackEvent("ui.video_option_changed", {
+                  option: "theme",
+                  value: next,
+                });
+              }}
+              showAvatar={showAvatar}
+              onShowAvatarChange={(next) => {
+                setShowAvatar(next);
+                // Which options athletes actually want is a product question,
+                // and this switch decides what gets rendered.
+                trackEvent("ui.video_option_changed", {
+                  option: "show_avatar",
+                  value: next,
+                });
+              }}
+              narrow={!wide}
+              expanded={expanded}
+              onToggleExpanded={() => setExpanded((open) => !open)}
+              onClose={() => setStudioOpen(false)}
+            />
+          )}
         </div>
       </main>
     </>

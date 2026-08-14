@@ -24,6 +24,28 @@ import { trackEvent } from "@/lib/logger";
 import { MonoLabel } from "@/components/mono";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
+import { cn } from "@/lib/utils";
+
+/**
+ * The 9:16 frame the film plays in.
+ *
+ * Exported because the page draws the same box while the streams are still
+ * loading, and a placeholder a different size from the thing it stands in for
+ * makes the whole column jump when it arrives.
+ *
+ * `"width"` fills the column it is given and lets the height fall out of the
+ * aspect ratio — the desktop stage, where the column is a known measure.
+ * `"height"` is the other way round: it grows into whatever vertical space is
+ * left over, which is the only way a phone can show a whole vertical film and
+ * its transport at once.
+ */
+export function filmFrame(fit: FilmFit): string {
+  return fit === "height"
+    ? "aspect-9/16 min-h-0 w-auto max-w-full flex-1 self-center"
+    : "aspect-9/16 w-full";
+}
+
+export type FilmFit = "width" | "height";
 
 /** The replay with its own transport. Remotion's built-in controls are a video
  *  chrome; this one speaks the film's language instead — a mono clock, and a
@@ -39,7 +61,8 @@ export function RunPlayer({
   mapboxToken,
   avatarUrl,
   theme,
-  expanded,
+  fit = "width",
+  expanded = false,
   onToggleExpanded,
 }: {
   /** Which cut of the run to play. The same id is sent with the render, so the
@@ -53,8 +76,13 @@ export function RunPlayer({
   avatarUrl: string;
   /** Which of the three looks to cut it in. */
   theme: ThemeName;
-  expanded: boolean;
-  onToggleExpanded: () => void;
+  /** Whether the frame is measured off its column or off the space left in the
+   *  column. See `filmFrame`. */
+  fit?: FilmFit;
+  expanded?: boolean;
+  /** Omitted where theatre mode has no meaning — the phone studio is already
+   *  the whole screen, and a control that can only be a no-op is noise. */
+  onToggleExpanded?: () => void;
 }) {
   const { t } = useTranslation();
   const { fps, width, height } = getTemplate(template);
@@ -113,9 +141,15 @@ export function RunPlayer({
   }, [activity.id, activity.name, t]);
 
   return (
-    // Fills whatever width it is given; the page owns the theatre-mode measure.
-    <div className="flex flex-col gap-4">
-      <div className="aspect-9/16 w-full overflow-hidden rounded-lg border bg-black">
+    // Fills whatever measure it is given; the page owns both the theatre-mode
+    // width and, on a phone, the height the frame has to grow into.
+    <div
+      className={cn(
+        "flex flex-col",
+        fit === "height" ? "min-h-0 flex-1 gap-3" : "gap-4",
+      )}
+    >
+      <div className={cn("overflow-hidden rounded-lg border bg-black", filmFrame(fit))}>
         <Player
           ref={player}
           component={VIDEO_COMPONENTS[template]}
@@ -131,7 +165,7 @@ export function RunPlayer({
         />
       </div>
 
-      <div className="flex items-center gap-3.5">
+      <div className="flex shrink-0 items-center gap-3.5">
         <Button
           size="icon"
           aria-label={playing ? t("player.pause") : t("player.play")}
@@ -157,25 +191,32 @@ export function RunPlayer({
           }}
         />
 
-        <Button
-          size="icon"
-          variant="subtle"
-          aria-label={expanded ? t("player.leaveTheatre") : t("player.enterTheatre")}
-          aria-pressed={expanded}
-          onClick={onToggleExpanded}
-        >
-          {expanded ? <MinimizeIcon /> : <MaximizeIcon />}
-        </Button>
+        {onToggleExpanded && (
+          <Button
+            size="icon"
+            variant="subtle"
+            aria-label={expanded ? t("player.leaveTheatre") : t("player.enterTheatre")}
+            aria-pressed={expanded}
+            onClick={onToggleExpanded}
+          >
+            {expanded ? <MinimizeIcon /> : <MaximizeIcon />}
+          </Button>
+        )}
       </div>
 
       {/* The design's second action here was "Download MP4"; that is now a real
-          Lambda render, and it lives in <RenderControls> under the player
-          because it has three states and a progress bar to show. */}
-      <div className="flex justify-end gap-2">
+          Lambda render, and it lives in <RenderControls> beside the player
+          because it has three states and a progress bar to show.
+
+          Two equal halves of the film's own width rather than a pair of pills
+          shoved right: this row is the film's footer, so it is measured off the
+          film and not off whatever is left over. */}
+      <div className="grid shrink-0 grid-cols-2 gap-2">
         {/* The coach reads the run you are watching: `?run=` arrives at the
             Coach screen as an attached run, so the first question is about
             this session without naming it. */}
         <Button
+          className="w-full"
           onClick={() => trackEvent("ui.ask_coach_clicked", { activityId: activity.id })}
           render={<Link to={`/coach?run=${activity.id}`} />}
           size="sm"
@@ -184,7 +225,7 @@ export function RunPlayer({
           <SparklesIcon />
           {t("player.askCoach")}
         </Button>
-        <Button size="sm" variant="subtle" onClick={share}>
+        <Button className="w-full" size="sm" variant="subtle" onClick={share}>
           <Share2Icon />
           {t("player.share")}
         </Button>

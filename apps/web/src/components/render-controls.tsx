@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
-import { DownloadIcon, FilmIcon, Loader2Icon } from "lucide-react";
+import { DownloadIcon, Loader2Icon } from "lucide-react";
 import { getTemplate, type TemplateId, type ThemeName } from "@repo/video";
 import { useVideoLabels, type VideoLabels } from "@/i18n/video";
 import {
@@ -32,10 +32,16 @@ import {
 const RENDER_FLAG = "video-render";
 
 /**
- * The render panel under the player: kick off a Remotion Lambda render, watch
- * its progress live (SSE), download the MP4 once it exists. Everything shown
- * here is the persisted render state — reloading mid-render resumes the
- * progress bar, and an already-rendered run goes straight to download.
+ * The foot of the video options panel: one button that says *Download video*
+ * whatever state the render is in. Rendering is our problem, not the athlete's
+ * — they asked for the file, so a run with no MP4 yet starts a Lambda render
+ * under the same label and the panel spends the wait saying it is preparing the
+ * video rather than naming the machinery. Everything shown here is the
+ * persisted render state, so reloading mid-render resumes the progress bar and
+ * an already-rendered run downloads on the first click.
+ *
+ * It draws no margin of its own — `<RunStudio>` owns the box it sits in, and on
+ * a phone that box is a sheet whose bottom edge is the render button.
  *
  * `template`, `showAvatar` and `theme` are what the film in the player is
  * playing, and they travel with the render request. A run holds one render per
@@ -93,7 +99,7 @@ export function RenderControls({
 
   if (loadError) {
     return (
-      <Alert variant="destructive" className="mt-4">
+      <Alert variant="destructive">
         <AlertTitle>{t("render.loadErrorTitle")}</AlertTitle>
         <AlertDescription>{loadError.error}</AlertDescription>
       </Alert>
@@ -103,11 +109,11 @@ export function RenderControls({
   if (render?.status === "rendering") {
     return (
       <Progress
-        className="mt-5 px-1"
+        className="px-1"
         value={Math.round(render.progress * 100)}
         aria-label={t("render.progressLabel")}
       >
-        <ProgressLabel>{t("render.rendering")}</ProgressLabel>
+        <ProgressLabel>{t("render.preparing")}</ProgressLabel>
         <ProgressValue />
       </Progress>
     );
@@ -119,7 +125,7 @@ export function RenderControls({
     // The video on file is the one the player is showing.
     return (
       <Button
-        className="mt-4 w-full"
+        className="w-full"
         onClick={() => trackEvent("ui.video_downloaded", { activityId: run.id })}
         render={<a href={download} download />}
       >
@@ -137,14 +143,14 @@ export function RenderControls({
   // Already-rendered videos keep their download above; only new renders stop.
   if (!renderEnabled) {
     return (
-      <p className="text-caption text-muted-foreground mt-4 text-center">
+      <p className="text-caption text-muted-foreground text-center">
         {t("render.paused")}
       </p>
     );
   }
 
   return (
-    <div className="mt-4 flex flex-col gap-3">
+    <div className="flex flex-col gap-3">
       {failure && (
         <Alert variant="destructive">
           <AlertTitle>{t("render.failedTitle")}</AlertTitle>
@@ -172,12 +178,12 @@ export function RenderControls({
           start.mutate({ path, body: { template, show_avatar: showAvatar, theme } });
         }}
       >
-        {start.isPending ? <Loader2Icon className="animate-spin" /> : <FilmIcon />}
-        {render?.status === "error"
-          ? t("render.retry")
-          : previous
-            ? t("render.again")
-            : t("render.start")}
+        {start.isPending ? <Loader2Icon className="animate-spin" /> : <DownloadIcon />}
+        {/* One label for "there is no file yet" and "the file on disk was cut
+            with other options": both are a download that has to be made first,
+            and the athlete asked for the same thing either way. A failure is
+            the one case that has to admit something went wrong. */}
+        {render?.status === "error" ? t("render.retry") : t("render.downloadVideo")}
       </Button>
       {/* Rendering replaces the stored file, so the one that already exists is
           offered while it is still there. */}

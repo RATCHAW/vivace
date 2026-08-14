@@ -6,6 +6,7 @@ import {
   type TemplateInput,
 } from "@repo/video";
 import { useVideoLabels } from "@/i18n/video";
+import { cn } from "@/lib/utils";
 import {
   Select,
   SelectContent,
@@ -22,6 +23,10 @@ import {
  * place, never hidden: an athlete on a treadmill should be able to see that the
  * route replay exists and understand in four words why this run can't have one.
  * A catalogue that changes length as you click down the list reads as a bug.
+ *
+ * That reason is the *only* second line here. The templates describe themselves
+ * well enough by name, and a sentence under each of four rows turns a choice
+ * into a page to read.
  */
 export function TemplateSelect({
   template,
@@ -48,28 +53,35 @@ export function TemplateSelect({
       value={template}
       onValueChange={(next) => onChange(next as TemplateId)}
     >
-      <SelectTrigger aria-label={t("videoOptions.templateSelect")} className="max-w-full">
+      <SelectTrigger aria-label={t("videoOptions.templateSelect")} className="w-full">
         <SelectValue>{labels.templateLabel(template)}</SelectValue>
       </SelectTrigger>
-      {/* Anchored under the trigger rather than over it: the list is taller than
-          the control and each row carries a line of explanation. */}
+      {/* Anchored under the trigger rather than over it: a greyed row carries a
+          second line saying why, so the list is taller than the control. */}
       <SelectContent align="start" alignItemWithTrigger={false} className="max-w-[360px]">
-        {verdicts.map((entry) => (
-          <SelectItem
-            key={entry.id}
-            value={entry.id}
-            disabled={!entry.eligible}
-            className="items-start py-2.5"
-          >
-            <span className="flex flex-col gap-1">
-              <span className="font-semibold">{labels.templateLabel(entry.id)}</span>
-              <span className="text-caption text-muted-foreground text-wrap">
-                {labels.eligibilityReason(entry) ??
-                  labels.templateDescription(entry.id)}
+        {verdicts.map((entry) => {
+          // Only the ineligible ones say anything beyond their name. A line of
+          // marketing under every row is noise in a list of four words.
+          const reason = labels.eligibilityReason(entry);
+
+          return (
+            <SelectItem
+              key={entry.id}
+              value={entry.id}
+              disabled={!entry.eligible}
+              className={cn(reason && "items-start py-2.5")}
+            >
+              <span className="flex flex-col gap-1">
+                <span className="font-semibold">{labels.templateLabel(entry.id)}</span>
+                {reason && (
+                  <span className="text-caption text-muted-foreground text-wrap">
+                    {reason}
+                  </span>
+                )}
               </span>
-            </span>
-          </SelectItem>
-        ))}
+            </SelectItem>
+          );
+        })}
       </SelectContent>
     </Select>
   );
