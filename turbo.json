@@ -3,6 +3,12 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
+      // Strict mode is the default: a variable absent from this list is not
+      // passed to the task at all. Locally that goes unnoticed because Vite and
+      // Next read .env off disk themselves; on Vercel the values only exist in
+      // the environment, so an undeclared one is silently inlined as undefined.
+      // VERCEL is here because apps/landing/next.config.ts branches on it.
+      "env": ["NEXT_PUBLIC_*", "VITE_*", "VERCEL"],
       "outputs": ["dist/**", ".next/**", "!.next/cache/**"]
     },
     "test": {
