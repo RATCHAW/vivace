@@ -30,7 +30,7 @@ appear in the product as coming next, but are not implemented yet.
 | Monorepo | [Turborepo](https://turbo.build) + [pnpm](https://pnpm.io) workspaces |
 | API | Node.js + [Hono](https://hono.dev) (`apps/api`) |
 | Auth | [better-auth](https://better-auth.com) with the generic OAuth plugin (Strava) |
-| Database | Postgres (Docker supplies the local instance) |
+| Database | Postgres + [Drizzle ORM](https://orm.drizzle.team) (Docker supplies the local instance) |
 | Web | [Vite](https://vite.dev) + React 19 (`apps/web`) |
 | Landing | [Next.js](https://nextjs.org) App Router (`apps/landing`) — marketing only, no session |
 | UI | [shadcn/ui](https://ui.shadcn.com) + [Tailwind CSS v4](https://tailwindcss.com) |
@@ -69,11 +69,14 @@ cp apps/landing/.env.example apps/landing/.env
 #    → add VITE_MAPBOX_TOKEN for map tiles in the local replay;
 #      both files also contain optional PostHog settings
 
-# 3. Start Postgres — the API migrates its own tables when it boots
+# 3. Start Postgres — the API migrates the schema itself when it boots
 pnpm db:up
 
 # 4. Run everything
 pnpm dev
+
+# 5. Optional: fill the database with seeded athletes, threads and renders
+pnpm db:seed
 ```
 
 Open <http://localhost:5173/login> and click **Continue with Strava**. After
@@ -102,6 +105,44 @@ only the downloadable MP4 render is unavailable.
 | `packages/strava-api` | Generated SDK for Strava's API |
 | `packages/video` | Shared Remotion template catalogue, Player code and Lambda entry |
 | `ops/loki`, `ops/grafana` | Local log storage and provisioned dashboards |
+
+## Database
+
+Postgres, reached through [Drizzle ORM](https://orm.drizzle.team). The schema
+lives in [`apps/api/src/db/schema/`](./apps/api/src/db/schema) and the SQL
+generated from it in `apps/api/drizzle/`, both committed. Eleven tables: four
+that belong to better-auth, five to the coach, one per rendered video and one
+webhook ledger.
+
+```sh
+# edit apps/api/src/db/schema/*.ts, then
+pnpm db:generate     # writes apps/api/drizzle/NNNN_*.sql + the snapshot
+pnpm db:migrate      # applies it (the API also does this itself at boot)
+```
+
+Three things about this setup are not obvious:
+
+- **The API migrates before it binds the port.** `src/db/migrate.ts` runs at
+  startup, behind a Postgres advisory lock so two containers overlapping during a
+  deploy can't both apply the same file. It fails closed — a process that served
+  requests against the wrong schema would look healthy while answering 500s.
+  There is no deployment step and no migration CLI in the production image.
+- **A database that already existed is adopted, not rebuilt.** Every table used
+  to be created lazily by the store that read it. `0000_init` describes exactly
+  what that produced, so on a database that predates Drizzle the migrator records
+  it as applied instead of running it, and carries on from `0001`. A local
+  database *older* than the last release is refused with a message telling you to
+  run `pnpm db:reset`, rather than adopted at a schema it doesn't have.
+- **better-auth's columns are camelCase and must stay that way.** Its Kysely
+  adapter quoted its own field names when it created those tables, so production
+  holds `"userId"`, not `user_id`. `auth:generate` emits snake_case — it writes
+  to a gitignored scratch file so nobody pastes it over the real schema, and
+  `src/db/schema.test.ts` fails if the two ever disagree.
+
+`pnpm db:seed` truncates and refills with deterministic fixtures
+([`drizzle-seed`](https://orm.drizzle.team/docs/seed-overview)) — three athletes
+with threads, messages, goals and render history. It refuses to run unless
+`DATABASE_URL` points at a local database.
 
 ## How the auth flow works
 
@@ -386,8 +427,8 @@ provider-agnostic.
 
 How it flows, and why it looks like this:
 
-- **Conversations live in Postgres** (`coach_thread`, `coach_message`), created
-  on first use like `run_render`. The sidebar on `/coach` lists them; the open
+- **Conversations live in Postgres** (`coach_thread`, `coach_message`). The
+  sidebar on `/coach` lists them; the open
   one is in the URL (`?thread=`), so it survives a reload and can be linked.
 - **The browser sends one message, not the transcript.**
   `prepareSendMessagesRequest` trims the request to what was just typed; the API
@@ -640,8 +681,12 @@ pnpm typecheck  # tsc --noEmit everywhere
 pnpm generate   # regenerate the OpenAPI document and both generated clients
 pnpm spec:pull  # re-download and bundle Strava's Swagger spec
 pnpm db:up      # start Postgres only (docker compose)
+pnpm db:reset   # throw the local Postgres volume away and start it empty
 pnpm logs:up    # start Postgres + Loki + Grafana (Grafana on :3002)
-pnpm auth:migrate  # the same better-auth migration the API runs at boot, by hand
+pnpm db:generate   # write a migration for the current src/db/schema (drizzle-kit)
+pnpm db:migrate    # apply pending migrations by hand; the API also does this at boot
+pnpm db:seed       # truncate and refill with deterministic fixtures (local only)
+pnpm db:studio     # browse the database (drizzle-kit studio)
 pnpm video:deploy  # deploy the Remotion Lambda functions + the site bundle
 pnpm --filter @repo/video bundle:check  # compile the Lambda bundle without AWS
 

@@ -111,6 +111,44 @@ Lambda bundle all read it rather than each holding their own list.
   apps/landing copies its primitives — nothing from apps/web exists on Lambda.
   `vivace-mark.test.tsx` in apps/web fails if the two paths drift.
 
+## Database — Drizzle, and one migration history for the whole schema
+
+Postgres through [Drizzle](https://orm.drizzle.team). `apps/api/src/db/schema/`
+is the source of truth; `apps/api/drizzle/` holds the generated SQL and is
+**committed**. Nothing else in the repo talks to a database.
+
+- **A schema change is two steps.** Edit `src/db/schema/*.ts` → `pnpm
+  db:generate`. The migration file and the snapshot in `drizzle/meta` are part of
+  the commit; `pnpm db:migrate` applies one by hand, and the API applies pending
+  ones itself at boot (`src/db/migrate.ts`) before it binds the port.
+- **`drizzle-kit push` is for scratch databases only.** It introspects and
+  rewrites to match, which against production would rebuild indexes and rename
+  every constraint the old bootstrap created. `generate` + `migrate` is the path
+  that ships.
+- **better-auth's four tables are ours now, and their columns are camelCase.**
+  `user`, `session`, `account`, `verification` were created by better-auth's own
+  Kysely adapter, which quoted its field names verbatim — so the live columns
+  really are `"userId"` and `"createdAt"`. `pnpm --filter @repo/api auth:generate`
+  emits **snake_case**; it writes to a gitignored scratch file precisely so it
+  can't be pasted over `src/db/schema/auth.ts`. Read it to see what a plugin
+  added, then add that field by hand. `src/db/schema.test.ts` fails if the column
+  names drift or a better-auth field has no column.
+- **A store never creates its own table.** Every table used to arrive through a
+  `CREATE TABLE IF NOT EXISTS` on first use, with a tail of `ADD COLUMN IF NOT
+  EXISTS` behind it. That is what the migration history replaces — a new column
+  belongs in the schema, not in a store's warm-up path.
+- **`predatesDrizzle`/`stampBaseline` in `src/db/migrate.ts` exist for databases
+  that already existed.** 0000 describes them, so it is recorded as applied
+  rather than run. Don't edit 0000: its sha256 is the row that says production is
+  adopted, and changing the file orphans that row.
+- **Our tables key on `user_id text` with no foreign key to `user`.** That is
+  what the live data is. It's also why `db/seed.ts` seeds athletes first and
+  hands their ids to the second pass — `drizzle-seed`'s `with` needs a real
+  reference, and only `coach_message.thread_id` has one.
+- **`pnpm db:seed` truncates.** It refuses to run when `NODE_ENV`/`APP_ENV` says
+  production or `DATABASE_URL` isn't local, and it is deterministic, so the rows
+  are the same every run.
+
 ## Logging — structured, never `console.log`
 
 pino in `apps/api/src/logger.ts` → JSON on stdout, and to Grafana Loki when
