@@ -1,8 +1,10 @@
 import type { Metadata, Viewport } from "next";
 import { notFound } from "next/navigation";
 import { Analytics } from "@/components/analytics";
+import { StructuredData } from "@/components/structured-data";
 import { getDictionary } from "@/i18n/dictionaries";
 import { isLocale, LOCALES, type Locale } from "@/i18n/config";
+import { createPageMetadata, homePagePaths } from "@/lib/metadata";
 import { siteUrl } from "@/lib/site";
 import "../../styles.css";
 
@@ -24,30 +26,15 @@ export async function generateMetadata({
   if (!isLocale(locale)) notFound();
   const t = getDictionary(locale).meta;
 
-  return {
-    metadataBase: new URL(siteUrl),
+  return createPageMetadata({
+    locale,
     title: t.title,
     description: t.description,
-    applicationName: "Vivace",
-    alternates: {
-      canonical: `/${locale}`,
-      // Search engines pair the two versions off these, and `x-default` names
-      // which one an unrecognised language gets — the same answer `proxy.ts`
-      // gives a browser with no preference we speak.
-      languages: {
-        ...Object.fromEntries(LOCALES.map((other) => [other, `/${other}`])),
-        "x-default": "/en",
-      },
-    },
-    openGraph: {
-      type: "website",
-      siteName: "Vivace",
-      locale,
-      title: t.ogTitle,
-      description: t.ogDescription,
-      url: `/${locale}`,
-    },
-  };
+    openGraphTitle: t.ogTitle,
+    openGraphDescription: t.ogDescription,
+    imageAlt: t.imageAlt,
+    paths: homePagePaths(),
+  });
 }
 
 export const viewport: Viewport = {
@@ -69,9 +56,31 @@ export default async function LocaleLayout({
   // under a German tag.
   if (!isLocale(locale)) notFound();
 
+  const structuredData = [
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "@id": `${siteUrl}/#organization`,
+      name: "Vivace",
+      url: siteUrl,
+      logo: `${siteUrl}/apple-touch-icon.png`,
+      email: "hello@vivace.run",
+    },
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "@id": `${siteUrl}/#website`,
+      name: "Vivace",
+      url: siteUrl,
+      publisher: { "@id": `${siteUrl}/#organization` },
+      inLanguage: LOCALES,
+    },
+  ];
+
   return (
     <html lang={locale}>
       <body>
+        <StructuredData data={structuredData} />
         {children}
         <Analytics />
       </body>

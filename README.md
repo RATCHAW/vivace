@@ -491,15 +491,21 @@ edits, so diff before accepting.
 its own. It has no session, no API client and no generated code: it never talks to
 `apps/api`, it only links to the app.
 
-- **One route**, statically prerendered: `src/app/page.tsx` composes the sections in
-  `src/components/sections/`.
+- **Static localized routes** — `/en` and `/fr` compose the marketing sections;
+  each language also prerenders localized About, Contact, Privacy, Terms and
+  Strava-data pages. The language switcher keeps equivalent pages paired.
+- **Search discovery** — the landing app emits `robots.txt`, `sitemap.xml`,
+  canonical and `hreflang` links, social-card metadata and WebSite/Organization
+  structured data. `NEXT_PUBLIC_SITE_URL` must use the final public origin.
 - **Where the buttons go** — every "Connect Strava" leaves for
   `${NEXT_PUBLIC_APP_URL}/login`. `NEXT_PUBLIC_*` is inlined at build time, so the
   app's origin is a *build* input, including in `apps/landing/Dockerfile`.
-- **The hero replay** (`src/components/replay-phone.tsx`) is the only client
+- **The hero replay** (`src/components/replay-phone.tsx`) is the primary client
   component. Its maths lives in `src/lib/replay.ts` as pure functions of `t`, so the
   server and the first client frame agree, and it is tested without a DOM. The frame
   is served mid-run: no JS, or `prefers-reduced-motion`, still shows a running replay.
+  The only other client boundary initializes analytics, and dynamically imports
+  PostHog only when a project key is configured.
 - **Tokens** — `src/styles.css` mirrors `apps/web/src/styles.css` and
   [`apps/web/DESIGN.md`](./apps/web/DESIGN.md); keep the two in step. The one
   deliberate difference: the app switches canvas by theme (`.dark`), the landing page

@@ -5,6 +5,14 @@ import {
   negotiateLocale,
   parseAcceptLanguage,
 } from "./config";
+import {
+  CONTENT_PAGE_KEYS,
+  CONTENT_PAGE_ROUTES,
+  contentPageKey,
+  contentPagePath,
+  contentPagePaths,
+  getContentPage,
+} from "./content-pages";
 import { fill, getDictionary } from "./dictionaries";
 import { en } from "./messages/en";
 import { fr } from "./messages/fr";
@@ -70,6 +78,38 @@ describe("dictionaries", () => {
       })
       .map(([key]) => key);
     expect(drifted).toEqual([]);
+  });
+});
+
+describe("content pages", () => {
+  it.each(LOCALES)("%s has complete, non-empty pages", (locale) => {
+    for (const key of CONTENT_PAGE_KEYS) {
+      const page = getContentPage(locale, key);
+      const blank = strings(page)
+        .filter(([, value]) => value.trim() === "")
+        .map(([path]) => `${key}.${path}`);
+      expect(blank).toEqual([]);
+      expect(page.sections.length).toBeGreaterThan(0);
+    }
+  });
+
+  it.each(LOCALES)("%s slugs are unique and round-trip", (locale) => {
+    const slugs = Object.values(CONTENT_PAGE_ROUTES[locale]);
+    expect(new Set(slugs).size).toBe(CONTENT_PAGE_KEYS.length);
+
+    for (const key of CONTENT_PAGE_KEYS) {
+      const slug = CONTENT_PAGE_ROUTES[locale][key];
+      expect(contentPageKey(locale, slug)).toBe(key);
+      expect(contentPagePath(locale, key)).toBe(`/${locale}/${slug}`);
+    }
+  });
+
+  it("pairs each translation with the same content page", () => {
+    for (const key of CONTENT_PAGE_KEYS) {
+      const paths = contentPagePaths(key);
+      expect(paths.en).toBe(`/en/${CONTENT_PAGE_ROUTES.en[key]}`);
+      expect(paths.fr).toBe(`/fr/${CONTENT_PAGE_ROUTES.fr[key]}`);
+    }
   });
 });
 

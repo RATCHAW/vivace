@@ -34,9 +34,11 @@ export function signInUrl(locale: Locale): string {
  * production host: an absolute URL is required in metadata, and a relative one
  * silently produces a useless `<link rel="alternate">`.
  */
-export const siteUrl = (
-  process.env.NEXT_PUBLIC_SITE_URL || "https://vivace.run"
-).replace(/\/$/, "");
+export function resolveSiteUrl(value?: string): string {
+  return (value || "https://www.vivace.run").replace(/\/$/, "");
+}
+
+export const siteUrl = resolveSiteUrl(process.env.NEXT_PUBLIC_SITE_URL);
 
 /**
  * The coach waitlist has no backend yet, so the form posts a mail draft rather

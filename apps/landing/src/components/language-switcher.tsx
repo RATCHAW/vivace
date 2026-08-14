@@ -18,10 +18,12 @@ export function LanguageSwitcher({
   copy,
   active,
   className,
+  paths,
 }: {
   copy: Copy;
   active: Locale;
   className?: string;
+  paths?: Record<Locale, string>;
 }) {
   return (
     <nav
@@ -31,7 +33,7 @@ export function LanguageSwitcher({
       {LOCALES.map((locale) => (
         <Link
           key={locale}
-          href={`/${locale}`}
+          href={paths?.[locale] ?? `/${locale}`}
           hrefLang={locale}
           // No prefetch, because `proxy.ts` cannot tell one apart from a real
           // visit: a background fetch of `/fr` comes back with a `Set-Cookie`

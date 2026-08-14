@@ -6,17 +6,26 @@ import type { Locale } from "@/i18n/config";
 import type { Copy } from "@/i18n/dictionaries";
 import { signInUrl } from "@/lib/site";
 
-export function SiteHeader({ copy, locale }: { copy: Copy; locale: Locale }) {
+export function SiteHeader({
+  copy,
+  locale,
+  languagePaths,
+}: {
+  copy: Copy;
+  locale: Locale;
+  languagePaths?: Record<Locale, string>;
+}) {
+  const homeHref = `/${locale}`;
   const nav = [
-    { href: "#film", label: copy.header.film },
-    { href: "#sports", label: copy.header.sports },
-    { href: "#coach", label: copy.header.coach },
-    { href: "#questions", label: copy.header.questions },
+    { href: `${homeHref}#film`, label: copy.header.film },
+    { href: `${homeHref}#sports`, label: copy.header.sports },
+    { href: `${homeHref}#coach`, label: copy.header.coach },
+    { href: `${homeHref}#questions`, label: copy.header.questions },
   ];
 
   return (
     <header className="bg-background sticky top-0 z-20 flex h-16 items-center gap-4 border-b px-6 sm:gap-6 sm:px-8 lg:gap-10">
-      <a href="#top" className="shrink-0" aria-label={copy.header.backToTop}>
+      <a href={homeHref} className="shrink-0" aria-label={copy.header.backToTop}>
         <Wordmark />
       </a>
 
@@ -40,6 +49,7 @@ export function SiteHeader({ copy, locale }: { copy: Copy; locale: Locale }) {
         <LanguageSwitcher
           active={locale}
           copy={copy}
+          paths={languagePaths}
           className="hidden sm:flex"
         />
         <a
