@@ -141,6 +141,12 @@ is the source of truth; `apps/api/drizzle/` holds the generated SQL and is
   that already existed.** 0000 describes them, so it is recorded as applied
   rather than run. Don't edit 0000: its sha256 is the row that says production is
   adopted, and changing the file orphans that row.
+- **Migrations are append-only, one per pull request.** `scripts/check-new-migrations.sh`
+  runs in CI and fails on either — an edited migration is never re-applied, so
+  production would keep the old schema while the repo describes the new one.
+  Two migrations in a branch means squashing: delete the generated files, revert
+  `meta/_journal.json` and `meta/*_snapshot.json` to `origin/main`, and run
+  `pnpm db:generate` once.
 - **Our tables key on `user_id text` with no foreign key to `user`.** That is
   what the live data is. It's also why `db/seed.ts` seeds athletes first and
   hands their ids to the second pass — `drizzle-seed`'s `with` needs a real
