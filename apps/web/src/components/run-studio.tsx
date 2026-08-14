@@ -29,6 +29,10 @@ import {
 } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
 
+/** How long a template has to stay highlighted before the player switches to
+ *  it. Long enough to sweep past a row, short enough not to feel asked-for. */
+const PREVIEW_SETTLE_MS = 140;
+
 /**
  * One run's film, and everything that shapes it.
  *
@@ -78,6 +82,10 @@ export function RunStudio({
   // Collapsed to start: the film is what the athlete came for, and on a phone
   // the sheet open would leave it a stamp.
   const [optionsOpen, setOptionsOpen] = useState(false);
+  // Two halves of the same idea: the row the athlete is currently on in the
+  // open dropdown, and the one the player has actually been told to play.
+  const [considered, setConsidered] = useState<TemplateId | null>(null);
+  const [preview, setPreview] = useState<TemplateId | null>(null);
 
   const { data: streams, error: streamsError } = useQuery(
     getRunStreamsOptions({ path: { id: String(run.id) } }),
@@ -99,6 +107,20 @@ export function RunStudio({
     };
   }, [narrow]);
 
+  // Settling before the film changes, because switching template remounts the
+  // composition — `RunMap` builds its Mapbox instance once per mount — and a
+  // cursor travelling down four rows to the one it wants should not build four
+  // films on the way. Letting go is immediate: closing the list has to put the
+  // chosen template back at once, or the revert reads as lag.
+  useEffect(() => {
+    if (considered === null) {
+      setPreview(null);
+      return;
+    }
+    const timer = setTimeout(() => setPreview(considered), PREVIEW_SETTLE_MS);
+    return () => clearTimeout(timer);
+  }, [considered]);
+
   // What decides which templates this run can be cut with. Null until the
   // streams are here: a treadmill run and a run whose streams are still loading
   // look identical, and only one of them should lose the route replay.
@@ -119,6 +141,17 @@ export function RunStudio({
   const hasOptions = entry.supportsTheme || avatarSupported;
   const fit = narrow ? "height" : "width";
 
+  // What is on screen, which is not always what has been chosen: a template
+  // being considered in the open dropdown plays, and is forgotten if the list
+  // closes without it. Only the film follows it — the options panel and the
+  // render button stay on the chosen template, because a preview must not fetch
+  // a render state or move a switch for a choice nobody has made yet. Its own
+  // answers to the two options, though: a preview of Route replay has to be the
+  // film Route replay would be, not the one the chosen template would allow.
+  const playing = preview ?? template;
+  const playingEntry = getTemplate(playing);
+  const playingTheme = playingEntry.supportsTheme ? theme : DEFAULT_THEME;
+
   const film = (
     <>
       {/* Which cut is playing, above the film it names. */}
@@ -127,6 +160,7 @@ export function RunStudio({
           template={template}
           input={input}
           onChange={onChooseTemplate}
+          onPreview={setConsidered}
         />
       </div>
 
@@ -154,13 +188,13 @@ export function RunStudio({
           // map, and the fiber nobody looked up is never deleted — the old
           // player stayed in the DOM, frozen, under the new one, once per
           // switch.
-          key={`player:${run.id}:${template}`}
-          template={template}
+          key={`player:${run.id}:${playing}`}
+          template={playing}
           activity={run}
           streams={streams ?? {}}
           mapboxToken={mapboxToken}
-          avatarUrl={showAvatar && avatarSupported ? avatarUrl : ""}
-          theme={filmTheme}
+          avatarUrl={showAvatar && playingEntry.supportsAvatar ? avatarUrl : ""}
+          theme={playingTheme}
           fit={fit}
           expanded={expanded}
           // Theatre mode is a wide-screen idea; the phone studio is already the
@@ -169,7 +203,7 @@ export function RunStudio({
         />
       )}
 
-      {!mapboxToken && entry.usesMap && (
+      {!mapboxToken && playingEntry.usesMap && (
         <p className="text-caption text-stone shrink-0">
           {/* The two <code> spans are part of the sentence, so the translation
               owns where they fall — a French clause puts the filename somewhere
