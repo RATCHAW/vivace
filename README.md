@@ -181,9 +181,34 @@ apps/api reads it to decide what to render and where, apps/web builds the picker
 and the `<Player>` from it, and the Lambda site bundle registers one
 `<Composition>` per entry.
 
-Adding a template is three edits — an entry in the registry, a component under
-`packages/video/src/templates/`, a line in `Root.tsx` — and **no change to
-apps/api at all**. A test fails if the registry and the components drift.
+Adding a template is four edits — an entry in the registry, a component under
+`packages/video/src/templates/`, a line in `Root.tsx`, a rule in
+`eligibility.ts` — and **no change to apps/api at all**. A test fails if the
+registry and the components drift, and the eligibility map is keyed by template
+id, so the compiler asks for the last one.
+
+The catalogue today:
+
+| Template | What it is | Needs |
+| --- | --- | --- |
+| **Route replay** | The route drawing under live metrics, camera following the runner. One continuous 20s shot on a Mapbox plate. | A GPS route |
+| **Split rush** | Every kilometre as a bar — longer means faster — the fastest one isolated, one verdict to close. No map anywhere in it. | 2 km, and distance + time streams |
+| **Route poster** | The route drawn on a bare plate, north up, then held still for two and a half seconds. | A GPS route |
+| **Minimal numbers** | One number at a time, filling the screen, counting up. | Nothing but a distance and a time |
+
+The three new ones share `packages/video/src/core/` — safe area, type ramp,
+themes, formatters, route geometry, beats — and are cut for **mute playback** on
+a story: nothing informational outside y=250…1600, tabular numerals on anything
+that animates, and a hard 15s ceiling because Instagram cuts a segment there.
+Their length is a property of the *run*, not the catalogue: a marathon's Split
+rush is longer than a parkrun's, and a run with three numbers is a shorter
+Minimal numbers than one with five. `estimateDurationInFrames` is what Remotion's
+`calculateMetadata` returns on Lambda and what sizes the `<Player>`, so the file
+and the preview are the same cut.
+
+A run that can't have a template sees it **greyed with the reason** rather than
+gone ("Needs a GPS route — this run has none"). Minimal numbers is eligible for
+everything by construction: it is what renders when a run has nothing.
 
 A serve URL is a *bundle*, not a video: one site holds every composition and
 `renderMediaOnLambda` picks one by id, so N templates is N chunks, not N
@@ -207,13 +232,21 @@ which is what makes both of those a config change rather than a refactor:
 
 ### Options
 
-**Video options** sit between the player and the render button, and change the
-film rather than the page. Which template to cut is one (shown only once there
-is more than one to choose). *Run as your avatar* is the other: it swaps the dot
-at the head of the route for the athlete's Strava picture — three times the size,
-with the camera widened to keep it in frame — and is offered only by templates
-whose `supportsAvatar` is true. The `<Player>` updates as each choice is made,
-and the same choices travel with the render request.
+Which template is playing is asked **above the player**, in a dropdown that
+names each one and explains it in a line — including the ones this run can't
+have, which are listed disabled with the reason in place of the description.
+
+**Video options** sit between the player and the render button and change the
+film rather than which film it is. The **theme** is one — Charcoal, Cream or
+Cobalt, three looks shared by every template that has one, and no generated
+palettes; it is offered by templates whose `supportsTheme` is true, which the
+route replay isn't, because its plate is a Mapbox style rather than ours to
+re-tint. *Run as your avatar* is the other: it swaps the dot at the head of the
+route for the athlete's Strava picture — three times the size, with the camera
+widened to keep it in frame — and is offered only by templates whose
+`supportsAvatar` is true. A template that honours neither has no panel at all.
+The `<Player>` updates as each choice is made, and the same choices travel with
+the render request.
 
 Template and options are part of a render's identity (a `props_hash` on the row),
 so a run already rendered with a different answer offers **Render again** (and

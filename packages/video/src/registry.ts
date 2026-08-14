@@ -83,6 +83,10 @@ export interface VideoTemplate {
   /** Honours the `show_avatar` option. When false the API skips the Strava
    *  profile fetch entirely rather than passing a picture nothing draws. */
   supportsAvatar: boolean;
+  /** Honours the `theme` option. False for a template whose look is not ours to
+   *  re-tint — the replay's plate is a Mapbox style, and a cream video over a
+   *  dark map is not a theme, it is a different template. */
+  supportsTheme: boolean;
 }
 
 const FPS = 30;
@@ -101,6 +105,58 @@ export const VIDEO_TEMPLATES = [
     durationInFrames: 20 * FPS,
     usesMap: true,
     supportsAvatar: true,
+    supportsTheme: false,
+  },
+  {
+    id: "split-rush",
+    compositionId: "split-rush",
+    label: "Split rush",
+    description:
+      "Every kilometre as a bar, the fastest one isolated, one verdict to close. " +
+      "No GPS anywhere in it — a treadmill run gets the same film as a park one.",
+    profile: "light",
+    width: 1080,
+    height: 1920,
+    fps: FPS,
+    // Typical, not fixed: the real length is `estimateDurationInFrames`, which
+    // counts the splits. This is what Studio opens on and what a bundle without
+    // `calculateMetadata` would render.
+    durationInFrames: 12 * FPS,
+    usesMap: false,
+    supportsAvatar: false,
+    supportsTheme: true,
+  },
+  {
+    id: "living-poster",
+    compositionId: "living-poster",
+    label: "Route poster",
+    description:
+      "The route drawn on a bare plate, north up, then held still. The last two " +
+      "and a half seconds are a frame you could print.",
+    profile: "light",
+    width: 1080,
+    height: 1920,
+    fps: FPS,
+    durationInFrames: 10 * FPS,
+    usesMap: false,
+    supportsAvatar: false,
+    supportsTheme: true,
+  },
+  {
+    id: "minimal-numbers",
+    compositionId: "minimal-numbers",
+    label: "Minimal numbers",
+    description:
+      "One number at a time, filling the screen. Needs nothing but a distance " +
+      "and a time, so it renders for every run there is.",
+    profile: "light",
+    width: 1080,
+    height: 1920,
+    fps: FPS,
+    durationInFrames: 9 * FPS,
+    usesMap: false,
+    supportsAvatar: false,
+    supportsTheme: true,
   },
 ] as const satisfies readonly VideoTemplate[];
 

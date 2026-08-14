@@ -1,13 +1,14 @@
 import { useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { DownloadIcon, FilmIcon, Loader2Icon } from "lucide-react";
-import type { TemplateId } from "@repo/video";
+import { getTemplate, THEMES, type TemplateId, type ThemeName } from "@repo/video";
 import {
   getRunRenderOptions,
   getRunRenderQueryKey,
   startRunRenderMutation,
   subscribeRunRenderProgress,
   type Run,
+  type RunRender,
   type RunRenderState,
 } from "@/api";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -33,8 +34,9 @@ const RENDER_FLAG = "video-render";
  * here is the persisted render state — reloading mid-render resumes the
  * progress bar, and an already-rendered run goes straight to download.
  *
- * `template` and `showAvatar` are what the film in the player is playing, and
- * they travel with the render request. A run holds one render per template, so
+ * `template`, `showAvatar` and `theme` are what the film in the player is
+ * playing, and they travel with the render request. A run holds one render per
+ * template, so
  * switching template swaps which one this panel is about rather than replacing
  * it; within a template, a finished render made with a different answer is a
  * different video, so the panel offers that one for download and this one to
@@ -44,10 +46,12 @@ export function RenderControls({
   run,
   template,
   showAvatar,
+  theme,
 }: {
   run: Run;
   template: TemplateId;
   showAvatar: boolean;
+  theme: ThemeName;
 }) {
   const queryClient = useQueryClient();
   // On unless PostHog says otherwise, so no key (or no flag) changes nothing.
@@ -56,7 +60,10 @@ export function RenderControls({
   const query = { template } as const;
   const { data, error: loadError } = useQuery(getRunRenderOptions({ path, query }));
   const render = data?.render ?? null;
-  const stale = render != null && render.show_avatar !== showAvatar;
+  // Every option the render was started with is part of what it *is*: a stored
+  // film made with another answer is a different video, not this one.
+  const stale =
+    render != null && (render.show_avatar !== showAvatar || render.theme !== theme);
 
   const start = useMutation({
     ...startRunRenderMutation(),
@@ -139,10 +146,9 @@ export function RenderControls({
           <AlertDescription>{failure}</AlertDescription>
         </Alert>
       )}
-      {previous && (
+      {previous && render && (
         <p className="text-caption text-muted-foreground">
-          Your last video was rendered with{" "}
-          {render?.show_avatar ? "your avatar" : "the plain dot"}.
+          Your last video was rendered {describeOptions(template, render)}.
         </p>
       )}
       <Button
@@ -154,8 +160,9 @@ export function RenderControls({
             template,
             retry: render?.status === "error",
             showAvatar,
+            theme,
           });
-          start.mutate({ path, body: { template, show_avatar: showAvatar } });
+          start.mutate({ path, body: { template, show_avatar: showAvatar, theme } });
         }}
       >
         {start.isPending ? <Loader2Icon className="animate-spin" /> : <FilmIcon />}
@@ -180,4 +187,22 @@ export function RenderControls({
       )}
     </div>
   );
+}
+
+/**
+ * What the stored film was made with, in the athlete's terms.
+ *
+ * Only the options this template actually honours: telling someone their Route
+ * poster was rendered "with the plain dot" describes a marker it never draws.
+ */
+// `RunRender` carries the `| null` of the state wrapper it is generated from;
+// the caller has already checked, so this takes the render itself.
+function describeOptions(template: TemplateId, render: NonNullable<RunRender>): string {
+  const entry = getTemplate(template);
+  const parts: string[] = [];
+  if (entry.supportsTheme) parts.push(`in ${THEMES[render.theme].label}`);
+  if (entry.supportsAvatar) {
+    parts.push(render.show_avatar ? "with your avatar" : "with the plain dot");
+  }
+  return parts.join(", ") || "with different options";
 }

@@ -42,11 +42,38 @@ Every video is a template declared in `packages/video/src/registry.ts`. That fil
 is the source of truth for what can be rendered; apps/api, apps/web and the
 Lambda bundle all read it rather than each holding their own list.
 
-- **Adding a template touches three files, none of them in apps/api.** An entry
+- **Adding a template touches four files, none of them in apps/api.** An entry
   in `registry.ts` → a component under `src/templates/` → a line in the two maps
-  in `Root.tsx`. `registry.test.ts` fails if the halves drift. Then run
+  in `Root.tsx` and in `VIDEO_COMPONENTS` → a rule in `eligibility.ts`. The
+  eligibility map is `Record<TemplateId, …>`, so the compiler asks for that one;
+  `registry.test.ts` fails if the other halves drift. Then run
   `pnpm --filter @repo/video bundle:check` — webpack, not tsc, is what finds a
   bad import in the Lambda entry, and otherwise `deploySite` finds it for you.
+- **A template's shared parts live in `src/core/`** — the safe area and type
+  ramp (`layout.ts`), the three themes (`theme.ts`), the formatters
+  (`format.ts`), route cleaning and projection (`geo.ts`), beats and easing
+  (`timing.ts`), and the `<Stage>`/numeral primitives. All of it is React-free
+  except `Stage.tsx` and `numerals.tsx`, because apps/api reaches the first group
+  through eligibility and duration.
+- **Tabular numerals are mandatory** anywhere a number animates
+  (`NUMERAL_STYLE`), and nothing informational sits outside `SAFE_TOP`…
+  `SAFE_BOTTOM` — a story's own UI covers the rest. A template's layout maths is
+  pure so the tests can assert both without rendering a frame.
+- **A film's length is a property of the run, not of the catalogue.**
+  `estimateDurationInFrames` is what `calculateMetadata` returns on Lambda and
+  what sizes the browser's `<Player>`; the catalogue's `durationInFrames` is the
+  fallback. Every template lays its beats out against the duration it was
+  actually handed (`buildBeats(spans, fps, total)`), so it can never end on
+  black. The ceiling is 15s — Instagram cuts a story segment there — and
+  `run-video` predates it, has no estimator, and keeps its 20s.
+- **Ineligible is shown, never hidden.** `templateEligibilities(input)` drives
+  the picker: a treadmill run sees the route replay greyed with four words
+  saying why. `minimal-numbers` must stay eligible for everything — it is what
+  renders when a run has nothing.
+- **Determinism is a feature, not a nicety.** Same input and options must give a
+  byte-identical file, because `renderPropsHash` promises the athlete the stored
+  MP4 *is* the film they just watched. Anything that wants to look random takes
+  its numbers from `core/seed.ts`.
 - **`registry.ts` must stay React-free.** apps/api imports `@repo/video` for the
   catalogue, and its tsconfig has no `jsx` setting — a type-level reference to a
   `.tsx` file from there breaks the API's typecheck, which is the point. The
@@ -68,7 +95,13 @@ Lambda bundle all read it rather than each holding their own list.
 - **A render's identity is `renderPropsHash(template, options)`** — template plus
   what the athlete chose, and deliberately *not* the serve URL or the resolved
   input props. Adding an option means adding it to that hash, which is the
-  decision to invalidate every stored video made without it.
+  decision to invalidate every stored video made without it. `theme` is in there
+  with its default value omitted, which is how it was added without marking a
+  single already-rendered film stale.
+- **An option a template ignores is never stored as an answer.** `supportsAvatar`
+  and `supportsTheme` on the catalogue entry are checked in the route, and the
+  option is dropped before it reaches the hash — otherwise two identical films
+  would hash differently and each get its own Lambda invocation.
 - **A run holds one render per template** (`run_render`'s key is user + activity
   + template), so switching template must never discard the last one's MP4.
 - The Vivace mark is copied into `packages/video/src/brand/` for the same reason
