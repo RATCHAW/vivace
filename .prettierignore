@@ -6,6 +6,12 @@ apps/web/src/api/generated/
 packages/strava-api/src/generated/
 packages/strava-api/openapi/strava-swagger.json
 
+# drizzle-kit's output: the migration SQL and the snapshot it diffs the next one
+# against. `pnpm db:generate` rewrites both, and the snapshot is a record of what
+# was applied — not a file to restyle. drizzle.config.ts is source, and is not
+# excluded.
+apps/api/drizzle/
+
 # Vendored agent skills, pinned by content hash in skills-lock.json. Formatting
 # one byte of these would invalidate the lock against upstream.
 .agents/

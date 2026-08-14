@@ -18,7 +18,10 @@
 // `/push_subscriptions` is absent from Strava's published Swagger, so there is
 // nothing generated to call.
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { pool } from "./db.js";
+import { and, eq, lt, sql } from "drizzle-orm";
+import { db } from "./db/index.js";
+import { account } from "./db/schema/auth.js";
+import { stravaWebhookEvent } from "./db/schema/webhook.js";
 import { logger } from "./logger.js";
 import type { StravaEvent } from "./schemas.js";
 
@@ -169,23 +172,6 @@ export async function deleteSubscription(id: number): Promise<void> {
 // The event's own shape lives in schemas.ts with the rest of the API contract,
 // because the route that receives it is documented like every other route.
 
-let tableReady: Promise<unknown> | null = null;
-
-function ensureTable(): Promise<unknown> {
-  tableReady ??= pool.query(`
-    CREATE TABLE IF NOT EXISTS "strava_webhook_event" (
-      "object_id" bigint NOT NULL,
-      "aspect_type" text NOT NULL,
-      "event_time" bigint NOT NULL,
-      "received_at" timestamptz NOT NULL DEFAULT now(),
-      -- Strava retries an unacknowledged event up to three times, and every
-      -- retry is byte-identical. This is what makes the work happen once.
-      PRIMARY KEY ("object_id", "aspect_type", "event_time")
-    )
-  `);
-  return tableReady;
-}
-
 /**
  * Takes ownership of an event, or reports that someone already has.
  *
@@ -193,13 +179,16 @@ function ensureTable(): Promise<unknown> {
  * second instance got there first) and there is nothing to do.
  */
 export async function claimEvent(event: StravaEvent): Promise<boolean> {
-  await ensureTable();
-  const { rowCount } = await pool.query(
-    `INSERT INTO "strava_webhook_event" ("object_id", "aspect_type", "event_time")
-     VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
-    [event.object_id, event.aspect_type, event.event_time],
-  );
-  return (rowCount ?? 0) > 0;
+  const claimed = await db
+    .insert(stravaWebhookEvent)
+    .values({
+      objectId: event.object_id,
+      aspectType: event.aspect_type,
+      eventTime: event.event_time,
+    })
+    .onConflictDoNothing()
+    .returning({ objectId: stravaWebhookEvent.objectId });
+  return claimed.length > 0;
 }
 
 /** Events older than this are dropped on the next claim; nothing replays a month later. */
@@ -208,12 +197,14 @@ const EVENT_RETENTION_DAYS = 30;
 /** Keeps the idempotency table from growing without limit. Best effort. */
 export async function pruneEvents(): Promise<void> {
   try {
-    await ensureTable();
-    await pool.query(
-      `DELETE FROM "strava_webhook_event"
-       WHERE "received_at" < now() - ($1 || ' days')::interval`,
-      [EVENT_RETENTION_DAYS],
-    );
+    await db
+      .delete(stravaWebhookEvent)
+      .where(
+        lt(
+          stravaWebhookEvent.receivedAt,
+          sql`now() - ${`${EVENT_RETENTION_DAYS} days`}::interval`,
+        ),
+      );
   } catch (err) {
     logger.warn(
       { event: "webhook.prune_failed", err },
@@ -226,12 +217,17 @@ export async function pruneEvents(): Promise<void> {
 export async function userForAthlete(
   athleteId: number,
 ): Promise<string | null> {
-  // better-auth owns this table; `accountId` is what `getUserInfo` returned for
-  // the provider, which for Strava is the athlete id as a string (see auth.ts).
-  const { rows } = await pool.query<{ userId: string }>(
-    `SELECT "userId" FROM "account"
-     WHERE "providerId" = 'strava' AND "accountId" = $1 LIMIT 1`,
-    [String(athleteId)],
-  );
-  return rows[0]?.userId ?? null;
+  // `accountId` is what `getUserInfo` returned for the provider, which for
+  // Strava is the athlete id as a string (see auth.ts).
+  const [row] = await db
+    .select({ userId: account.userId })
+    .from(account)
+    .where(
+      and(
+        eq(account.providerId, "strava"),
+        eq(account.accountId, String(athleteId)),
+      ),
+    )
+    .limit(1);
+  return row?.userId ?? null;
 }

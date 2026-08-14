@@ -10,7 +10,11 @@
     "typecheck": "tsc --noEmit",
     "openapi:emit": "tsx scripts/emit-openapi.ts",
     "webhook": "tsx scripts/strava-webhook.ts",
-    "auth:migrate": "better-auth migrate --config src/auth.ts -y"
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:studio": "drizzle-kit studio",
+    "db:seed": "tsx src/db/seed.ts",
+    "auth:generate": "auth generate --config src/auth.ts --output .better-auth-schema.ts -y"
   },
   "dependencies": {
     "@ai-sdk/google": "^4.0.43",
@@ -24,6 +28,7 @@
     "ai": "^7.0.64",
     "better-auth": "1.6.27",
     "dotenv": "^16.4.0",
+    "drizzle-orm": "^0.45.2",
     "hono": "^4.10.0",
     "pg": "^8.13.0",
     "pino": "^10.3.1",
@@ -38,6 +43,8 @@
     "@types/node": "^22.0.0",
     "@types/pg": "^8.11.0",
     "auth": "1.6.27",
+    "drizzle-kit": "^0.31.10",
+    "drizzle-seed": "^0.3.1",
     "typescript": "^5.7.0",
     "vitest": "^3.0.0"
   }

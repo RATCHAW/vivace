@@ -98,6 +98,7 @@ export const en = {
 
   runs: {
     backToOverview: "Back to overview",
+    backToList: "Back to all runs",
     title: "Your runs",
     syncCount_one: "{{count}} activity · synced from Strava",
     syncCount_other: "{{count}} activities · synced from Strava",
@@ -126,6 +127,8 @@ export const en = {
 
   videoOptions: {
     section: "Video options",
+    edit: "Edit",
+    hide: "Hide",
     themeGroup: "Video theme",
     templateSelect: "Video template",
     runAsAvatar: "Run as your avatar",
@@ -190,16 +193,14 @@ export const en = {
   },
 
   render: {
-    loadErrorTitle: "Could not load the render state",
-    rendering: "Rendering video…",
-    progressLabel: "Video render progress",
+    loadErrorTitle: "Could not load the video state",
+    preparing: "Preparing your video…",
+    progressLabel: "Video preparation progress",
     downloadVideo: "Download video",
-    failedTitle: "Render failed",
-    paused: "Video rendering is paused right now. Check back shortly.",
-    lastRendered: "Your last video was rendered {{options}}.",
-    retry: "Retry render",
-    again: "Render again",
-    start: "Render video",
+    failedTitle: "Could not prepare this video",
+    paused: "Video downloads are paused right now. Check back shortly.",
+    lastRendered: "Your last video was made {{options}}.",
+    retry: "Try again",
     downloadLast: "Download the last video",
     optionTheme: "in {{theme}}",
     optionAvatar: "with your avatar",
