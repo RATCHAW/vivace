@@ -729,9 +729,26 @@ export type ReceiveStravaWebhookData = {
     url: '/api/strava/webhook';
 };
 
+export type ReceiveStravaWebhookErrors = {
+    /**
+     * The delivery signature was absent, invalid, or stale.
+     */
+    403: ApiError;
+    /**
+     * The request body exceeded the webhook limit.
+     */
+    413: ApiError;
+    /**
+     * Webhook signature verification is not configured.
+     */
+    503: ApiError;
+};
+
+export type ReceiveStravaWebhookError = ReceiveStravaWebhookErrors[keyof ReceiveStravaWebhookErrors];
+
 export type ReceiveStravaWebhookResponses = {
     /**
-     * Acknowledged. Always, whatever the event turns out to be.
+     * Authenticated and acknowledged.
      */
     200: {
         received: true;

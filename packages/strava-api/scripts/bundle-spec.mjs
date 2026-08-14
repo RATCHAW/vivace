@@ -98,8 +98,32 @@ async function resolveDefinition(url, name) {
   await localizeRefs(schema, url);
 }
 
+/**
+ * Strava's example responses contain a token-shaped `embed_token`. The sample
+ * activity ids and asset hosts around it are synthetic, but keeping a realistic
+ * credential-shaped value in a committed fixture creates noisy secret-scanning
+ * alerts and makes it too easy to mistake sample data for a usable token.
+ */
+function sanitizeExamples(node) {
+  if (Array.isArray(node)) {
+    for (const item of node) sanitizeExamples(item);
+    return;
+  }
+  if (!node || typeof node !== "object") return;
+
+  for (const [key, value] of Object.entries(node)) {
+    if (key === "embed_token" && typeof value === "string") {
+      node[key] = "example-embed-token";
+    } else {
+      sanitizeExamples(value);
+    }
+  }
+}
+
 const root = await fetchDocument(ROOT_URL);
 await localizeRefs(root, ROOT_URL);
+sanitizeExamples(root);
+sanitizeExamples(definitions);
 
 // `definitions` is built by async fan-out, so sort it for a stable diff.
 const bundled = {

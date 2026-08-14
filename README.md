@@ -414,6 +414,8 @@ without anyone asking:
 # 1. Any random string, in apps/api/.env — the API echoes Strava's challenge
 #    only when it matches.
 STRAVA_WEBHOOK_VERIFY_TOKEN=$(openssl rand -hex 16)
+# Copy the webhook signing secret assigned to your Strava application too.
+STRAVA_WEBHOOK_SIGNING_SECRET=...
 
 # 2. With the API publicly reachable (in development, a tunnel:
 #    cloudflared tunnel --url http://localhost:3000)
@@ -424,10 +426,11 @@ pnpm --filter @repo/api webhook delete <id>
 
 Strava allows one subscription per application, and gives the callback two
 seconds to answer — both the validation handshake and every event. So
-`POST /api/strava/webhook` acknowledges first and works afterwards, guarded
-twice: `strava_webhook_event` absorbs Strava's three retries of an identical
-event, and `coach_debrief` makes sure a run is never debriefed twice even if a
-redelivery arrives long after those rows are pruned.
+`POST /api/strava/webhook` first verifies the timestamped `X-Strava-Signature`
+over the exact request body, then acknowledges and works afterwards. The HMAC
+rejects forged or replayed deliveries; `strava_webhook_event` absorbs Strava's
+legitimate retries, and `coach_debrief` makes sure a run is never debriefed
+twice even if a redelivery arrives long after those rows are pruned.
 
 The card in an automatic debrief is a **`data-` part, not a tool part** — nothing
 called a tool, and a function call at the head of a thread with no question in
@@ -435,8 +438,8 @@ front of it makes the athlete's *next* message fail. `convertToModelMessages`
 drops data parts, so the card stays UI and the written read is what the model
 sees. There is a test pinning that (`debrief.test.ts`).
 
-Unset the verify token and the callback refuses to validate; nothing else in the
-app changes.
+Unset the verify token and the callback refuses to validate. Unset the signing
+secret and event POSTs fail closed with 503; nothing else in the app changes.
 
 ## UI
 
@@ -520,7 +523,7 @@ docker compose --profile observability up -d
 pnpm dev
 ```
 
-Grafana is at <http://localhost:3002> — anonymous admin, no login. Open
+Grafana is at <http://localhost:3002> — anonymous read-only access, no login. Open
 **Vivace — user activity** or **Vivace — errors & health**.
 
 **What gets logged.** The API writes one `http_request` line per request

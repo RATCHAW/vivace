@@ -1,9 +1,9 @@
 // The Strava webhook end to end, with everything it reaches for stubbed.
 //
-// This endpoint is unauthenticated by necessity — Strava has no credential to
-// present — so what is actually under test is the two things that stand in for
-// one: the verify token on the handshake, and the claim that stops a retried
-// event from being processed twice.
+// This endpoint has no user session by design, so the tests pin its provider
+// authentication instead: the verify token on the handshake, the signed POST
+// body, and the claim that stops a retried event from being processed twice.
+import { createHmac } from "node:crypto";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { StravaEvent } from "./schemas.js";
 
@@ -11,6 +11,7 @@ process.env.BETTER_AUTH_SECRET ??= "test-secret-not-for-production";
 process.env.DATABASE_URL ??= "postgres://app:app@localhost:5433/app";
 
 const VERIFY_TOKEN = "a-random-string";
+const SIGNING_SECRET = "a-distinct-webhook-signing-secret";
 const ATHLETE_ID = 165387970;
 const USER_ID = "athlete-1";
 const ACTIVITY_ID = 987654321;
@@ -82,11 +83,27 @@ function event(over: Partial<StravaEvent> = {}) {
   };
 }
 
-function post(body: unknown) {
+function post(
+  body: unknown,
+  signature: "valid" | "invalid" | "missing" = "valid",
+  timestamp = Math.floor(Date.now() / 1000),
+) {
+  const rawBody = JSON.stringify(body);
+  const headers: Record<string, string> = { "content-type": "application/json" };
+  if (signature !== "missing") {
+    const digest =
+      signature === "valid"
+        ? createHmac("sha256", SIGNING_SECRET)
+            .update(`${timestamp}.${rawBody}`)
+            .digest("hex")
+        : "0".repeat(64);
+    headers["x-strava-signature"] = `t=${timestamp},v1=${digest}`;
+  }
+
   return app.request("/api/strava/webhook", {
     method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(body),
+    headers,
+    body: rawBody,
   });
 }
 
@@ -123,6 +140,7 @@ describe("GET /api/strava/webhook", () => {
 
 describe("POST /api/strava/webhook", () => {
   beforeEach(() => {
+    process.env.STRAVA_WEBHOOK_SIGNING_SECRET = SIGNING_SECRET;
     claimed = [];
     known = [ATHLETE_ID];
     debriefed = [];
@@ -136,6 +154,32 @@ describe("POST /api/strava/webhook", () => {
 
     await settle();
     expect(debriefed).toEqual([{ userId: USER_ID, activityId: ACTIVITY_ID }]);
+  });
+
+  it("rejects a delivery without a signature", async () => {
+    expect((await post(event(), "missing")).status).toBe(403);
+    await settle();
+    expect(debriefed).toEqual([]);
+  });
+
+  it("rejects a delivery with a bad signature", async () => {
+    expect((await post(event(), "invalid")).status).toBe(403);
+    await settle();
+    expect(debriefed).toEqual([]);
+  });
+
+  it("rejects a signed delivery outside the replay window", async () => {
+    const stale = Math.floor(Date.now() / 1000) - 600;
+    expect((await post(event(), "valid", stale)).status).toBe(403);
+    await settle();
+    expect(debriefed).toEqual([]);
+  });
+
+  it("fails closed when no signing secret is configured", async () => {
+    delete process.env.STRAVA_WEBHOOK_SIGNING_SECRET;
+    expect((await post(event())).status).toBe(503);
+    await settle();
+    expect(debriefed).toEqual([]);
   });
 
   it("debriefs a retried event once", async () => {

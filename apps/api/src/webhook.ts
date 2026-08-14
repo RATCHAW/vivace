@@ -17,6 +17,7 @@
 // CLAUDE.md says to use the generated SDK, and everything else does — but
 // `/push_subscriptions` is absent from Strava's published Swagger, so there is
 // nothing generated to call.
+import { createHmac, timingSafeEqual } from "node:crypto";
 import { pool } from "./db.js";
 import { logger } from "./logger.js";
 import type { StravaEvent } from "./schemas.js";
@@ -36,6 +37,62 @@ export const WEBHOOK_PATH = "/api/strava/webhook";
  */
 export function verifyToken(): string | null {
   return process.env.STRAVA_WEBHOOK_VERIFY_TOKEN || null;
+}
+
+/** Secret Strava uses to authenticate each POST delivery. */
+export function webhookSigningSecret(): string | null {
+  return process.env.STRAVA_WEBHOOK_SIGNING_SECRET || null;
+}
+
+const SIGNATURE_MAX_AGE_SECONDS = 300;
+
+/**
+ * Verifies Strava's `X-Strava-Signature: t=…,v1=…` header over the exact body.
+ *
+ * The timestamp window prevents a captured delivery from being replayed after
+ * five minutes. The database claim remains necessary for legitimate retries
+ * that arrive inside that window.
+ */
+export function verifyWebhookSignature(
+  rawBody: string,
+  header: string | null,
+  secret: string,
+  nowSeconds = Math.floor(Date.now() / 1000),
+): boolean {
+  if (!header) return false;
+
+  let timestamp: string | null = null;
+  const signatures: string[] = [];
+  for (const part of header.split(",")) {
+    const separator = part.indexOf("=");
+    if (separator <= 0) continue;
+    const key = part.slice(0, separator).trim();
+    const value = part.slice(separator + 1).trim();
+    if (key === "t" && value) timestamp = value;
+    if (key === "v1" && value) signatures.push(value);
+  }
+
+  if (!timestamp || !/^\d+$/.test(timestamp) || signatures.length === 0) {
+    return false;
+  }
+
+  const eventSeconds = Number(timestamp);
+  if (
+    !Number.isSafeInteger(eventSeconds) ||
+    Math.abs(nowSeconds - eventSeconds) > SIGNATURE_MAX_AGE_SECONDS
+  ) {
+    return false;
+  }
+
+  const expected = createHmac("sha256", secret)
+    .update(`${timestamp}.${rawBody}`)
+    .digest();
+
+  return signatures.some((candidate) => {
+    if (!/^[0-9a-f]{64}$/i.test(candidate)) return false;
+    const actual = Buffer.from(candidate, "hex");
+    return actual.length === expected.length && timingSafeEqual(actual, expected);
+  });
 }
 
 function credentials(): { client_id: string; client_secret: string } {

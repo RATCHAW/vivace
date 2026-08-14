@@ -1988,7 +1988,7 @@
           "Webhooks"
         ],
         "summary": "Receive a Strava activity or athlete event",
-        "description": "Acknowledged immediately and processed afterwards: Strava requires a 200 within two seconds and retries up to three times otherwise, which is far less time than reading an activity and writing a debrief takes. A new run becomes a post-run debrief in the athlete's \"Post-run debriefs\" thread; everything else is recorded and ignored.",
+        "description": "Authenticated with Strava's X-Strava-Signature header, then acknowledged immediately and processed afterwards: Strava requires a 200 within two seconds and retries up to three times otherwise, which is far less time than reading an activity and writing a debrief takes. A new run becomes a post-run debrief in the athlete's \"Post-run debriefs\" thread; everything else is recorded and ignored.",
         "requestBody": {
           "required": true,
           "content": {
@@ -2001,7 +2001,7 @@
         },
         "responses": {
           "200": {
-            "description": "Acknowledged. Always, whatever the event turns out to be.",
+            "description": "Authenticated and acknowledged.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2017,6 +2017,36 @@
                   "required": [
                     "received"
                   ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The delivery signature was absent, invalid, or stale.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The request body exceeded the webhook limit.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Webhook signature verification is not configured.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
                 }
               }
             }

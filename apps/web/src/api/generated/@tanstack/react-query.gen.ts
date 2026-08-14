@@ -4,7 +4,7 @@ import { type DefaultError, queryOptions, type UseMutationOptions } from '@tanst
 
 import { client } from '../client.gen';
 import { acceptCoachPlan, createCoachThread, deleteCoachThread, getCoachBriefing, getCoachThread, getHealth, getRunRender, getRuns, getRunStreams, getStravaAthlete, listCoachThreads, type Options, postClientLogs, receiveStravaWebhook, startRunRender, updateCoachContext, validateStravaWebhook } from '../sdk.gen';
-import type { AcceptCoachPlanData, AcceptCoachPlanError, AcceptCoachPlanResponse, CreateCoachThreadData, CreateCoachThreadError, CreateCoachThreadResponse, DeleteCoachThreadData, DeleteCoachThreadError, DeleteCoachThreadResponse, GetCoachBriefingData, GetCoachBriefingError, GetCoachBriefingResponse, GetCoachThreadData, GetCoachThreadError, GetCoachThreadResponse, GetHealthData, GetHealthResponse, GetRunRenderData, GetRunRenderError, GetRunRenderResponse, GetRunsData, GetRunsError, GetRunsResponse, GetRunStreamsData, GetRunStreamsError, GetRunStreamsResponse, GetStravaAthleteData, GetStravaAthleteError, GetStravaAthleteResponse, ListCoachThreadsData, ListCoachThreadsError, ListCoachThreadsResponse, PostClientLogsData, PostClientLogsResponse, ReceiveStravaWebhookData, ReceiveStravaWebhookResponse, StartRunRenderData, StartRunRenderError, StartRunRenderResponse, UpdateCoachContextData, UpdateCoachContextError, UpdateCoachContextResponse, ValidateStravaWebhookData, ValidateStravaWebhookError, ValidateStravaWebhookResponse } from '../types.gen';
+import type { AcceptCoachPlanData, AcceptCoachPlanError, AcceptCoachPlanResponse, CreateCoachThreadData, CreateCoachThreadError, CreateCoachThreadResponse, DeleteCoachThreadData, DeleteCoachThreadError, DeleteCoachThreadResponse, GetCoachBriefingData, GetCoachBriefingError, GetCoachBriefingResponse, GetCoachThreadData, GetCoachThreadError, GetCoachThreadResponse, GetHealthData, GetHealthResponse, GetRunRenderData, GetRunRenderError, GetRunRenderResponse, GetRunsData, GetRunsError, GetRunsResponse, GetRunStreamsData, GetRunStreamsError, GetRunStreamsResponse, GetStravaAthleteData, GetStravaAthleteError, GetStravaAthleteResponse, ListCoachThreadsData, ListCoachThreadsError, ListCoachThreadsResponse, PostClientLogsData, PostClientLogsResponse, ReceiveStravaWebhookData, ReceiveStravaWebhookError, ReceiveStravaWebhookResponse, StartRunRenderData, StartRunRenderError, StartRunRenderResponse, UpdateCoachContextData, UpdateCoachContextError, UpdateCoachContextResponse, ValidateStravaWebhookData, ValidateStravaWebhookError, ValidateStravaWebhookResponse } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
@@ -315,10 +315,10 @@ export const validateStravaWebhookOptions = (options: Options<ValidateStravaWebh
 /**
  * Receive a Strava activity or athlete event
  *
- * Acknowledged immediately and processed afterwards: Strava requires a 200 within two seconds and retries up to three times otherwise, which is far less time than reading an activity and writing a debrief takes. A new run becomes a post-run debrief in the athlete's "Post-run debriefs" thread; everything else is recorded and ignored.
+ * Authenticated with Strava's X-Strava-Signature header, then acknowledged immediately and processed afterwards: Strava requires a 200 within two seconds and retries up to three times otherwise, which is far less time than reading an activity and writing a debrief takes. A new run becomes a post-run debrief in the athlete's "Post-run debriefs" thread; everything else is recorded and ignored.
  */
-export const receiveStravaWebhookMutation = (options?: Partial<Options<ReceiveStravaWebhookData>>): UseMutationOptions<ReceiveStravaWebhookResponse, DefaultError, Options<ReceiveStravaWebhookData>> => {
-    const mutationOptions: UseMutationOptions<ReceiveStravaWebhookResponse, DefaultError, Options<ReceiveStravaWebhookData>> = {
+export const receiveStravaWebhookMutation = (options?: Partial<Options<ReceiveStravaWebhookData>>): UseMutationOptions<ReceiveStravaWebhookResponse, ReceiveStravaWebhookError, Options<ReceiveStravaWebhookData>> => {
+    const mutationOptions: UseMutationOptions<ReceiveStravaWebhookResponse, ReceiveStravaWebhookError, Options<ReceiveStravaWebhookData>> = {
         mutationFn: async (fnOptions) => {
             const { data } = await receiveStravaWebhook({
                 ...options,
