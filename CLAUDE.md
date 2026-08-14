@@ -322,3 +322,15 @@ rendering models, and the same rule about the module graph applies here as to
 ## Checks
 
 `pnpm typecheck && pnpm test && pnpm build` must pass before a change is done.
+
+Two husky hooks catch a subset of that earlier, installed by the root `prepare`
+script on `pnpm install`:
+
+- **`pre-commit` runs `pnpm lint-staged`**, which typechecks *only* the
+  workspaces owning the staged `.ts`/`.tsx` files. It is a fast gate, not CI —
+  it never runs tests or builds, so it passing does not mean the change is done.
+- **`commit-msg` runs `pnpm commitlint --edit $1`.** Commit messages are
+  Conventional Commits; there is deliberately no scope allow-list.
+- **Nothing formats your code.** This repository has no linter or formatter, and
+  the hooks add none — `lint-staged` is a task runner here. Don't introduce
+  Prettier to satisfy the name; the source is hand-wrapped on purpose.

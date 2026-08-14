@@ -4,6 +4,7 @@
   "license": "CC-BY-NC-SA-4.0",
   "packageManager": "pnpm@11.21.0",
   "scripts": {
+    "prepare": "husky",
     "dev": "turbo run dev",
     "build": "turbo run build",
     "test": "turbo run test",
@@ -16,6 +17,10 @@
     "logs:up": "docker compose --profile observability up -d"
   },
   "devDependencies": {
+    "@commitlint/cli": "^21.2.2",
+    "@commitlint/config-conventional": "^21.2.2",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.3.0",
     "turbo": "^2.5.0"
   }
 }

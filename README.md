@@ -658,6 +658,31 @@ pnpm --filter @repo/web test
 pnpm --filter @repo/landing dev   # landing page only, on :3001
 ```
 
+## Git hooks
+
+`pnpm install` runs `husky` through the root `prepare` script, which points
+`core.hooksPath` at `.husky/_`. Two hooks are installed:
+
+| Hook | Runs | Rejects |
+| --- | --- | --- |
+| `pre-commit` | `pnpm lint-staged` | a staged `.ts`/`.tsx` file whose workspace no longer typechecks |
+| `commit-msg` | `pnpm commitlint --edit $1` | a message that is not a [Conventional Commit](https://www.conventionalcommits.org) |
+
+`lint-staged.config.mjs` maps each staged file back to the workspace that owns it
+and runs `turbo run typecheck` for those workspaces only, so touching
+`apps/landing` never typechecks the API. Turbo caches the result; an unchanged
+package costs nothing on the next commit. lint-staged stashes unstaged work
+first, so `tsc` sees the tree that is about to be committed rather than the one
+on disk.
+
+The hooks are a fast gate, not a replacement for CI — they do not run tests or
+builds. `pnpm typecheck && pnpm test && pnpm build` is still what "done" means.
+
+```sh
+git commit --no-verify   # skip both hooks
+HUSKY=0 git commit       # skip them for a whole shell session
+```
+
 ## Running fully in Docker
 
 ```sh
