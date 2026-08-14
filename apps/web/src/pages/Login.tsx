@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { authClient } from "@/lib/auth-client";
 import { trackError, trackEvent } from "@/lib/logger";
@@ -15,8 +15,11 @@ import { Button } from "@/components/ui/button";
 export function Login() {
   const { t } = useTranslation();
   const [error, setError] = useState<string | null>(null);
+  const signInStarted = useRef(false);
 
   async function signInWithStrava() {
+    if (signInStarted.current) return;
+    signInStarted.current = true;
     setError(null);
     // The redirect to Strava happens next, so this is the last thing we can
     // record on our side — an athlete who never comes back shows up as a
@@ -29,6 +32,7 @@ export function Login() {
       errorCallbackURL: `${window.location.origin}/login`,
     });
     if (error) {
+      signInStarted.current = false;
       // The message comes off the wire in whatever language the auth server
       // speaks; only our own fallback is ours to translate.
       const message = error.message ?? t("login.failedFallback");
@@ -39,6 +43,18 @@ export function Login() {
       setError(message);
     }
   }
+
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("provider") !== "strava") return;
+
+    // Consume the landing-page intent before leaving. If OAuth returns an
+    // error, or the athlete refreshes before the redirect finishes, this page
+    // remains a safe manual retry instead of immediately redirecting again.
+    url.searchParams.delete("provider");
+    window.history.replaceState(window.history.state, "", url);
+    void signInWithStrava();
+  }, []);
 
   return (
     <main className="grid min-h-svh items-stretch lg:grid-cols-2">
