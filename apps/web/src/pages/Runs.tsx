@@ -12,6 +12,7 @@ import {
 import { AppHeader } from "@/components/app-header";
 import { MonoLabel, SoonBadge } from "@/components/mono";
 import { RunPlayer } from "@/components/run-player";
+import { TemplateSelect } from "@/components/template-select";
 import { VideoOptions } from "@/components/video-options";
 import { trackEvent } from "@/lib/logger";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -24,10 +25,15 @@ import { cn } from "@/lib/utils";
 import {
   avatarSource,
   DEFAULT_TEMPLATE_ID,
+  DEFAULT_THEME,
   formatClock,
   formatPace,
   getTemplate,
+  recommendTemplate,
+  templateEligibility,
   type TemplateId,
+  type TemplateInput,
+  type ThemeName,
 } from "@repo/video";
 
 // Empty until the Mapbox token is provided; the video falls back to a plain
@@ -59,9 +65,8 @@ export function Runs() {
   // A cut of the film, not a property of the run — these outlive selecting
   // another one, and both the player and the render request read them.
   const [showAvatar, setShowAvatar] = useState(false);
-  const [template, setTemplate] = useState<TemplateId>(DEFAULT_TEMPLATE_ID);
-  // A template that draws no runner has nothing for the avatar switch to do.
-  const avatarSupported = getTemplate(template).supportsAvatar;
+  const [chosen, setChosen] = useState<TemplateId>(DEFAULT_TEMPLATE_ID);
+  const [theme, setTheme] = useState<ThemeName>(DEFAULT_THEME);
 
   const { data: runs, error: runsError } = useQuery(getRunsOptions());
   const { data: athlete, error: athleteError } = useQuery(getStravaAthleteOptions());
@@ -74,6 +79,22 @@ export function Runs() {
     ...getRunStreamsOptions({ path: { id: String(selected?.id ?? 0) } }),
     enabled: selected != null,
   });
+
+  // What decides which templates this run can be cut with. Null until the
+  // streams are here: a treadmill run and a run whose streams are still loading
+  // look identical, and only one of them should lose the route replay.
+  const input: TemplateInput | null =
+    selected && streams ? { activity: selected, streams } : null;
+  // The athlete's choice, unless this run can't have it — clicking a treadmill
+  // run in the list must not leave the route replay selected and empty. Derived
+  // rather than stored, so their choice comes back the moment a run can serve it.
+  const template =
+    input && !templateEligibility(chosen, input).eligible ? recommendTemplate(input) : chosen;
+  // A template that draws no runner has nothing for the avatar switch to do,
+  // and one whose plate isn't ours to re-tint has nothing for the theme. Both
+  // are resolved once, so the player and the render are handed the same answers.
+  const avatarSupported = getTemplate(template).supportsAvatar;
+  const filmTheme = getTemplate(template).supportsTheme ? theme : DEFAULT_THEME;
 
   return (
     <>
@@ -198,6 +219,20 @@ export function Runs() {
                 stacked under it — transport, render panel, footnote — keeps to
                 the same width, or the column reads as three loose things. */}
             <div className={cn(expanded && "mx-auto max-w-[460px]")}>
+              {/* Which cut is playing, above the film it names. */}
+              {selected && (
+                <div className="mb-3.5">
+                  <TemplateSelect
+                    template={template}
+                    input={input}
+                    onChange={(next) => {
+                      setChosen(next);
+                      trackEvent("ui.video_template_changed", { template: next });
+                    }}
+                  />
+                </div>
+              )}
+
               {!selected || (!streams && !streamsError) ? (
                 <div className="flex aspect-9/16 w-full items-center justify-center rounded-lg border bg-black">
                   <Loader2Icon className="text-muted-foreground size-6 animate-spin" />
@@ -210,12 +245,20 @@ export function Runs() {
                 </Alert>
               ) : (
                 <RunPlayer
-                  key={`${selected.id}:${template}`}
+                  // Prefixed, and it has to be: the render panel below is keyed
+                  // on the same run and template, and two siblings sharing a key
+                  // is not a warning here but a leak. React maps a parent's
+                  // children by key when one of them changes, so the duplicate
+                  // evicts the first from that map, and the fiber nobody looked
+                  // up is never deleted — the old player stayed in the DOM,
+                  // frozen, under the new one, once per switch.
+                  key={`player:${selected.id}:${template}`}
                   template={template}
                   activity={selected}
                   streams={streams ?? {}}
                   mapboxToken={MAPBOX_TOKEN}
                   avatarUrl={showAvatar && avatarSupported ? avatarUrl : ""}
+                  theme={filmTheme}
                   expanded={expanded}
                   onToggleExpanded={() => setExpanded((open) => !open)}
                 />
@@ -224,9 +267,13 @@ export function Runs() {
               {selected && (
                 <VideoOptions
                   template={template}
-                  onTemplateChange={(next) => {
-                    setTemplate(next);
-                    trackEvent("ui.video_template_changed", { template: next });
+                  theme={theme}
+                  onThemeChange={(next) => {
+                    setTheme(next);
+                    trackEvent("ui.video_option_changed", {
+                      option: "theme",
+                      value: next,
+                    });
                   }}
                   avatarSupported={avatarSupported}
                   avatarUrl={avatarUrl}
@@ -250,14 +297,16 @@ export function Runs() {
                   it stands even when the browser could not load the streams. */}
               {selected && (
                 <RenderControls
-                  key={`${selected.id}:${template}`}
+                  // Its own namespace — see the player's key above.
+                  key={`render:${selected.id}:${template}`}
                   run={selected}
                   template={template}
                   showAvatar={showAvatar && avatarSupported}
+                  theme={filmTheme}
                 />
               )}
 
-              {!MAPBOX_TOKEN && (
+              {!MAPBOX_TOKEN && getTemplate(template).usesMap && (
                 <p className="text-caption text-stone mt-4">
                   No Mapbox token configured — the replay draws the route on a
                   plain canvas. Set <code>VITE_MAPBOX_TOKEN</code> in{" "}

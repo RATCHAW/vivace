@@ -1,7 +1,9 @@
 import type { ComponentType } from "react";
 import { Composition } from "remotion";
+import { DEFAULT_THEME } from "./core/theme";
+import { estimateDurationInFrames } from "./duration";
 import { VIDEO_TEMPLATES, type TemplateId } from "./registry";
-import type { VideoActivity } from "./types";
+import type { VideoActivity, VideoStreams } from "./types";
 
 /**
  * Every template in the catalogue, registered as a `<Composition>`.
@@ -29,6 +31,18 @@ export const TEMPLATE_COMPONENTS: Record<
     import("./templates/run-video/RunVideo").then((module) => ({
       default: module.RunVideo as AnyVideo,
     })),
+  "split-rush": () =>
+    import("./templates/split-rush/SplitRush").then((module) => ({
+      default: module.SplitRush as AnyVideo,
+    })),
+  "living-poster": () =>
+    import("./templates/living-poster/LivingPoster").then((module) => ({
+      default: module.LivingPoster as AnyVideo,
+    })),
+  "minimal-numbers": () =>
+    import("./templates/minimal-numbers/MinimalNumbers").then((module) => ({
+      default: module.MinimalNumbers as AnyVideo,
+    })),
 };
 
 /** Only ever seen in Remotion Studio; real renders get their props from the API,
@@ -54,7 +68,28 @@ export const TEMPLATE_DEFAULT_PROPS: Record<TemplateId, Record<string, unknown>>
     mapboxToken: "",
     avatarUrl: "",
   },
+  "split-rush": { activity: placeholderRun, streams: {}, theme: DEFAULT_THEME },
+  "living-poster": { activity: placeholderRun, streams: {}, theme: DEFAULT_THEME },
+  "minimal-numbers": { activity: placeholderRun, streams: {}, theme: DEFAULT_THEME },
 };
+
+/**
+ * The run and its streams out of a composition's untyped `inputProps`.
+ *
+ * `calculateMetadata` runs before the component does — on Lambda it runs against
+ * whatever the API sent — so this is the one place that has to survive props
+ * that aren't what we think they are, rather than crash the render at frame
+ * zero and bill for it.
+ */
+function videoInput(props: Record<string, unknown>): {
+  activity: VideoActivity;
+  streams: VideoStreams;
+} {
+  return {
+    activity: (props.activity ?? placeholderRun) as VideoActivity,
+    streams: (props.streams ?? {}) as VideoStreams,
+  };
+}
 
 export function RemotionRoot() {
   return (
@@ -69,6 +104,13 @@ export function RemotionRoot() {
           width={template.width}
           height={template.height}
           defaultProps={TEMPLATE_DEFAULT_PROPS[template.id]}
+          // The length of the film is a property of the run, not of the
+          // catalogue: a marathon's Split Rush is longer than a parkrun's, and a
+          // run with three numbers in it is a shorter Minimal Numbers than one
+          // with five. The browser's <Player> calls the same function.
+          calculateMetadata={({ props }) => ({
+            durationInFrames: estimateDurationInFrames(template.id, videoInput(props)),
+          })}
         />
       ))}
     </>

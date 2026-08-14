@@ -72,6 +72,7 @@ export type RunRender = {
     template: VideoTemplate;
     status: 'rendering' | 'done' | 'error';
     show_avatar: boolean;
+    theme: VideoTheme;
     progress: number;
     output_url: string | null;
     error: string | null;
@@ -79,11 +80,14 @@ export type RunRender = {
     updated_at: string;
 } | null;
 
-export type VideoTemplate = 'run-video';
+export type VideoTemplate = 'run-video' | 'split-rush' | 'living-poster' | 'minimal-numbers';
+
+export type VideoTheme = 'charcoal' | 'cream' | 'accent';
 
 export type RunRenderOptions = {
     template?: VideoTemplate;
     show_avatar?: boolean;
+    theme?: VideoTheme;
 };
 
 export type CoachThread = {

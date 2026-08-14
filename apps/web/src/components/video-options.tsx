@@ -1,4 +1,4 @@
-import { getTemplate, VIDEO_TEMPLATES, type TemplateId } from "@repo/video";
+import { getTemplate, THEMES, THEME_NAMES, type TemplateId, type ThemeName } from "@repo/video";
 import { MonoLabel } from "@/components/mono";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Label } from "@/components/ui/label";
@@ -9,7 +9,8 @@ import { cn } from "@/lib/utils";
  * How the replay is cut, chosen before it is rendered. Everything here changes
  * the film itself, not the page around it — the player above updates as each
  * choice is made, and the same choices are what the Lambda render is started
- * with.
+ * with. *Which* film is a different question, and it is asked above the player
+ * by `<TemplateSelect>`; these are the options within one.
  *
  * `avatarUrl` is the athlete's Strava picture, or "" when they never set one —
  * the marker has nothing to be in that case, so the switch says so rather than
@@ -19,7 +20,8 @@ import { cn } from "@/lib/utils";
  */
 export function VideoOptions({
   template,
-  onTemplateChange,
+  theme,
+  onThemeChange,
   avatarSupported,
   avatarUrl,
   name,
@@ -28,8 +30,10 @@ export function VideoOptions({
   showAvatar,
   onShowAvatarChange,
 }: {
+  /** Which cut is playing — it decides which of these options it honours. */
   template: TemplateId;
-  onTemplateChange: (next: TemplateId) => void;
+  theme: ThemeName;
+  onThemeChange: (next: ThemeName) => void;
   /** False when the chosen template draws no runner to put a face on. */
   avatarSupported: boolean;
   avatarUrl: string;
@@ -39,11 +43,16 @@ export function VideoOptions({
   showAvatar: boolean;
   onShowAvatarChange: (next: boolean) => void;
 }) {
+  const themeSupported = getTemplate(template).supportsTheme;
+  // A template that honours neither option has no panel — the picker above the
+  // player is the whole of its configuration.
+  if (!themeSupported && !avatarSupported) return null;
+
   return (
     <section aria-label="Video options" className="mt-5 flex flex-col gap-3">
       <MonoLabel>Video options</MonoLabel>
 
-      <TemplatePicker template={template} onChange={onTemplateChange} />
+      {themeSupported && <ThemePicker theme={theme} onChange={onThemeChange} />}
 
       {avatarSupported && (
         // DESIGN.md: a hairline and a surface, no elevation shadow.
@@ -80,50 +89,47 @@ export function VideoOptions({
 }
 
 /**
- * Which cut to play and render. Renders nothing while the catalogue holds a
- * single template — there is no choice to offer — so adding one to
- * `@repo/video`'s registry is what puts this on screen.
- *
- * Toggle buttons rather than a radio group: the design system's pill is already
- * the vocabulary for "one of these", and shadcn's radio-group is the upgrade if
- * the catalogue ever outgrows a single row.
+ * The look. Three, shared by every template that has one — no generated
+ * palettes, and no per-template variants: a Vivace video is recognisable
+ * because the catalogue is small.
  */
-function TemplatePicker({
-  template,
+function ThemePicker({
+  theme,
   onChange,
 }: {
-  template: TemplateId;
-  onChange: (next: TemplateId) => void;
+  theme: ThemeName;
+  onChange: (next: ThemeName) => void;
 }) {
-  if (VIDEO_TEMPLATES.length < 2) return null;
-
   return (
-    <div
-      role="group"
-      aria-label="Video template"
-      className="flex flex-col gap-2.5"
-    >
+    <div role="group" aria-label="Video theme" className="flex flex-col gap-2.5">
       <div className="flex flex-wrap gap-2">
-        {VIDEO_TEMPLATES.map((entry) => (
+        {THEME_NAMES.map((name) => (
           <button
-            key={entry.id}
+            key={name}
             type="button"
-            aria-pressed={entry.id === template}
-            onClick={() => onChange(entry.id)}
+            aria-pressed={name === theme}
+            onClick={() => onChange(name)}
             className={cn(
-              "text-body-sm focus-visible:ring-ring/50 inline-flex h-12 items-center rounded-full border px-5 font-semibold outline-none focus-visible:ring-3",
-              entry.id === template
-                ? "bg-muted border-transparent"
-                : "text-muted-foreground hover:bg-muted/40",
+              "text-body-sm focus-visible:ring-ring/50 inline-flex h-12 items-center gap-2.5 rounded-full border px-4 font-semibold outline-none focus-visible:ring-3",
+              name === theme ? "bg-muted border-transparent" : "text-muted-foreground hover:bg-muted/40",
             )}
           >
-            {entry.label}
+            {/* The swatch is the theme's own canvas and accent — the only place
+                in the app that paints with the video's tokens rather than the
+                page's, because it is describing the file, not the page. */}
+            <span
+              aria-hidden
+              className="size-5 shrink-0 rounded-full border"
+              style={{
+                backgroundColor: THEMES[name].canvas,
+                borderColor: THEMES[name].accent,
+              }}
+            />
+            {THEMES[name].label}
           </button>
         ))}
       </div>
-      <p className="text-caption text-muted-foreground">
-        {getTemplate(template).description}
-      </p>
+      <p className="text-caption text-muted-foreground">{THEMES[theme].description}</p>
     </div>
   );
 }

@@ -10,7 +10,13 @@ import {
   Share2Icon,
   SparklesIcon,
 } from "lucide-react";
-import { formatClock, getTemplate, type TemplateId } from "@repo/video";
+import {
+  estimateDurationInFrames,
+  formatClock,
+  getTemplate,
+  type TemplateId,
+  type ThemeName,
+} from "@repo/video";
 import { VIDEO_COMPONENTS } from "@repo/video/compositions";
 import type { Run, RunStreams } from "@/api";
 import { trackEvent } from "@/lib/logger";
@@ -31,6 +37,7 @@ export function RunPlayer({
   streams,
   mapboxToken,
   avatarUrl,
+  theme,
   expanded,
   onToggleExpanded,
 }: {
@@ -43,10 +50,17 @@ export function RunPlayer({
   /** The athlete's picture when the avatar option is on, else "" — see
    *  `<VideoOptions>`. A change re-renders the film, not the player. */
   avatarUrl: string;
+  /** Which of the three looks to cut it in. */
+  theme: ThemeName;
   expanded: boolean;
   onToggleExpanded: () => void;
 }) {
-  const { durationInFrames, fps, width, height } = getTemplate(template);
+  const { fps, width, height } = getTemplate(template);
+  // The length of the film is a property of the *run*: a marathon's Split Rush
+  // is longer than a parkrun's. Lambda gets the same number from the same
+  // function through the composition's `calculateMetadata`, so what plays here
+  // and what comes off the render are the same cut.
+  const durationInFrames = estimateDurationInFrames(template, { activity, streams });
   const player = useRef<PlayerRef>(null);
   const [frame, setFrame] = useState(0);
   const [playing, setPlaying] = useState(false);
@@ -101,7 +115,7 @@ export function RunPlayer({
         <Player
           ref={player}
           component={VIDEO_COMPONENTS[template]}
-          inputProps={{ activity, streams, mapboxToken, avatarUrl }}
+          inputProps={{ activity, streams, mapboxToken, avatarUrl, theme }}
           durationInFrames={durationInFrames}
           fps={fps}
           compositionWidth={width}

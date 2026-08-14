@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { DEFAULT_THEME } from "./core/theme";
 import { TEMPLATE_COMPONENTS, TEMPLATE_DEFAULT_PROPS } from "./Root";
 import {
   DEFAULT_TEMPLATE_ID,
@@ -64,6 +65,28 @@ describe("the catalogue", () => {
     // A profile nothing uses is a function the deploy script must not create.
     for (const profile of profiles) {
       expect(VIDEO_TEMPLATES.some((t) => t.profile === profile)).toBe(true);
+    }
+  });
+
+  it("does not make a template that draws only type pay for the map's iron", () => {
+    for (const template of VIDEO_TEMPLATES) {
+      if (template.usesMap) continue;
+      const profile = getProfile(template);
+      // No GPU work, no tile fetches: a cheap function, and Lambda bills by
+      // GB-second. This is the axis the profiles exist to split.
+      expect(profile.gl, template.id).toBeNull();
+      expect(profile.memorySizeInMb, template.id).toBeLessThanOrEqual(1024);
+    }
+  });
+
+  it("only lets a template be themed when the look is ours to re-tint", () => {
+    for (const template of VIDEO_TEMPLATES) {
+      if (!template.supportsTheme) continue;
+      // The replay's plate is a Mapbox style; a cream video over a dark map is
+      // not a theme, it is a different template.
+      expect(template.usesMap, template.id).toBe(false);
+      // …and a themed template is handed one, so Studio opens on a real look.
+      expect(TEMPLATE_DEFAULT_PROPS[template.id].theme, template.id).toBe(DEFAULT_THEME);
     }
   });
 

@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { DEFAULT_TEMPLATE_ID, getTemplate } from "@repo/video";
 import { renderPropsHash, resolveRenderTarget } from "./render.js";
@@ -83,20 +84,36 @@ describe("resolveRenderTarget", () => {
 
 describe("renderPropsHash", () => {
   it("is stable for the same cut", () => {
-    expect(renderPropsHash(TEMPLATE, { showAvatar: true })).toBe(
-      renderPropsHash(TEMPLATE, { showAvatar: true }),
+    expect(renderPropsHash(TEMPLATE, { showAvatar: true, theme: "charcoal" })).toBe(
+      renderPropsHash(TEMPLATE, { showAvatar: true, theme: "charcoal" }),
     );
   });
 
   it("separates the options that make a different video", () => {
-    expect(renderPropsHash(TEMPLATE, { showAvatar: true })).not.toBe(
-      renderPropsHash(TEMPLATE, { showAvatar: false }),
+    expect(renderPropsHash(TEMPLATE, { showAvatar: true, theme: "charcoal" })).not.toBe(
+      renderPropsHash(TEMPLATE, { showAvatar: false, theme: "charcoal" }),
     );
   });
 
   it("separates templates, so one cut never serves another's MP4", () => {
-    expect(renderPropsHash(TEMPLATE, { showAvatar: false })).not.toBe(
-      renderPropsHash("other-template" as never, { showAvatar: false }),
+    expect(renderPropsHash(TEMPLATE, { showAvatar: false, theme: "charcoal" })).not.toBe(
+      renderPropsHash("other-template" as never, { showAvatar: false, theme: "charcoal" }),
+    );
+  });
+
+  it("separates the look, but leaves the default one out of the hash", () => {
+    // A theme other than the default is a different film, and the browser has
+    // to be offered a re-render for it.
+    expect(renderPropsHash(TEMPLATE, { showAvatar: false, theme: "cream" })).not.toBe(
+      renderPropsHash(TEMPLATE, { showAvatar: false, theme: "charcoal" }),
+    );
+    // …and the default one hashes to what it hashed to before themes existed,
+    // so adding the option marked no athlete's finished video stale.
+    expect(renderPropsHash(TEMPLATE, { showAvatar: false, theme: "charcoal" })).toBe(
+      createHash("sha256")
+        .update(JSON.stringify({ template: TEMPLATE, show_avatar: false }))
+        .digest("hex")
+        .slice(0, 32),
     );
   });
 
@@ -105,8 +122,8 @@ describe("renderPropsHash", () => {
     // the moment the bundle was redeployed, and offer athletes a re-render of a
     // file they already have.
     process.env.REMOTION_SERVE_URL = "https://s3/sites/vivace-abc123/index.html";
-    const before = renderPropsHash(TEMPLATE, { showAvatar: false });
+    const before = renderPropsHash(TEMPLATE, { showAvatar: false, theme: "charcoal" });
     process.env.REMOTION_SERVE_URL = "https://s3/sites/vivace-def456/index.html";
-    expect(renderPropsHash(TEMPLATE, { showAvatar: false })).toBe(before);
+    expect(renderPropsHash(TEMPLATE, { showAvatar: false, theme: "charcoal" })).toBe(before);
   });
 });
