@@ -39,19 +39,37 @@ describe("posthog, unconfigured", () => {
     ).resolves.toBe(false);
   });
 
-  it("drops LLM generations on the floor", async () => {
-    const { captureCoachGeneration } = await import("./posthog.js");
+  it("drops LLM traces, generations and spans on the floor", async () => {
+    const { captureLlmGeneration, captureLlmSpan, captureLlmTrace } =
+      await import("./posthog.js");
 
-    expect(() =>
-      captureCoachGeneration({
+    expect(() => {
+      captureLlmTrace({
         distinctId: "athlete-1",
+        traceId: "trace-1",
+        spanName: "coach turn",
+        latencySeconds: 3,
+        input: "How am I doing?",
+        output: "Well.",
+      });
+      captureLlmGeneration({
+        distinctId: "athlete-1",
+        traceId: "trace-1",
         modelId: "gemini-2.5-flash",
         latencySeconds: 1.2,
         inputTokens: 100,
         outputTokens: 50,
         input: [{ role: "user" }],
         output: "…",
-      }),
-    ).not.toThrow();
+      });
+      captureLlmSpan({
+        distinctId: "athlete-1",
+        traceId: "trace-1",
+        spanName: "getRunSplits",
+        latencySeconds: 0.4,
+        input: { run_id: 1 },
+        output: { splits: [] },
+      });
+    }).not.toThrow();
   });
 });

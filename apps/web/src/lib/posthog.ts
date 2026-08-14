@@ -62,6 +62,22 @@ export function resetPostHog(): void {
   posthog.reset();
 }
 
+/**
+ * The id of the replay being recorded right now, if one is.
+ *
+ * The coach's answers are written on the server, so the trace PostHog draws for
+ * a turn knows nothing about the athlete who is waiting for it. Sending this
+ * along with the question is what links the two: `$session_id` on an `$ai_*`
+ * event is a link to the replay from the trace.
+ *
+ * PostHog can do this by patching every `fetch` in the page (`tracing_headers`),
+ * which is a lot of machinery for the one request that needs it.
+ */
+export function replaySessionId(): string | undefined {
+  if (!posthogEnabled) return undefined;
+  return posthog.get_session_id() || undefined;
+}
+
 /** Prefer `trackEvent` in `@/lib/logger`, which also reaches the server logs. */
 export function capturePostHogEvent(
   event: string,

@@ -132,5 +132,7 @@ describe("without a project key", () => {
       analytics.capturePostHogException(new Error("boom"));
       analytics.resetPostHog();
     }).not.toThrow();
+    // No replay to point an LLM trace at, so the coach request sends no header.
+    expect(analytics.replaySessionId()).toBeUndefined();
   });
 });

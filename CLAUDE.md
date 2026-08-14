@@ -216,12 +216,24 @@ the SDKs; nothing else imports `posthog-js` or `posthog-node`.
   unreachable, or has never heard of the flag. The server reads `getFlag()`, not
   `isEnabled()` — the latter reports an unknown flag as *off*, which would
   disable a feature the moment PostHog was switched on.
+- **A model call is traced through `observeTurn`, never by hand.**
+  `ai-observability.ts` owns the whole shape — one `$ai_trace` per turn, an
+  `$ai_generation` per model call under it, an `$ai_span` per tool call under
+  *that* — and posthog.ts owns writing the three. Spread `turn.callbacks` into
+  `streamText`/`generateText` and call `turn.end()`; a new model call anywhere
+  in the app is those two lines, not a new event.
 - **Don't reach for `withTracing`** from `@posthog/ai` — it throws on an AI SDK
-  v7 model and demands an OpenTelemetry exporter. The coach sends
-  `captureAiGeneration` from `streamText`'s `onFinish`, where the SDK already
-  hands over tokens, latency and stop reason.
-- **Coach transcripts stay private by default** (`privacyMode`), so
-  `$ai_generation` carries the numbers and not the conversation. The opt-in is
+  v7 model and demands an OpenTelemetry exporter. The SDK's own
+  `onLanguageModelCallStart`/`End` and `onToolExecutionEnd` already carry the
+  prompt, the tokens, the latency and the stop reason. `onFinish` alone is not
+  enough: it only ever sees the last step, and a coach answer is up to eight.
+- **A turn is one trace id, and everything else hangs off it.** `$ai_session_id`
+  is the thread, so a conversation reads as one; `$session_id` is the browser's
+  replay, which reaches the API as `X-POSTHOG-SESSION-ID` on the chat request
+  (set in `coach-chat.tsx`, not by patching `fetch` with `tracing_headers`).
+- **Coach transcripts stay private by default** (`privacyMode`), so the LLM
+  events carry the numbers and not the conversation — including `$ai_span`'s
+  tool arguments and results, which posthog.ts redacts itself. The opt-in is
   `POSTHOG_LLM_CAPTURE_CONTENT=true`.
 - **Session replay is on.** Anything that identifies an athlete on screen gets
   `ph-no-capture`, which blocks it in replay *and* autocapture.

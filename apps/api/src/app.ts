@@ -17,11 +17,8 @@ import { DEFAULT_TEMPLATE_ID, DEFAULT_THEME, getTemplate } from "@repo/video";
 import { auth } from "./auth.js";
 import { track, trackError } from "./analytics.js";
 import { logger } from "./logger.js";
-import {
-  captureCoachGeneration,
-  captureServerException,
-  isFeatureEnabledFor,
-} from "./posthog.js";
+import { captureServerException, isFeatureEnabledFor } from "./posthog.js";
+import { observeTurn, POSTHOG_SESSION_HEADER } from "./ai-observability.js";
 import { identify, requestLogger, type AppEnv } from "./request-logger.js";
 import {
   AthleteSchema,
@@ -1296,7 +1293,24 @@ app.openapi(coachChatRoute, async (c) => {
   );
 
   const today = todayLocal();
-  const startedAt = Date.now();
+
+  // Every model call and every tool call in this answer, into PostHog's LLM
+  // analytics as one trace. The session header is what links it to the replay
+  // of the athlete sitting there waiting for it; the thread is what groups the
+  // turn with the rest of the conversation.
+  const turn = observeTurn({
+    distinctId: session.user.id,
+    name: "coach turn",
+    streamed: true,
+    conversationId: thread.id,
+    replaySessionId: c.req.header(POSTHOG_SESSION_HEADER),
+    properties: {
+      thread_id: thread.id,
+      trigger: body.trigger,
+      range_weeks: body.range_weeks,
+    },
+  });
+
   const result = streamText({
     model: config.model,
     system: coachSystemPrompt(today, body.range_weeks, attachedRun(messages)),
@@ -1311,26 +1325,21 @@ app.openapi(coachChatRoute, async (c) => {
     // looping through the athlete's whole history.
     stopWhen: stepCountIs(COACH_MAX_STEPS),
     providerOptions: COACH_PROVIDER_OPTIONS,
-    // Tokens, cost, latency and stop reason for this turn, into PostHog's LLM
-    // analytics. The SDK hands them over here, which is why the coach needs no
-    // tracing wrapper around its model.
-    onFinish: ({ usage, finishReason, text, steps }) => {
-      captureCoachGeneration({
-        distinctId: session.user.id,
-        modelId: config.modelId,
-        latencySeconds: (Date.now() - startedAt) / 1000,
-        inputTokens: usage.inputTokens,
-        outputTokens: usage.outputTokens,
-        input: messages,
-        output: text,
-        finishReason,
-        properties: {
-          thread_id: thread.id,
-          trigger: body.trigger,
-          // How many times it went back to Strava before answering.
-          steps: steps.length,
-        },
-      });
+    ...turn.callbacks,
+    onFinish: ({ text }) => {
+      turn.end({ input: messages, output: text });
+    },
+    // A model that never answered. `toUIMessageStreamResponse`'s onError below
+    // is what the athlete sees; this is what the trace records.
+    onError: ({ error }) => {
+      turn.end({ input: messages, error });
+    },
+    // Only reachable if something ever passes an abort signal — nothing does
+    // today, and the athlete's stop button doesn't: it closes the browser's end
+    // of the stream, which the server never hears about. `onEnd` below is what
+    // covers that case.
+    onAbort: () => {
+      turn.end({ input: messages, properties: { cut_short: true } });
     },
   });
 
@@ -1347,6 +1356,20 @@ app.openapi(coachChatRoute, async (c) => {
         { threadId: thread.id },
         "Coach answered",
       );
+      // The only callback that runs whatever happened. An answer the athlete
+      // stopped reaches *nothing* above — not onFinish, not onAbort, because
+      // cancelling the response stream isn't an abort as far as `streamText` is
+      // concerned — so without this the turn's generations and tool spans would
+      // hang under a trace that never arrives.
+      //
+      // `end` files once, and by here the two callbacks that beat it to it have
+      // already run (onFinish on the way out, onError during generation), so
+      // `cut_short` marks exactly the turns nothing else finished.
+      turn.end({
+        input: messages,
+        output: responseMessage,
+        properties: { cut_short: true },
+      });
     },
     onError: (error) => {
       // The default swallows everything as "An error occurred." — a coach that

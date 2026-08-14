@@ -643,7 +643,7 @@ What each product is wired to:
 | **Session replay** | On, inputs masked. The athlete's name and avatar carry `ph-no-capture` |
 | **Error tracking** | Every `trackError`, the React `ErrorBoundary`, `window.onerror`, the React Query caches, and the API's `onError` |
 | **Feature flags** | `useFeatureFlag()` in the browser, `isFeatureEnabledFor()` in the API. `video-render` is a real one — see below |
-| **AI observability** | One `$ai_generation` per coach turn: model, tokens, cost, latency, stop reason, tool steps |
+| **AI observability** | One `$ai_trace` per coach turn, an `$ai_generation` per model call inside it and an `$ai_span` per tool call — see below |
 | **Surveys** | Enabled in the SDK; author and target them in PostHog against the events above — no deploy needed |
 
 ### The `video-render` flag
@@ -659,14 +659,52 @@ the API reads `getFlag()` rather than `isEnabled()` — the latter reports a fla
 that doesn't exist as *off*, which would disable the feature the moment PostHog
 was switched on.
 
+### AI observability
+
+Everything the coach does is one trace, built from the AI SDK's own lifecycle
+callbacks in `apps/api/src/ai-observability.ts` — no wrapper around the model,
+no OpenTelemetry exporter:
+
+```
+$ai_trace          coach turn            9.4s
+├─ $ai_generation  gemini-2.5-flash      1.2s   30 in / 12 out, tool-calls
+│  └─ $ai_span     getRunSplits          6.9s   ← the Strava call that was slow
+└─ $ai_generation  gemini-2.5-flash      1.3s   28 in / 96 out, stop
+```
+
+What that buys, over one event per turn:
+
+- **A slow answer names its own cause.** A turn is up to eight model calls with
+  Strava reads between them; `$ai_span` is what says which one took the time.
+- **Cost is per call**, so a turn that looped through the athlete's history
+  costs visibly more than one that answered straight away.
+- **A tool that failed reads as a failure**, including the ones that "succeed"
+  by returning `{ error: "Strava is unavailable…" }` for the model to read.
+- **A model that never answered** files an errored `$ai_generation` rather than
+  nothing at all, so the model's error rate is real — timed from the call that
+  broke, not from the turn, so it doesn't inherit the seconds before it.
+- **An answer the athlete stopped still files its trace**, marked `cut_short`.
+  Cancelling the response stream isn't an abort as far as `streamText` is
+  concerned: neither `onFinish` nor `onAbort` runs, so the turn is closed from
+  `onEnd`, the one callback that always does.
+- **Turns join up.** `$ai_session_id` is the thread, so a conversation reads as
+  a conversation; `$session_id` is the browser's replay, so a trace links to
+  what the athlete was doing while they waited. The browser sends that as
+  `X-POSTHOG-SESSION-ID` on the chat request — one header, rather than PostHog's
+  `tracing_headers`, which patches every `fetch` on the page.
+
+The post-run debrief (`debrief.ts`) is traced the same way. It has no replay to
+link to and no conversation to sit in: nobody asked for it.
+
 ### Privacy
 
 - Session replay masks all inputs, and `ph-no-capture` blocks the athlete's
   name and avatar in both replay and autocapture.
-- **Coach transcripts are not sent.** `$ai_generation` carries the numbers —
-  tokens, cost, latency, errors — with `$ai_input` and `$ai_output` redacted.
-  Set `POSTHOG_LLM_CAPTURE_CONTENT=true` in `apps/api/.env` to include the
-  prompt and reply when you need to debug answer quality.
+- **Coach transcripts are not sent.** The LLM events carry the numbers —
+  tokens, cost, latency, errors — with `$ai_input`, `$ai_output_choices` and
+  both `$ai_*_state` fields redacted. Set `POSTHOG_LLM_CAPTURE_CONTENT=true` in
+  `apps/api/.env` to include the prompt, the reply and what the tools returned
+  when you need to debug answer quality.
 - `person_profiles: "identified_only"`, so anonymous traffic doesn't create a
   person for every visitor.
 
