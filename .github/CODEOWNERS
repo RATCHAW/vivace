@@ -1,0 +1,9 @@
+# Security-sensitive automation and dependency boundaries.
+/.github/ @RATCHAW
+/.gitleaksignore @RATCHAW
+/.dockerignore @RATCHAW
+/package.json @RATCHAW
+/pnpm-lock.yaml @RATCHAW
+/pnpm-workspace.yaml @RATCHAW
+/docker-compose.yml @RATCHAW
+/**/Dockerfile @RATCHAW

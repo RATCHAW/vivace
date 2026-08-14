@@ -14,7 +14,7 @@ serve({ fetch: app.fetch, port }, (info) => {
       port: info.port,
       // Absent means logs stay on stdout only — worth seeing at boot rather
       // than wondering later why Grafana is empty.
-      loki: process.env.LOKI_URL ?? null,
+      loki: Boolean(process.env.LOKI_URL),
       posthog: posthogEnabled,
     },
     `API listening on http://localhost:${info.port}`,

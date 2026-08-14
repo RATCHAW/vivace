@@ -1,4 +1,4 @@
-FROM node:22-alpine AS build
+FROM node:22-alpine@sha256:c610fcdfb1d5b4740dd70c284ed3cb16bb857e0f7166196e36a5501df7a3aa32 AS build
 WORKDIR /repo
 
 ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
@@ -24,16 +24,23 @@ ARG NEXT_PUBLIC_POSTHOG_HOST
 ENV NEXT_PUBLIC_POSTHOG_HOST=$NEXT_PUBLIC_POSTHOG_HOST
 RUN pnpm --filter @repo/landing build
 
-FROM node:22-alpine
+FROM node:22-alpine@sha256:c610fcdfb1d5b4740dd70c284ed3cb16bb857e0f7166196e36a5501df7a3aa32
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3001
 ENV HOSTNAME=0.0.0.0
 
+# The standalone server runs with Node directly; package managers only add
+# unused executables and their transitive vulnerability surface at runtime.
+RUN corepack disable \
+  && rm -rf /usr/local/lib/node_modules/corepack /usr/local/lib/node_modules/npm
+
 # `output: "standalone"` traces from the monorepo root, so the server lands at
 # apps/landing/server.js with its node_modules beside it.
-COPY --from=build /repo/apps/landing/.next/standalone ./
-COPY --from=build /repo/apps/landing/.next/static ./apps/landing/.next/static
+COPY --chown=node:node --from=build /repo/apps/landing/.next/standalone ./
+COPY --chown=node:node --from=build /repo/apps/landing/.next/static ./apps/landing/.next/static
+
+USER node
 
 EXPOSE 3001
 CMD ["node", "apps/landing/server.js"]

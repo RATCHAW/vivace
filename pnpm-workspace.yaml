@@ -2,6 +2,15 @@ packages:
   - "apps/*"
   - "packages/*"
 
-# pnpm 10 blocks dependency build scripts unless they are listed here
-onlyBuiltDependencies:
-  - esbuild
+overrides:
+  js-yaml: 4.3.1
+  lodash: 4.18.1
+
+# pnpm 11 requires an explicit decision for every dependency install hook.
+# esbuild's platform binary is required by the toolchain; the others are
+# optional transitive integrations that this repository never imports.
+allowBuilds:
+  "@prisma/client": false
+  better-sqlite3: false
+  core-js: false
+  esbuild: true

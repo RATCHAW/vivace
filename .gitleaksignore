@@ -1,0 +1,6 @@
+# Strava's upstream Swagger fixture used the same synthetic, token-shaped
+# embed example twice when the spec was first imported. The current tree and
+# the pull script sanitize it; these exact historical fingerprints are retained
+# only so full-history CI can distinguish the upstream sample from a real leak.
+59163be92ca267f875a868034b61930f3ed6e764:packages/strava-api/openapi/strava-swagger.json:generic-api-key:1234
+59163be92ca267f875a868034b61930f3ed6e764:packages/strava-api/openapi/strava-swagger.json:generic-api-key:1474

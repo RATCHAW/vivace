@@ -1231,7 +1231,7 @@
                 ],
                 "hide_from_home": false,
                 "device_name": "Garmin Edge 1030",
-                "embed_token": "18e4615989b47dd4ff3dc711b0aa4502e4b311a9",
+                "embed_token": "example-embed-token",
                 "segment_leaderboard_opt_out": false,
                 "leaderboard_opt_out": false
               }
@@ -1471,7 +1471,7 @@
                 ],
                 "hide_from_home": false,
                 "device_name": "Garmin Edge 1030",
-                "embed_token": "18e4615989b47dd4ff3dc711b0aa4502e4b311a9",
+                "embed_token": "example-embed-token",
                 "segment_leaderboard_opt_out": false,
                 "leaderboard_opt_out": false
               }

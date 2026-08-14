@@ -3,6 +3,7 @@ import { swaggerUI } from "@hono/swagger-ui";
 import type { Context } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { cors } from "hono/cors";
+import { secureHeaders } from "hono/secure-headers";
 import { streamSSE } from "hono/streaming";
 import {
   convertToModelMessages,
@@ -83,8 +84,10 @@ import {
   claimEvent,
   pruneEvents,
   userForAthlete,
+  verifyWebhookSignature,
   verifyToken,
   WEBHOOK_PATH,
+  webhookSigningSecret,
 } from "./webhook.js";
 import {
   createThread,
@@ -157,6 +160,33 @@ export const app = new OpenAPIHono<AppEnv>({
 // First in the chain so every request — including the mounted better-auth
 // routes and anything that throws — produces exactly one `http_request` line.
 app.use("*", requestLogger);
+
+app.use(
+  "*",
+  secureHeaders({
+    // The browser normally reaches the API through a same-origin proxy, but
+    // direct CORS access remains supported for explicitly trusted origins.
+    crossOriginResourcePolicy: "cross-origin",
+    referrerPolicy: "strict-origin-when-cross-origin",
+    xFrameOptions: "DENY",
+    permissionsPolicy: {
+      camera: [],
+      microphone: [],
+      geolocation: [],
+    },
+  }),
+);
+
+// File attachments are base64-encoded inside coach messages, so legitimate
+// requests need more room than a conventional JSON API. They still get a hard
+// ceiling before parsing, while narrower public endpoints add tighter limits.
+app.use(
+  "/api/*",
+  bodyLimit({
+    maxSize: 16 * 1024 * 1024,
+    onError: (c) => c.json({ error: "Request body too large" }, 413),
+  }),
+);
 
 app.onError((err, c) => {
   // The request logger already emitted the summary line; this one carries the
@@ -1353,7 +1383,8 @@ const webhookEventRoute = createRoute({
   tags: ["Webhooks"],
   summary: "Receive a Strava activity or athlete event",
   description:
-    "Acknowledged immediately and processed afterwards: Strava requires a 200 " +
+    "Authenticated with Strava's X-Strava-Signature header, then acknowledged " +
+    "immediately and processed afterwards: Strava requires a 200 " +
     "within two seconds and retries up to three times otherwise, which is far " +
     "less time than reading an activity and writing a debrief takes. A new run " +
     "becomes a post-run debrief in the athlete's \"Post-run debriefs\" thread; " +
@@ -1366,10 +1397,59 @@ const webhookEventRoute = createRoute({
   },
   responses: {
     200: {
-      description: "Acknowledged. Always, whatever the event turns out to be.",
+      description: "Authenticated and acknowledged.",
       content: { "application/json": { schema: z.object({ received: z.literal(true) }) } },
     },
+    403: {
+      description: "The delivery signature was absent, invalid, or stale.",
+      content: { "application/json": { schema: ErrorSchema } },
+    },
+    413: {
+      description: "The request body exceeded the webhook limit.",
+      content: { "application/json": { schema: ErrorSchema } },
+    },
+    503: {
+      description: "Webhook signature verification is not configured.",
+      content: { "application/json": { schema: ErrorSchema } },
+    },
   },
+});
+
+app.use(
+  WEBHOOK_PATH,
+  bodyLimit({
+    maxSize: 64 * 1024,
+    onError: (c) => c.json({ error: "Request body too large" }, 413),
+  }),
+);
+
+app.use(WEBHOOK_PATH, async (c, next) => {
+  if (c.req.method !== "POST") return next();
+
+  const secret = webhookSigningSecret();
+  const log = c.get("log");
+  if (!secret) {
+    log.error(
+      { event: "webhook.no_signing_secret" },
+      "STRAVA_WEBHOOK_SIGNING_SECRET is not set; refusing the event",
+    );
+    return c.json({ error: "Webhooks are not configured on this server" }, 503);
+  }
+
+  // Read a clone so OpenAPI's JSON validator still receives the untouched body.
+  const rawBody = await c.req.raw.clone().text();
+  if (
+    !verifyWebhookSignature(
+      rawBody,
+      c.req.header("x-strava-signature") ?? null,
+      secret,
+    )
+  ) {
+    log.warn({ event: "webhook.signature_rejected" }, "Rejected a Strava webhook event");
+    return c.json({ error: "Invalid webhook signature" }, 403);
+  }
+
+  return next();
 });
 
 /**

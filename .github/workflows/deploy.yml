@@ -25,6 +25,11 @@ on:
         description: "Commit, tag or branch to deploy (defaults to main's head)"
         required: false
 
+# Deployment only needs to read the tested source. Keep the token read-only even
+# if the repository default is later widened for another workflow.
+permissions:
+  contents: read
+
 # Serialised: two runs would race to pin the commit and set the environment.
 concurrency:
   group: deploy-production
@@ -32,25 +37,31 @@ concurrency:
 
 jobs:
   check:
+    name: Validate the release
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     outputs:
       sha: ${{ steps.resolve.outputs.sha }}
       video: ${{ steps.scope.outputs.video }}
       api: ${{ steps.scope.outputs.api }}
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out the requested revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.ref || github.sha }}
           # The scope check diffs against the previous head, so shallow won't do
           fetch-depth: 0
+          persist-credentials: false
 
-      - id: resolve
+      - name: Resolve the tested commit
+        id: resolve
         run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       # Worked out with git rather than a marketplace action: this workflow holds
       # credentials to the production host, so it takes as few third-party
       # dependencies as it can.
-      - id: scope
+      - name: Determine the deployment scope
+        id: scope
         env:
           BEFORE: ${{ github.event.before }}
           EVENT: ${{ github.event_name }}
@@ -76,43 +87,58 @@ jobs:
           echo "api=$api" >> "$GITHUB_OUTPUT"
           echo "video=$video, api=$api"
 
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - name: Set up pnpm
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 22
           cache: pnpm
 
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm typecheck
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Typecheck
+        run: pnpm typecheck
       # No database needed: the API suite drives the Hono app in-process. The
       # openapi drift test lives here too — it fails when a route changed
       # without `pnpm generate`.
-      - run: pnpm test
-      - run: pnpm build
+      - name: Test
+        run: pnpm test
+      - name: Build
+        run: pnpm build
 
       # webpack, not tsc, is what finds a bad import in the Lambda entry, so
       # `pnpm build` above passes on a bundle that cannot be built. Without this
       # the deploy job discovers it after joining the tailnet and calling AWS.
-      - if: steps.scope.outputs.video == 'true'
+      - name: Check the Remotion bundle
+        if: steps.scope.outputs.video == 'true'
         run: pnpm --filter @repo/video run bundle:check
 
   deploy:
+    name: Deploy production
     needs: check
     if: needs.check.outputs.api == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: Production
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out the tested commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.check.outputs.sha }}
+          persist-credentials: false
 
-      - uses: pnpm/action-setup@v4
+      - name: Set up pnpm
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
         if: needs.check.outputs.video == 'true'
-      - uses: actions/setup-node@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         if: needs.check.outputs.video == 'true'
         with:
           node-version: 22
           cache: pnpm
-      - if: needs.check.outputs.video == 'true'
+      - name: Install Remotion dependencies
+        if: needs.check.outputs.video == 'true'
         run: pnpm install --frozen-lockfile --filter @repo/video...
 
       # The site is named after the commit, so this adds a bundle rather than
@@ -139,7 +165,7 @@ jobs:
       # tagged tag:ci joins for the length of this job; scope that tag in your
       # ACL to this one host and this one port.
       - name: Join the tailnet
-        uses: tailscale/github-action@v4
+        uses: tailscale/github-action@780049a30b6ff5c378a9e7b389d15ece7a204888 # v4.1.3
         with:
           oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
           oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
@@ -192,7 +218,9 @@ jobs:
             [ "$code" = 404 ] && code=$(set_env POST "$key" "$value")
             case "$code" in
               200|201) echo "set $key" ;;
-              *) echo "::error::Coolify rejected $key (HTTP $code)"; cat /tmp/env.json; exit 1 ;;
+              # A rejected response may echo the submitted secret. Keep the
+              # public Actions log useful without printing the response body.
+              *) echo "::error::Coolify rejected $key (HTTP $code; response withheld)"; exit 1 ;;
             esac
           done < "$ENV_FILE"
 

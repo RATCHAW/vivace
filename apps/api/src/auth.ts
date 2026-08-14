@@ -4,11 +4,47 @@ import { genericOAuth, openAPI } from "better-auth/plugins";
 import { createStravaClient, getLoggedInAthlete } from "@repo/strava-api";
 import { pool } from "./db.js";
 
+const production =
+  process.env.NODE_ENV === "production" || process.env.APP_ENV === "production";
+
+const baseURL = process.env.BETTER_AUTH_URL ?? "http://localhost:3000";
+const webOrigin = process.env.WEB_ORIGIN ?? "http://localhost:5173";
+const secret = process.env.BETTER_AUTH_SECRET;
+const stravaClientId = process.env.STRAVA_CLIENT_ID ?? "";
+const stravaClientSecret = process.env.STRAVA_CLIENT_SECRET ?? "";
+
+if (production) {
+  const missing = [
+    ["BETTER_AUTH_URL", process.env.BETTER_AUTH_URL],
+    ["WEB_ORIGIN", process.env.WEB_ORIGIN],
+    ["BETTER_AUTH_SECRET", secret],
+    ["STRAVA_CLIENT_ID", stravaClientId],
+    ["STRAVA_CLIENT_SECRET", stravaClientSecret],
+  ]
+    .filter(([, value]) => !value)
+    .map(([name]) => name);
+
+  if (missing.length > 0) {
+    throw new Error(`Missing required production configuration: ${missing.join(", ")}`);
+  }
+  if ((secret?.length ?? 0) < 32) {
+    throw new Error("BETTER_AUTH_SECRET must be at least 32 characters in production");
+  }
+  for (const [name, value] of [
+    ["BETTER_AUTH_URL", baseURL],
+    ["WEB_ORIGIN", webOrigin],
+  ] as const) {
+    if (new URL(value).protocol !== "https:") {
+      throw new Error(`${name} must use https in production`);
+    }
+  }
+}
+
 export const auth = betterAuth({
   database: pool,
-  baseURL: process.env.BETTER_AUTH_URL ?? "http://localhost:3000",
-  secret: process.env.BETTER_AUTH_SECRET,
-  trustedOrigins: [process.env.WEB_ORIGIN ?? "http://localhost:5173"],
+  baseURL,
+  secret,
+  trustedOrigins: [webOrigin],
   plugins: [
     // Documents the /api/auth/* routes; Scalar reference at /api/auth/reference.
     openAPI(),
@@ -16,8 +52,8 @@ export const auth = betterAuth({
       config: [
         {
           providerId: "strava",
-          clientId: process.env.STRAVA_CLIENT_ID ?? "",
-          clientSecret: process.env.STRAVA_CLIENT_SECRET ?? "",
+          clientId: stravaClientId,
+          clientSecret: stravaClientSecret,
           authorizationUrl: "https://www.strava.com/oauth/authorize",
           tokenUrl: "https://www.strava.com/oauth/token",
           // Strava expects client_id/client_secret in the POST body, not Basic auth
