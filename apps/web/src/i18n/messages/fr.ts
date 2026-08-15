@@ -26,6 +26,7 @@ export const fr: Translated<Messages> = {
     km: "km",
     perKm: "/km",
     dash: "—",
+    close: "Fermer",
   },
 
   nav: {
@@ -34,6 +35,7 @@ export const fr: Translated<Messages> = {
     activities: "Activités",
     coach: "Coach",
     signOut: "Se déconnecter",
+    menu: "Menu",
   },
 
   theme: {
@@ -216,6 +218,7 @@ export const fr: Translated<Messages> = {
 
   coach: {
     section: "Coach",
+    rangeSelect: "Jusqu’où le coach remonte",
     range6: "6 dernières semaines",
     range12: "12 dernières semaines",
     rangeSeason: "Cette saison",
@@ -230,7 +233,6 @@ export const fr: Translated<Messages> = {
     emptyBody:
       "Demandez un plan, un affûtage, ou un avis franc sur la semaine passée. Je vois toutes les courses que vous avez synchronisées depuis Strava.",
     errorTitle: "Le coach n’a pas pu répondre",
-    grounded: "Fondé sur votre historique Strava · vérifiez ce qui compte",
     planAccepted: "C’est votre semaine. Elle est dans le rail.",
     copy: "Copier",
     copied: "Copié",
@@ -368,6 +370,7 @@ export const fr: Translated<Messages> = {
   },
 
   rail: {
+    title: "Objectifs et signaux",
     goalRace: "Course objectif",
     goalRaceEmpty:
       "Le coach planifie autour d’une date. Dites-lui une fois ce que vous préparez et chaque conversation le saura.",

@@ -17,6 +17,7 @@ export const en = {
     km: "km",
     perKm: "/km",
     dash: "—",
+    close: "Close",
   },
 
   nav: {
@@ -25,6 +26,7 @@ export const en = {
     activities: "Activities",
     coach: "Coach",
     signOut: "Sign out",
+    menu: "Menu",
   },
 
   theme: {
@@ -210,6 +212,7 @@ export const en = {
 
   coach: {
     section: "Coach",
+    rangeSelect: "How far back the coach reads",
     range6: "Last 6 weeks",
     range12: "Last 12 weeks",
     rangeSeason: "This season",
@@ -224,7 +227,6 @@ export const en = {
     emptyBody:
       "Ask for a plan, a taper, or an honest read on last week. I can see every run you’ve synced from Strava.",
     errorTitle: "The coach could not answer",
-    grounded: "Grounded in your Strava history · check anything that matters",
     planAccepted: "That’s your week. It’s in the rail now.",
     copy: "Copy",
     copied: "Copied",
@@ -350,6 +352,7 @@ export const en = {
   },
 
   rail: {
+    title: "Goals & signals",
     goalRace: "Goal race",
     goalRaceEmpty:
       "The coach plans around a date. Tell it what you’re training for once and every thread starts knowing.",

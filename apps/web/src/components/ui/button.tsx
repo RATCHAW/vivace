@@ -41,8 +41,11 @@ const buttonVariants = cva(
         lg: "h-14 gap-2.5 px-8 text-heading-sm font-medium has-data-[icon=inline-end]:pr-6 has-data-[icon=inline-start]:pl-6 [&_svg:not([class*='size-'])]:size-6",
         icon: "size-12",
         "icon-xs": "size-8 [&_svg:not([class*='size-'])]:size-3.5",
+        // The touch bump is on both axes: a 36×44 pill is a lopsided oval the
+        // moment the variant carries a border, and a 36px-wide tap target is
+        // the half of the 44px rule that actually gets missed.
         "icon-sm":
-          "size-9 min-h-11 sm:min-h-9 [&_svg:not([class*='size-'])]:size-4",
+          "size-9 min-h-11 min-w-11 sm:min-h-9 sm:min-w-9 [&_svg:not([class*='size-'])]:size-4",
         "icon-lg": "size-14 [&_svg:not([class*='size-'])]:size-6",
       },
     },
