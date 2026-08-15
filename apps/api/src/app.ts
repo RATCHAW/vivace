@@ -68,10 +68,12 @@ import {
   attachedRun,
   COACH_NOT_CONFIGURED,
   COACH_PROVIDER_OPTIONS,
+  coachFailure,
   coachMessageMetadataSchema,
   coachSystemPrompt,
   createCoachTools,
   getCoachConfig,
+  type CoachFailure,
 } from "./coach.js";
 import { buildBriefing, todayLocal } from "./briefing.js";
 import { saveContext, savePlan } from "./coach-store.js";
@@ -1220,7 +1222,11 @@ const coachChatRoute = createRoute({
   },
   responses: {
     200: {
-      description: "A UI message stream of the coach's reply.",
+      description:
+        "A UI message stream of the coach's reply. A turn that fails after " +
+        "the stream is open ends in an error chunk carrying a `CoachFailure` " +
+        "reason — `rate_limited`, `unavailable`, `failed` — never the " +
+        "provider's own message.",
       content: { "text/event-stream": { schema: z.string() } },
     },
     400: {
@@ -1236,7 +1242,9 @@ const coachChatRoute = createRoute({
       content: { "application/json": { schema: ErrorSchema } },
     },
     503: {
-      description: "No model API key is configured on this server.",
+      description:
+        "No model API key is configured on this server; `error` is the " +
+        "`not_configured` reason, and the instructions are in the server log.",
       content: { "application/json": { schema: ErrorSchema } },
     },
   },
@@ -1249,11 +1257,10 @@ app.openapi(coachChatRoute, async (c) => {
   const log = c.get("log");
   const config = getCoachConfig();
   if (!config) {
-    log.warn(
-      { event: "coach.not_configured" },
-      "No model API key is configured",
-    );
-    return c.json({ error: COACH_NOT_CONFIGURED }, 503);
+    // The instructions are for whoever runs the server, so they go to the log.
+    // The athlete gets the reason and apps/web writes the sentence.
+    log.warn({ event: "coach.not_configured" }, COACH_NOT_CONFIGURED);
+    return c.json({ error: "not_configured" satisfies CoachFailure }, 503);
   }
 
   const body = c.req.valid("json");
@@ -1409,9 +1416,10 @@ app.openapi(coachChatRoute, async (c) => {
         { threadId: thread.id },
         "Coach failed",
       );
-      return error instanceof Error
-        ? error.message
-        : "The coach could not answer that.";
+      // The reason, not the provider's sentence. "Quota exceeded for metric:
+      // generativelanguage.googleapis.com/generate_content_free_tier_requests"
+      // is a message to the account holder, and it went to the line above.
+      return coachFailure(error);
     },
   });
 });

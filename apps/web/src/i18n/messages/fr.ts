@@ -227,6 +227,16 @@ export const fr: Translated<Messages> = {
     emptyBody:
       "Demandez un plan, un affûtage, ou un avis franc sur la semaine passée. Je vois toutes les courses que vous avez synchronisées depuis Strava.",
     errorTitle: "Le coach n’a pas pu répondre",
+    errors: {
+      notConfigured:
+        "Le coach n’est pas disponible dans cette application pour le moment.",
+      rateLimited:
+        "Le coach répond à beaucoup de questions en ce moment. Patientez une minute et redemandez.",
+      unavailable:
+        "Le coach est injoignable pour le moment. Réessayez dans un instant.",
+      failed:
+        "Une erreur s’est produite pendant la rédaction de la réponse. Reposez votre question.",
+    },
     planAccepted: "C’est votre semaine. Elle est dans le rail.",
     copy: "Copier",
     copied: "Copié",
@@ -241,7 +251,7 @@ export const fr: Translated<Messages> = {
     feedbackSend: "Envoyer",
     feedbackThanks: "Merci — c’est noté.",
     sources: "D’après",
-    toolFailed: "{{title}} a échoué : {{error}}",
+    toolFailed: "{{title}} a échoué",
     workingReading: "Lecture de votre historique Strava",
     workingWriting: "Rédaction",
 

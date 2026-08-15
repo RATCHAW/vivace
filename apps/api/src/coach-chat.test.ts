@@ -6,7 +6,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MockLanguageModelV4, simulateReadableStream } from "ai/test";
 import type { LanguageModelV4StreamPart } from "@ai-sdk/provider";
-import type { UIMessage } from "ai";
+import { APICallError, type UIMessage } from "ai";
 
 process.env.BETTER_AUTH_SECRET ??= "test-secret-not-for-production";
 process.env.DATABASE_URL ??= "postgres://app:app@localhost:5433/app";
@@ -285,7 +285,7 @@ describe("POST /api/coach/chat", () => {
     expect(res.status).toBe(404);
   });
 
-  it("503s with instructions when no model is configured", async () => {
+  it("503s with a reason, not the operator's instructions, when no model is configured", async () => {
     config = null;
     const res = await chat({
       thread_id: THREAD_ID,
@@ -296,7 +296,48 @@ describe("POST /api/coach/chat", () => {
       },
     });
     expect(res.status).toBe(503);
-    expect((await res.json()).error).toContain("GOOGLE_GENERATIVE_AI_API_KEY");
+    // The env var to set is a note to whoever runs the server; it goes to the
+    // log, and the browser gets something it can translate.
+    expect((await res.json()).error).toBe("not_configured");
+  });
+
+  it("ends a failed turn with a reason, never the provider's own message", async () => {
+    config = {
+      model: new MockLanguageModelV4({
+        doStream: () => {
+          throw new APICallError({
+            message:
+              "You exceeded your current quota, please check your plan and " +
+              "billing details. * Quota exceeded for metric: " +
+              "generativelanguage.googleapis.com/generate_content_free_tier_requests",
+            url: "https://generativelanguage.googleapis.com/v1beta/models",
+            requestBodyValues: {},
+            statusCode: 429,
+            // The real one is retried first and reaches the route wrapped in a
+            // RetryError; `coachFailure` unwraps that and is tested on it in
+            // coach.test.ts. Here it throws straight through, so the test
+            // doesn't sit through the SDK's backoff.
+            isRetryable: false,
+          });
+        },
+      }),
+      modelId: "mock",
+    };
+
+    const res = await chat({
+      thread_id: THREAD_ID,
+      trigger: "submit-message",
+      message: {
+        id: "user-1",
+        role: "user",
+        parts: [{ type: "text", text: "Where do I start?" }],
+      },
+    });
+
+    const body = await res.text();
+    expect(body).toContain("rate_limited");
+    expect(body).not.toContain("quota");
+    expect(body).not.toContain("generativelanguage");
   });
 
   it("401s when the Strava token has gone", async () => {

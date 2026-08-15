@@ -676,7 +676,7 @@ export type CoachChatErrors = {
      */
     404: ApiError;
     /**
-     * No model API key is configured on this server.
+     * No model API key is configured on this server; `error` is the `not_configured` reason, and the instructions are in the server log.
      */
     503: ApiError;
 };
@@ -685,7 +685,7 @@ export type CoachChatError = CoachChatErrors[keyof CoachChatErrors];
 
 export type CoachChatResponses = {
     /**
-     * A UI message stream of the coach's reply.
+     * A UI message stream of the coach's reply. A turn that fails after the stream is open ends in an error chunk carrying a `CoachFailure` reason — `rate_limited`, `unavailable`, `failed` — never the provider's own message.
      */
     200: string;
 };
