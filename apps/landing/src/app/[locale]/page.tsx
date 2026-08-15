@@ -33,9 +33,9 @@ export default async function LandingPage({
       <main>
         <Hero copy={copy} locale={locale} />
         <HowItWorks copy={copy} />
-        <Film copy={copy} locale={locale} />
+        <Coach copy={copy} locale={locale} />
         <Sports copy={copy} />
-        <Coach copy={copy} />
+        <Film copy={copy} locale={locale} />
         <Questions copy={copy} />
         <ClosingCta copy={copy} locale={locale} />
       </main>

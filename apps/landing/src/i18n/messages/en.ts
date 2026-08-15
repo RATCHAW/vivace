@@ -9,21 +9,21 @@
  */
 export const en = {
   meta: {
-    title: "Turn Strava Runs Into Shareable Videos | Vivace",
+    title: "AI Running Coach & Shareable Strava Run Videos | Vivace",
     description:
-      "Connect Strava and turn every run into a shareable vertical video with an animated route, live pace, heart rate and a downloadable 9:16 MP4.",
-    ogTitle: "Vivace — Strava runs, made to share",
+      "Connect Strava for an AI running coach grounded in your training history, plus shareable run videos with animated routes, pace and heart rate.",
+    ogTitle: "Vivace — AI coaching and run videos from your Strava data",
     ogDescription:
-      "Turn a Strava run into a vertical film with an animated route, live effort and a downloadable MP4.",
+      "Get practical training advice from every run, then turn the ones you love into shareable vertical videos.",
     imageAlt:
       "Vivace turns Strava runs into shareable vertical videos with route, pace and heart rate.",
   },
 
   header: {
     backToTop: "Vivace — home",
-    film: "The film",
+    film: "Run replays",
     sports: "Sports",
-    coach: "Coach",
+    coach: "AI coach",
     questions: "Questions",
     logIn: "Log in",
     connectStrava: "Connect Strava",
@@ -37,12 +37,12 @@ export const en = {
   soon: "Soon",
 
   hero: {
-    badge: "Runs today · rides, lifts & swims next",
-    titleLine1: "Strava runs,",
-    titleLine2: "made to share.",
-    body: "Connect Strava and turn every run into a vertical film — your route drawing itself, your pace and heart rate as they happened, ready to download and share.",
+    badge: "AI coach + run replays · live now",
+    titleLine1: "An AI coach for every run.",
+    titleLine2: "Replays made to share.",
+    body: "Connect Strava for an AI running coach grounded in your full training history, plus vertical run videos with your route, pace and heart rate.",
     primaryCta: "Continue with Strava",
-    secondaryCta: "See a replay",
+    secondaryCta: "Meet your coach",
     footnote:
       "Free while we’re in alpha. We never post to Strava on your behalf.",
     /**
@@ -67,7 +67,7 @@ export const en = {
   },
 
   howItWorks: {
-    label: "How it works",
+    label: "How Vivace works",
     steps: [
       {
         step: "01",
@@ -76,13 +76,13 @@ export const en = {
       },
       {
         step: "02",
-        title: "Pick a run",
-        body: "Your whole history lands in a list — GPS, splits and heart rate included.",
+        title: "Your training, in context",
+        body: "Vivace brings your routes, splits, heart rate and recent training into one clear picture.",
       },
       {
         step: "03",
-        title: "Watch it back",
-        body: "The replay renders in seconds. Watch it, download the MP4, post it.",
+        title: "Choose what comes next",
+        body: "Ask the coach what to do next, or turn any run into a vertical video you can share.",
       },
     ],
   },
@@ -145,12 +145,10 @@ export const en = {
   },
 
   coach: {
-    badge: "Coming soon",
-    heading: "A coach that has read every run you’ve done.",
-    body: "Ask for a plan, a taper, or an honest read on last week. It sees the same history the replays are built from — and answers with something you can run tomorrow.",
-    emailLabel: "Email address",
-    emailPlaceholder: "you@email.com",
-    submit: "Join waitlist",
+    badge: "Available now",
+    heading: "An AI running coach that has read every run you’ve done.",
+    body: "Ask for a training plan, a taper, or an honest read on last week. It uses your Strava history to answer with specific sessions you can run tomorrow.",
+    cta: "Try the coach",
     conversation: [
       {
         from: "runner",
@@ -170,6 +168,10 @@ export const en = {
       {
         q: "Why Strava only?",
         a: "Your runs already live there with GPS and heart rate attached. Signing in with Strava means there’s nothing to import and no data to re-enter.",
+      },
+      {
+        q: "What can the AI running coach help with?",
+        a: "It can read your recent training, explain pace and heart-rate patterns, build a week or race plan, adjust a taper and answer questions about a specific run. Its advice is grounded in the Strava history you choose to share.",
       },
       {
         q: "Do you post anything to my Strava?",
@@ -192,21 +194,21 @@ export const en = {
 
   closingCta: {
     label: "Get started",
-    heading: "Your last run deserves better than a number.",
-    body: "Connect Strava and the first replay is ready before you’ve finished stretching.",
+    heading: "Every run can guide what comes next.",
+    body: "Connect Strava for coaching grounded in your training and vertical replays built from every effort.",
     cta: "Continue with Strava",
   },
 
   footer: {
-    tagline: "Replays for the runs you already did.",
+    tagline: "AI coaching and replays for the runs you already did.",
     logIn: "Log in",
     poweredByStrava: "Powered by Strava",
     copyright: "© {{year}} vivace. Not affiliated with Strava, Inc.",
     product: {
       heading: "Product",
-      film: "The film",
+      film: "Run replays",
       sports: "Sports",
-      coach: "Coach",
+      coach: "AI coach",
     },
     company: {
       heading: "Company",

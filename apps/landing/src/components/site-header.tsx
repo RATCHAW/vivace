@@ -17,9 +17,9 @@ export function SiteHeader({
 }) {
   const homeHref = `/${locale}`;
   const nav = [
-    { href: `${homeHref}#film`, label: copy.header.film },
-    { href: `${homeHref}#sports`, label: copy.header.sports },
     { href: `${homeHref}#coach`, label: copy.header.coach },
+    { href: `${homeHref}#sports`, label: copy.header.sports },
+    { href: `${homeHref}#film`, label: copy.header.film },
     { href: `${homeHref}#questions`, label: copy.header.questions },
   ];
 

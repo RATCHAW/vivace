@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { MonoLabel } from "@/components/mono";
+import { VivaceMark } from "@/components/vivace-mark";
 import {
   buildRoute,
   CANVAS,
@@ -145,10 +146,18 @@ export function ReplayPhone({ copy }: { copy: ReplayCopy }) {
               large
             />
           </div>
-          <div className="mt-7 flex items-center gap-2 border-t pt-4.5">
-            <span className="bg-brand size-2 rounded-full" />
-            <span className="text-caption font-semibold">vivace</span>
-          </div>
+        </div>
+
+        {/* The exported video carries this lockup through every frame. Keeping
+            it persistent here makes the mockup an honest preview of the MP4. */}
+        <div
+          aria-hidden
+          className="absolute top-7 right-6 flex items-center gap-1.5"
+        >
+          <VivaceMark className="text-brand size-3.5" />
+          <span className="text-caption font-semibold -tracking-[0.01em]">
+            vivace
+          </span>
         </div>
 
         {/* Chapter bars — the same three-part cut on every replay. */}

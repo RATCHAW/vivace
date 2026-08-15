@@ -4,13 +4,17 @@ import sitemap from "@/app/sitemap";
 import { LOCALES } from "@/i18n/config";
 import { CONTENT_PAGE_KEYS } from "@/i18n/content-pages";
 import { createPageMetadata, homePagePaths } from "./metadata";
-import { resolveSiteUrl, signInUrl, siteUrl } from "./site";
+import { coachUrl, resolveSiteUrl, signInUrl, siteUrl } from "./site";
 
 describe("app handoff", () => {
   it("carries the language and starts Strava sign-in", () => {
     expect(signInUrl("fr")).toBe(
       "http://localhost:5173/login?lang=fr&provider=strava",
     );
+  });
+
+  it("opens the live coach in the selected language", () => {
+    expect(coachUrl("fr")).toBe("http://localhost:5173/coach?lang=fr");
   });
 });
 

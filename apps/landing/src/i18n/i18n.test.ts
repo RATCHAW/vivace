@@ -84,6 +84,25 @@ describe("dictionaries", () => {
   });
 });
 
+describe("homepage positioning", () => {
+  it.each([
+    ["en", /coach/i, /video|replay/i],
+    ["fr", /coach/i, /vidéo|replay/i],
+  ] as const)(
+    "%s presents coaching and run videos as core products",
+    (locale, coachPattern, videoPattern) => {
+      const copy = getDictionary(locale);
+      const metadata = `${copy.meta.title} ${copy.meta.description}`;
+      const hero = `${copy.hero.titleLine1} ${copy.hero.titleLine2} ${copy.hero.body}`;
+
+      expect(metadata).toMatch(coachPattern);
+      expect(metadata).toMatch(videoPattern);
+      expect(hero).toMatch(coachPattern);
+      expect(hero).toMatch(videoPattern);
+    },
+  );
+});
+
 describe("content pages", () => {
   it.each(LOCALES)("%s has complete, non-empty pages", (locale) => {
     for (const key of CONTENT_PAGE_KEYS) {

@@ -1,10 +1,10 @@
 import { BrandBadge } from "@/components/mono";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { ButtonLink } from "@/components/ui/button";
+import type { Locale } from "@/i18n/config";
 import type { Copy } from "@/i18n/dictionaries";
-import { waitlistEmail } from "@/lib/site";
+import { coachUrl } from "@/lib/site";
 
-export function Coach({ copy }: { copy: Copy }) {
+export function Coach({ copy, locale }: { copy: Copy; locale: Locale }) {
   const t = copy.coach;
 
   return (
@@ -22,30 +22,9 @@ export function Coach({ copy }: { copy: Copy }) {
             {t.body}
           </p>
 
-          {/* No waitlist backend yet, so the form opens a mail draft rather
-              than swallowing the address. See lib/site.ts. */}
-          <form
-            action={`mailto:${waitlistEmail}`}
-            method="post"
-            encType="text/plain"
-            className="flex max-w-[480px] items-center gap-3.5"
-          >
-            <label htmlFor="waitlist-email" className="sr-only">
-              {t.emailLabel}
-            </label>
-            <Input
-              id="waitlist-email"
-              name="email"
-              type="email"
-              required
-              autoComplete="email"
-              placeholder={t.emailPlaceholder}
-              // `color-scheme: dark` is set for the black canvas, so the field
-              // inside a white band has to name its own ink.
-              className="text-foreground placeholder:text-stone flex-1"
-            />
-            <Button type="submit">{t.submit}</Button>
-          </form>
+          <ButtonLink className="self-start" href={coachUrl(locale)}>
+            {t.cta}
+          </ButtonLink>
         </div>
 
         <div className="bg-muted flex flex-col gap-4 rounded-lg border p-7">

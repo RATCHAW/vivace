@@ -28,6 +28,11 @@ export function signInUrl(locale: Locale): string {
   return `${appUrl}/login?lang=${locale}&provider=strava`;
 }
 
+/** Take signed-in athletes straight to the live coach. */
+export function coachUrl(locale: Locale): string {
+  return `${appUrl}/coach?lang=${locale}`;
+}
+
 /**
  * The canonical origin, for `hreflang` and Open Graph. Falls back to the
  * production host: an absolute URL is required in metadata, and a relative one
@@ -38,11 +43,3 @@ export function resolveSiteUrl(value?: string): string {
 }
 
 export const siteUrl = resolveSiteUrl(process.env.NEXT_PUBLIC_SITE_URL);
-
-/**
- * The coach waitlist has no backend yet, so the form posts a mail draft rather
- * than pretending to store the address. Point this at a real endpoint when
- * there is one.
- */
-export const waitlistEmail =
-  process.env.NEXT_PUBLIC_WAITLIST_EMAIL || "hello@vivace.run";

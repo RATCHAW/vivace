@@ -25,7 +25,7 @@ export function Hero({ copy, locale }: { copy: Copy; locale: Locale }) {
             {t.badge}
           </span>
 
-          <h1 className="font-heading text-display-xxl text-balance">
+          <h1 className="font-heading text-display-xl text-balance">
             {t.titleLine1}
             <br />
             {t.titleLine2}
@@ -40,7 +40,7 @@ export function Hero({ copy, locale }: { copy: Copy; locale: Locale }) {
               <StravaIcon className="text-strava size-5" />
               {t.primaryCta}
             </ButtonLink>
-            <ButtonLink size="lg" variant="outline" href="#film">
+            <ButtonLink size="lg" variant="outline" href="#coach">
               {t.secondaryCta}
             </ButtonLink>
           </div>
