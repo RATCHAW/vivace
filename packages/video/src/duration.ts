@@ -23,8 +23,8 @@ import { splitRushSeconds } from "./templates/split-rush/splits";
  * The hard ceiling: Instagram cuts a story segment at 15 seconds, and a film
  * that gets cut in half by the platform it was made for is a bug.
  *
- * The route replay predates this and is 20s of one continuous shot, which is a
- * different format — it has no estimator here and keeps its catalogue duration.
+ * A template without an estimator keeps its catalogue duration, which must also
+ * stay within this ceiling.
  */
 export const MAX_STORY_SECONDS = 15;
 const MIN_STORY_SECONDS = 6;

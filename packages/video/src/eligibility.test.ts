@@ -78,9 +78,6 @@ describe("duration", () => {
   it("cuts every story template inside Instagram's segment limit", () => {
     for (const fixture of FIXTURES) {
       for (const template of VIDEO_TEMPLATES) {
-        // The route replay predates the limit and is a different format: one
-        // continuous 20s shot, and it keeps its catalogue duration.
-        if (template.id === "run-video") continue;
         const frames = estimateDurationInFrames(template.id, fixture);
         expect(
           frames / template.fps,
