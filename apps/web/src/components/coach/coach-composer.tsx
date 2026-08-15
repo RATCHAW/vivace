@@ -202,7 +202,7 @@ export function CoachComposer({
       )}
 
       {pickerOpen && (
-        <div className="border-border bg-card max-h-52 overflow-y-auto rounded-md border">
+        <div className="border-border bg-card scrollbar-subtle max-h-52 overflow-y-auto rounded-md border">
           {runs?.length ? (
             <ul>
               {runs.slice(0, PICKER_RUNS).map((run) => (

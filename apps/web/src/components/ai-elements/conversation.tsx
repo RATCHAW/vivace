@@ -26,10 +26,15 @@ export type ConversationContentProps = ComponentProps<
 
 export const ConversationContent = ({
   className,
+  scrollClassName,
   ...props
 }: ConversationContentProps) => (
   <StickToBottom.Content
     className={cn("flex flex-col gap-8 p-4", className)}
+    // The element that actually scrolls is this part's outer div, not the one
+    // `className` lands on — so the rail is styled here, matching the one
+    // `<ScrollArea>` draws either side of the transcript.
+    scrollClassName={cn("scrollbar-subtle", scrollClassName)}
     {...props}
   />
 );
