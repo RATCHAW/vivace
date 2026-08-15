@@ -235,8 +235,7 @@ export const en = {
   render: {
     loadErrorTitle: "Could not load the video state",
     preparing: "Preparing your video…",
-    /** The same sentence where the only thing drawing the progress is a 3px
-     *  rule — the phone's Download tile, whose icon has no room for a number. */
+    /** The phone's compact Download tile uses this as its accessible name. */
     preparingPercent: "Preparing your video… {{percent}}%",
     progressLabel: "Video preparation progress",
     downloadVideo: "Download video",

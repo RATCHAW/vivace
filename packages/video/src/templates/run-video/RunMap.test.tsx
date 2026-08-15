@@ -35,6 +35,7 @@ const { instances, FakeMap } = vi.hoisted(() => {
     }
 
     addSource(id: string, source: { data: unknown }) {
+      if (this.removed) throw new Error("Cannot mutate a removed map");
       this.sources[id] = { data: source.data };
     }
 
@@ -262,6 +263,18 @@ describe("RunMap in the Player", () => {
     // Selecting another run remounts the whole composition; without this every
     // click leaks a WebGL context until the browser starts dropping them.
     expect(live()).toHaveLength(0);
+  });
+
+  it("ignores a late style load after switching away from the route", () => {
+    const { unmount } = render(mapAt(0));
+    const [map] = instances;
+
+    // On a phone the style can finish after selecting another template. Mapbox
+    // still delivers the queued event even though cleanup removed the map.
+    unmount();
+
+    expect(() => map.emit("load")).not.toThrow();
+    expect(map.sources).toEqual({});
   });
 });
 
