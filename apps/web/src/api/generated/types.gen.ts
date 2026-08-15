@@ -118,6 +118,7 @@ export type CoachMessageMetadata = {
         name: string;
         date: string;
     };
+    trace_id?: string;
 } | null;
 
 export type CoachBriefing = {

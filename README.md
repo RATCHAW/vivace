@@ -529,6 +529,46 @@ What that buys, over one event per turn:
 The post-run debrief (`debrief.ts`) is traced the same way. It has no replay to
 link to and no conversation to sit in: nobody asked for it.
 
+### Was the answer any good?
+
+The one question the numbers can't answer: a turn that cost little and answered
+fast can still be wrong. Every answer carries its trace id back to the browser
+(on the message, so it survives a reload), and a thumbs up/down on it is
+recorded against that same trace — next to the tokens, the tool calls and the
+session replay that produced it.
+
+The thumbs, and the "what was wrong with it?" that follows a thumbs down, are
+this app's own — `src/components/coach/coach-feedback.tsx`, in the app's type
+scale and both its languages, inline in the transcript rather than a pop-up over
+it. What PostHog stores is a survey *response* rather than a bare event, which
+is what puts it on the trace's **Feedback** tab and in Surveys with response
+rates already built. So a survey has to exist, but only as a schema:
+
+1. In PostHog: **New survey → Presentation: API**. API is the presentation that
+   records responses and draws nothing.
+2. First question: **Rating**, scale **1–2**. Second: an **open** question.
+   Their wording only ever appears in PostHog — the athlete reads ours, so this
+   is the one part of the survey that is a column header rather than copy.
+3. Put the survey's id in `apps/web/.env`:
+
+```sh
+VITE_POSTHOG_COACH_SURVEY_ID=019bb5a3-...
+```
+
+Unset, no thumbs are drawn at all — a button that records nothing is worse than
+no button. A thumbs up completes the response on its own; a thumbs down is
+recorded the moment it is clicked and leaves the response open, so an athlete
+who says an answer was wrong but not why still counts. Responses are filed under
+the survey's own question ids, read from the survey PostHog already fetched, so
+reordering the questions there can't start filing ratings as free text.
+
+**An answer is rated once.** Which answers have been rated, and how, is kept in
+`localStorage` — coming back to a conversation shows the thumb that was pressed
+rather than asking again, and neither a reload nor a tab switch can double-count
+one. That is per browser: the same athlete on their phone could rate an answer
+their laptop already did. Storing it against the message instead would be a
+column and an endpoint for a number PostHog is already holding.
+
 ### Privacy
 
 - Session replay masks all inputs, and `ph-no-capture` blocks the athlete's
