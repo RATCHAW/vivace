@@ -55,7 +55,12 @@ export const MessageContent = ({
 
 export type MessageActionsProps = ComponentProps<"div">;
 
-/** Copy, retry and friends — revealed on hover so a read-through stays quiet. */
+/**
+ * Copy, retry and friends — revealed on hover so a read-through stays quiet.
+ *
+ * A coarse pointer has no hover to reveal them with, and the row is holding its
+ * height there either way: on touch they are simply shown.
+ */
 export const MessageActions = ({
   className,
   children,
@@ -63,7 +68,7 @@ export const MessageActions = ({
 }: MessageActionsProps) => (
   <div
     className={cn(
-      "flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100",
+      "flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 pointer-coarse:opacity-100 focus-within:opacity-100",
       className,
     )}
     {...props}

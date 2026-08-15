@@ -247,6 +247,14 @@
   --color-strava: #fc4c02;
 }
 
+/* The curve a panel travels on when it slides in from an edge — Ionic's, by way
+   of iOS. CSS's own `ease-in-out` is too weak to read as a surface arriving:
+   it leaves and settles at the same lazy rate, where this one commits early and
+   decelerates into place. Sheets only; a hover or a fade wants plain `ease`. */
+@theme {
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
 /* The coach's "I'm working on it" dots. Three of these run together, staggered
    by 0.2s, so the row reads as one thought rather than three blinking lights.
    Not `animate-pulse`: that dips to 50% opacity, which is invisible at 6px. */
