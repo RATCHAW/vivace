@@ -101,6 +101,25 @@ describe("homepage positioning", () => {
       expect(hero).toMatch(videoPattern);
     },
   );
+
+  /**
+   * The social card is the one asset that cannot be read from the copy, so it
+   * goes stale silently — it did, for the whole of the coach launch. `imageAlt`
+   * is the only description of `og-image.png` there is; if it stops naming both
+   * products, the picture it describes has almost certainly stopped showing
+   * them.
+   */
+  it.each([
+    ["en", /coach/i, /replay|video/i],
+    ["fr", /coach/i, /replay|vidéo/i],
+  ] as const)(
+    "%s describes a social card carrying both products",
+    (locale, coachPattern, videoPattern) => {
+      const { imageAlt } = getDictionary(locale).meta;
+      expect(imageAlt).toMatch(coachPattern);
+      expect(imageAlt).toMatch(videoPattern);
+    },
+  );
 });
 
 describe("content pages", () => {
@@ -125,6 +144,25 @@ describe("content pages", () => {
       expect(contentPagePath(locale, key)).toBe(`/${locale}/${slug}`);
     }
   });
+
+  /**
+   * `about` is the page a search engine reads to learn what Vivace is, and the
+   * only one in the sitemap above 0.5. It described a video-only product for
+   * the whole of the coach launch, which is exactly the drift this catches.
+   */
+  it.each([
+    ["en", /coach/i, /replay|film|video/i],
+    ["fr", /coach/i, /replay|film|vidéo/i],
+  ] as const)(
+    "%s introduces both products on the about page",
+    (locale, coachPattern, productPattern) => {
+      const page = getContentPage(locale, "about");
+      const summary = `${page.title} ${page.description} ${page.lead}`;
+
+      expect(summary).toMatch(coachPattern);
+      expect(summary).toMatch(productPattern);
+    },
+  );
 
   it("pairs each translation with the same content page", () => {
     for (const key of CONTENT_PAGE_KEYS) {

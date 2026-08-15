@@ -16,7 +16,7 @@ export const en = {
     ogDescription:
       "Get practical training advice from every run, then turn the ones you love into shareable vertical videos.",
     imageAlt:
-      "Vivace turns Strava runs into shareable vertical videos with route, pace and heart rate.",
+      "A Vivace coach reply planning Sunday’s long run, beside a run replay showing the route, distance and pace.",
   },
 
   header: {
@@ -183,7 +183,7 @@ export const en = {
       },
       {
         q: "How is Vivace different from Strava Flyover?",
-        a: "Strava Flyover explores an activity on a 3D map inside Strava. Vivace creates a fixed 20-second vertical film that combines your route, live pace, heart rate and summary, then gives you a downloadable MP4 to share anywhere.",
+        a: "Strava Flyover explores an activity on a 3D map inside Strava. Vivace renders a short vertical film from the same run — route, live pace, heart rate and a summary — and hands you a downloadable MP4 to share anywhere. It also reads your training history, so the same run can tell you what to do next.",
       },
       {
         q: "What does it cost?",
