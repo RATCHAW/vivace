@@ -21,6 +21,13 @@ const buttonVariants = cva(
         // arrows, Share — where a full-strength rule would outshout the content.
         subtle:
           "border-border bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground aria-expanded:bg-muted",
+        // The CTA *on* a {component.plan-card-featured} cobalt surface.
+        // Deliberately not `default`: --brand is #494fdf in both themes, and in
+        // light mode --primary is black, which lands at 2.5:1 on it — below
+        // every threshold. --brand-foreground is white in both themes, so this
+        // is the one pill that reads the same either way.
+        onBrand:
+          "bg-brand-foreground text-brand hover:bg-brand-foreground/90 focus-visible:ring-brand-foreground/50",
         // button-soft — surface-soft ground
         secondary:
           "bg-secondary text-secondary-foreground hover:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_5%)] aria-expanded:bg-secondary",

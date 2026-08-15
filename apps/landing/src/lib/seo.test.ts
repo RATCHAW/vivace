@@ -20,8 +20,19 @@ describe("app handoff", () => {
     );
   });
 
-  it("opens the live coach in the selected language", () => {
-    expect(coachUrl("fr")).toBe("http://localhost:5173/coach?lang=fr");
+  it("carries a destination through sign-in when one is asked for", () => {
+    expect(signInUrl("en", "/replays?run=123")).toBe(
+      "http://localhost:5173/login?lang=en&provider=strava&next=%2Freplays%3Frun%3D123",
+    );
+  });
+
+  it("opens the live coach in the selected language, through sign-in", () => {
+    // Not `/coach` directly: the app's route guard would bounce a signed-out
+    // visitor to sign-in and land them on the Overview, losing the button they
+    // actually pressed.
+    expect(coachUrl("fr")).toBe(
+      "http://localhost:5173/login?lang=fr&provider=strava&next=%2Fcoach",
+    );
   });
 });
 

@@ -19,7 +19,7 @@ export function useShareRun(run: Pick<Run, "id" | "name">) {
   const { t } = useTranslation();
 
   return useCallback(async () => {
-    const url = `${window.location.origin}/runs?run=${run.id}`;
+    const url = `${window.location.origin}/replays?run=${run.id}`;
     try {
       if (navigator.share) {
         await navigator.share({ title: run.name, url });

@@ -24,13 +24,23 @@ const appUrl = (
  * arrive at an English sign-in screen. `provider=strava` tells that screen to
  * continue straight to OAuth instead of asking for the same click again.
  */
-export function signInUrl(locale: Locale): string {
-  return `${appUrl}/login?lang=${locale}&provider=strava`;
+export function signInUrl(locale: Locale, next?: string): string {
+  const base = `${appUrl}/login?lang=${locale}&provider=strava`;
+  return next ? `${base}&next=${encodeURIComponent(next)}` : base;
 }
 
-/** Take signed-in athletes straight to the live coach. */
+/**
+ * Take athletes straight to the live coach.
+ *
+ * Through sign-in, not around it. This used to point at `/coach` directly,
+ * which for the signed-out visitor this button is written for meant the app's
+ * route guard bounced them to `/login` and then dropped them on the Overview —
+ * the one surface that, until recently, never mentioned the coach at all. The
+ * app reads `next` on the way back out of OAuth; see `next-path.ts` over there,
+ * which is also what refuses anything that isn't a path on its own origin.
+ */
 export function coachUrl(locale: Locale): string {
-  return `${appUrl}/coach?lang=${locale}`;
+  return signInUrl(locale, "/coach");
 }
 
 /**

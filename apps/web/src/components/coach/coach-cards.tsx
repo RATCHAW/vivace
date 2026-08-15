@@ -284,7 +284,7 @@ export function RunDebrief({
 
       <div className="border-border flex flex-wrap gap-2 border-t px-5 py-3.5">
         {/* Base UI composes with `render`, not Radix's `asChild`. */}
-        <Button render={<Link to={`/runs?run=${card.run_id}`} />} size="sm">
+        <Button render={<Link to={`/replays?run=${card.run_id}`} />} size="sm">
           {t("cards.watchReplay")}
           <ArrowRightIcon data-icon="inline-end" />
         </Button>

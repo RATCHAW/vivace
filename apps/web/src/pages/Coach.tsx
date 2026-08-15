@@ -302,7 +302,7 @@ export function Coach() {
               initialMention={initialMention}
               initialMessages={toUIMessages(thread.messages)}
               key={thread.thread.id}
-              onOpenRun={(runId) => navigate(`/runs?run=${runId}`)}
+              onOpenRun={(runId) => navigate(`/replays?run=${runId}`)}
               rangeWeeks={range.weeks}
               registerAsk={(fn) => {
                 askRef.current = fn;

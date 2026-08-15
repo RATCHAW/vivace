@@ -58,7 +58,7 @@ describe("analytics fan-out", () => {
   it("leaves pageviews to PostHog's own $pageview", () => {
     const { capture } = mockTransports();
 
-    trackEvent("ui.page_view", { path: "/runs" });
+    trackEvent("ui.page_view", { path: "/replays" });
 
     expect(capture).not.toHaveBeenCalled();
   });

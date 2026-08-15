@@ -1,7 +1,7 @@
 // A deploy replaces every hashed file under /assets, so a tab that was open
 // across one goes looking for a chunk that no longer exists. Only the lazy
 // routes can hit it — everything already in the bundle is in memory — which is
-// why it shows up as a render crash on /runs or /coach seconds after a release.
+// why it shows up as a render crash on /replays or /coach seconds after a release.
 //
 // Vite dispatches `vite:preloadError` for exactly this and reloading is what
 // its docs recommend: `index.html` is served `must-revalidate`, so the reload
