@@ -141,8 +141,6 @@ export const fr: Translated<Messages> = {
 
   videoOptions: {
     section: "Options de la vidéo",
-    edit: "Modifier",
-    hide: "Masquer",
     themeGroup: "Thème de la vidéo",
     templateSelect: "Modèle de vidéo",
     runAsAvatar: "Courir avec votre avatar",
@@ -202,6 +200,7 @@ export const fr: Translated<Messages> = {
   render: {
     loadErrorTitle: "Impossible de charger l’état de la vidéo",
     preparing: "Préparation de votre vidéo…",
+    preparingPercent: "Préparation de votre vidéo… {{percent}} %",
     progressLabel: "Progression de la préparation de la vidéo",
     downloadVideo: "Télécharger la vidéo",
     failedTitle: "Impossible de préparer cette vidéo",
