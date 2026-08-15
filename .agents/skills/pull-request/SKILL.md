@@ -47,24 +47,32 @@ mechanical will catch a bad one.
 
 ## Description
 
-Prose. Not a template — no checklist, no `## Summary` heading, no bullet list and no
-generated-by footer appears in a single human-written pull request on this repo. Three or
-four paragraphs a reviewer reads top to bottom:
+Short, and mostly bullets. One or two sentences saying what the PR introduces and why,
+then a bullet per thing it changes. The older descriptions on this repo are three or four
+dense paragraphs — accurate, and nobody read them past the first one. A reviewer should
+have the whole shape of the change without scrolling.
 
-1. **The problem, concretely**, with the symptom someone could have observed — the error
-   string, the event name, the file and line. #40 opens with the crash and its component
-   stack; #37 with `sh: husky: not found` and the Dockerfile line it died on.
-2. **The approach, and why it is that shape.** Name the file that now owns the behaviour,
-   and state the decision inside it a reviewer would otherwise have to reverse-engineer:
-   why one reload and not a retry, why the SDK's own callbacks and not `withTracing`, why
-   the setting is cleared by the workflow rather than in a UI.
-3. **What is deliberately not covered**, when there is something — an option left out, a
-   surface that stays English, a follow-up. Saying it stops a reviewer looking for it.
-   Bounding the blast radius counts too: "no API or schema changes" is worth a clause,
-   because it tells a reviewer what *not* to read.
-4. **How it was verified.** Which checks ran, how many tests, and what was exercised by
-   hand — a Docker build, a stub of a third-party API, the local nginx stack. Most
-   descriptions here close on that line.
+1. **Lead with what it introduces**, in a sentence or two. What is different after this
+   merges, and the concrete symptom it fixes when there is one — the error string, the
+   event name, the file and line. If the lead needs a paragraph to set up, the title is
+   wrong.
+2. **Then one bullet per change**, outcome first and mechanism second, naming the file
+   that now owns the behaviour: "coach answers carry their trace id back to the browser
+   (`messageMetadata` in the chat route)". Keep each to a line or two. Three to six
+   bullets is the normal size; ten means the PR should have been two.
+3. **A bullet for what is deliberately not covered**, when there is something — an option
+   left out, a surface that stays English, a follow-up. Saying it stops a reviewer looking
+   for it. Bounding the blast radius counts too: "no API or schema changes" earns its
+   bullet, because it tells a reviewer what *not* to read.
+4. **Close on one line of verification.** Which checks ran, how many tests, and what was
+   exercised by hand — a Docker build, a stub of a third-party API, the local nginx stack.
+
+Still not a template: no `## Summary` heading, no checklist, no generated-by footer. A
+bullet earns its place by naming something that changed, so drop the ones that only
+restate the title, and put the *why* inside the bullet rather than in a paragraph above it
+— a reason a reviewer would otherwise have to reverse-engineer (why one reload and not a
+retry, why the SDK's own callbacks and not `withTracing`) belongs in the clause after the
+dash, not in an essay.
 
 If later commits change the scope, update the title *and* the description before handing
 the PR off. A stale description is worse than none, and this one becomes the commit
