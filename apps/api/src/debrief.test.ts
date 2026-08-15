@@ -2,7 +2,7 @@
 //
 // A debrief is written by the webhook, not by the model: nothing called a tool,
 // and nobody asked a question. Storing its card as a tool result puts a function
-// call at the head of a thread with no user turn in front of it, and Gemini
+// call at the head of a thread with no user turn in front of it, and a provider
 // rejects the athlete's *next* message with "function call turn must come
 // immediately after a user turn or after a function response turn" — a failure
 // that shows up one turn away from its cause.

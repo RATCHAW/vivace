@@ -148,8 +148,8 @@ export async function postRunDebrief(
       // Nothing called a tool here — the webhook built this card. Storing it as
       // a tool result would put a function call at the head of the thread with
       // no user turn before it, and the next message the athlete sends would
-      // come back from Gemini as "function call turn must come immediately
-      // after a user turn". `convertToModelMessages` skips data parts, so the
+      // come back rejected as "function call turn must come immediately after
+      // a user turn". `convertToModelMessages` skips data parts, so the
       // card stays a UI artifact and the text below is what the model reads.
       { type: DEBRIEF_PART, data: card },
       { type: "text", text: read },

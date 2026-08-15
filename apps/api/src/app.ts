@@ -67,11 +67,11 @@ import {
 import {
   attachedRun,
   COACH_NOT_CONFIGURED,
-  COACH_PROVIDER_OPTIONS,
   coachFailure,
   coachMessageMetadataSchema,
   coachSystemPrompt,
   createCoachTools,
+  dropUnannouncedToolInput,
   getCoachConfig,
   type CoachFailure,
 } from "./coach.js";
@@ -1350,7 +1350,19 @@ app.openapi(coachChatRoute, async (c) => {
     // Every tool call costs a round trip; the cap keeps a confused model from
     // looping through the athlete's whole history.
     stopWhen: stepCountIs(COACH_MAX_STEPS),
-    providerOptions: COACH_PROVIDER_OPTIONS,
+    // A gateway routes to whatever upstream it likes, and not all of them
+    // announce a tool call before streaming its arguments. Diagnostics, not
+    // analytics: this describes the provider, not the athlete.
+    experimental_transform: dropUnannouncedToolInput((toolCallId) => {
+      log.warn(
+        {
+          event: "coach.tool_input_unannounced",
+          toolCallId,
+          modelId: config.modelId,
+        },
+        "Dropped tool arguments the model stream never announced",
+      );
+    }),
     ...turn.callbacks,
     onFinish: ({ text }) => {
       turn.end({ input: messages, output: text });
@@ -1416,9 +1428,9 @@ app.openapi(coachChatRoute, async (c) => {
         { threadId: thread.id },
         "Coach failed",
       );
-      // The reason, not the provider's sentence. "Quota exceeded for metric:
-      // generativelanguage.googleapis.com/generate_content_free_tier_requests"
-      // is a message to the account holder, and it went to the line above.
+      // The reason, not the provider's sentence. "Insufficient credits — top up
+      // at llmgateway.io/billing" is a message to whoever holds the key, and it
+      // went to the line above.
       return coachFailure(error);
     },
   });

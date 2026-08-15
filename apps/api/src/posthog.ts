@@ -201,7 +201,7 @@ function capture(event: string, distinctId: string, properties: object): void {
 
 export interface LlmGeneration extends LlmEventContext {
   modelId: string;
-  /** The AI SDK's provider id, e.g. `google.generative-ai`. */
+  /** The AI SDK's provider id — `gateway` for anything the gateway routes. */
   provider?: string;
   /** Wall-clock seconds the model call took. */
   latencySeconds: number;
@@ -210,7 +210,7 @@ export interface LlmGeneration extends LlmEventContext {
   streamed?: boolean;
   inputTokens?: number;
   outputTokens?: number;
-  /** Gemini's thinking tokens. Billed as output, invisible in the reply. */
+  /** The model's thinking tokens. Billed as output, invisible in the reply. */
   reasoningTokens?: number;
   cacheReadTokens?: number;
   cacheWriteTokens?: number;
@@ -222,6 +222,22 @@ export interface LlmGeneration extends LlmEventContext {
   /** The tool definitions the model was given, for `$ai_tools`. */
   tools?: unknown[];
   error?: unknown;
+}
+
+/**
+ * The vendor PostHog prices the call against.
+ *
+ * Its table is keyed on the vendor ("deepseek"), not on the SDK's provider id —
+ * and through a gateway that id is `gateway` for everything it routes, which
+ * would price every call in the app at nothing. The gateway's model ids carry
+ * the vendor in front of the slash, so that is what to read; the provider id's
+ * first segment ("google.generative-ai" → "google") is what a model reached
+ * directly would have.
+ */
+function vendorOf({ modelId, provider }: LlmGeneration): string {
+  const [vendor, model] = modelId.split("/");
+  if (model) return vendor;
+  return provider?.split(".")[0] ?? "gateway";
 }
 
 /**
@@ -244,10 +260,7 @@ export function captureLlmGeneration(generation: LlmGeneration): void {
   void captureAiGeneration(client, {
     distinctId: generation.distinctId,
     model: generation.modelId,
-    // PostHog prices a call by provider and model, and its table is keyed on
-    // the vendor ("google"), not on the SDK's provider id
-    // ("google.generative-ai") — so send the first segment of it.
-    provider: (generation.provider ?? "google").split(".")[0],
+    provider: vendorOf(generation),
     input: generation.input,
     output: generation.output,
     latency: generation.latencySeconds,

@@ -1,18 +1,20 @@
 // The coach's brain: which model answers, what it is told about itself, and the
 // tools that let it read the athlete's Strava history instead of guessing.
-// Everything here is provider-agnostic on purpose — swapping Gemini for another
-// model is a change to `getCoachConfig` and nothing else.
+// Everything here is provider-agnostic on purpose — swapping one model for
+// another is a change to `getCoachConfig` and nothing else.
 //
 // Several tools return a `card` field. That is a contract with the browser:
 // apps/web renders the tool's output as a chart, a plan or a run card rather
 // than as JSON, so the shape of those outputs is part of the UI and changing
 // one means changing `coach-cards.tsx` with it.
-import { google } from "@ai-sdk/google";
 import {
   APICallError,
+  createGateway,
   RetryError,
   tool,
   type LanguageModel,
+  type StreamTextTransform,
+  type TextStreamPart,
   type ToolSet,
 } from "ai";
 import { z } from "zod";
@@ -52,8 +54,21 @@ import type { Run } from "./schemas.js";
 // the coach.
 export { clock, pace, toSplits, weekStart } from "./training.js";
 
-/** Gemini 2.5 Flash unless `COACH_MODEL` names another Google model. */
-const DEFAULT_MODEL = "gemini-2.5-flash";
+/**
+ * DeepSeek V4 Flash unless `COACH_MODEL` names another model the gateway
+ * routes. Written `vendor/model`, which pins the vendor; a bare id would let
+ * the gateway pick one for us, and a coach whose model changes underneath it
+ * is a coach whose answers change for no reason the athlete can see.
+ */
+const DEFAULT_MODEL = "deepseek/deepseek-v4-flash";
+
+/**
+ * LLM Gateway speaks the AI SDK's own gateway protocol, and its URL carries the
+ * SDK major it answers for: v4 is AI SDK 7, which is what `ai` is pinned to in
+ * package.json. Bumping the SDK past 7 means bumping this with it. Overridable
+ * because the gateway is self-hostable.
+ */
+const DEFAULT_GATEWAY_URL = "https://api.llmgateway.io/v4/ai";
 
 export interface CoachConfig {
   model: LanguageModel;
@@ -66,18 +81,21 @@ export interface CoachConfig {
  * routes treat a missing Remotion Lambda deployment.
  */
 export function getCoachConfig(): CoachConfig | null {
-  // The name @ai-sdk/google reads by default; set it and the provider is wired.
-  if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY) return null;
+  const apiKey = process.env.LLM_GATEWAY_API_KEY;
+  if (!apiKey) return null;
   // `||`, not `??`: docker-compose passes an unset variable through as "".
   const modelId = process.env.COACH_MODEL || DEFAULT_MODEL;
-  return { model: google(modelId), modelId };
+  const gateway = createGateway({
+    apiKey,
+    baseURL: process.env.LLM_GATEWAY_URL || DEFAULT_GATEWAY_URL,
+  });
+  return { model: gateway(modelId), modelId };
 }
 
 /** What the operator has to do about it. Logged, never sent to the browser. */
 export const COACH_NOT_CONFIGURED =
   "No model API key is configured. Get a key from " +
-  "https://aistudio.google.com/apikey and set GOOGLE_GENERATIVE_AI_API_KEY in " +
-  "apps/api/.env.";
+  "https://llmgateway.io and set LLM_GATEWAY_API_KEY in apps/api/.env.";
 
 /**
  * Why a turn produced no answer, as a token rather than a sentence.
@@ -108,9 +126,10 @@ export function coachFailure(error: unknown): CoachFailure {
     }
   }
 
-  // Providers disagree about which status carries a quota, and Gemini answers
-  // an overloaded model with a 503 whose message is the only thing that says
-  // so. The wording is a hint, never the classification's only source.
+  // Providers disagree about which status carries a quota, and an overloaded
+  // model often arrives as a 503 whose message is the only thing that says so.
+  // A gateway adds a second source of both — its own limits, and whichever
+  // upstream it routed to. The wording is a hint, never the only source.
   const message = cause instanceof Error ? cause.message.toLowerCase() : "";
   if (/quota|rate limit|too many requests/.test(message)) return "rate_limited";
   if (/overloaded|unavailable|timed out|timeout/.test(message)) {
@@ -120,12 +139,49 @@ export function coachFailure(error: unknown): CoachFailure {
 }
 
 /**
- * Thinking-capable Gemini models (2.5 and up) stream their reasoning when asked;
- * the UI renders it in a collapsible panel above the answer.
+ * Drops the arguments of a tool call the stream never announced.
+ *
+ * `tool-input-delta` carries a tool call's arguments arriving character by
+ * character, and it means nothing without the `tool-input-start` that says
+ * which tool they belong to. The SDK refuses one that arrives without it —
+ * `Received tool-input-delta for missing tool call with ID …` — and it refuses
+ * it *on the server*, in the pass that rebuilds the answer for `onEnd`, so a
+ * provider that skips the announcement costs the athlete the whole turn and the
+ * answer is never stored. `tool-input-end` needs no such guard: it maps to no
+ * UI chunk at all.
+ *
+ * Dropped rather than repaired: a delta carries no tool name, so there is
+ * nothing to invent the missing start from. Nothing is lost but the arguments
+ * animating in — `tool-call` still arrives with the complete input, which is
+ * what actually runs the tool, and every card this app draws is drawn from a
+ * tool's *result*.
  */
-export const COACH_PROVIDER_OPTIONS = {
-  google: { thinkingConfig: { includeThoughts: true } },
-};
+export function dropUnannouncedToolInput<TOOLS extends ToolSet>(
+  onDrop: (toolCallId: string) => void,
+): StreamTextTransform<TOOLS> {
+  return () => {
+    const announced = new Set<string>();
+    const dropped = new Set<string>();
+
+    return new TransformStream<TextStreamPart<TOOLS>, TextStreamPart<TOOLS>>({
+      transform(part, controller) {
+        if (part.type === "tool-input-start") announced.add(part.id);
+
+        if (part.type === "tool-input-delta" && !announced.has(part.id)) {
+          // Once per tool call, not once per character — a dropped argument
+          // list is hundreds of deltas and one thing worth knowing.
+          if (!dropped.has(part.id)) {
+            dropped.add(part.id);
+            onDrop(part.id);
+          }
+          return;
+        }
+
+        controller.enqueue(part);
+      },
+    });
+  };
+}
 
 const BASE_SYSTEM_PROMPT = `
 You are Vivace's running coach. You are talking to one athlete, inside their own
