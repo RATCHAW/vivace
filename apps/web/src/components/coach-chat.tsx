@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next";
 import {
   CheckIcon,
   CopyIcon,
+  PencilIcon,
   RefreshCcwIcon,
   SparklesIcon,
 } from "lucide-react";
@@ -58,6 +59,7 @@ import {
   useMentionLabel,
   type RunMention,
 } from "@/components/coach/coach-composer";
+import { CoachMessageEdit } from "@/components/coach/coach-message-edit";
 import { MonoLabel } from "@/components/mono";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -167,6 +169,15 @@ function cardOf(part: UIMessage["parts"][number]): CoachCard | null {
     return asCoachCard(part.output);
   }
   return null;
+}
+
+/** What a message says, as plain text — what Copy puts on the clipboard and
+ *  what the editor opens with. */
+function textOf(message: UIMessage): string {
+  return message.parts
+    .filter((part) => part.type === "text")
+    .map((part) => part.text)
+    .join("\n\n");
 }
 
 /** Every card drawn in one message. */
@@ -339,6 +350,8 @@ export function CoachChat({
   const [draft, setDraft] = useState("");
   const [attached, setAttached] = useState<RunMention | null>(initialMention);
   const [pickerOpen, setPickerOpen] = useState(false);
+  /** The question being rewritten, if one is — one at a time. */
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const chat = coachChatFor(threadId, initialMessages);
   const { messages, sendMessage, regenerate, status, stop, error } = useChat({
@@ -388,6 +401,10 @@ export function CoachChat({
     setDraft("");
     setAttached(null);
     setPickerOpen(false);
+    // A question asked from anywhere else settles the one being rewritten:
+    // leaving that box open over a message the conversation has moved past
+    // would arm it to cut off everything just said.
+    setEditingId(null);
   };
 
   // The rails live outside this component but ask through it.
@@ -396,6 +413,27 @@ export function CoachChat({
     // `ask` closes over the send function and the attachment, both of which are
     // allowed to change between renders; re-registering is cheap.
   });
+
+  /**
+   * Ask the same question again, in different words.
+   *
+   * `messageId` is what makes this a rewrite rather than a new question: the
+   * SDK cuts its transcript back to that message and reuses its id, and the
+   * transport passes the id on so the server cuts the stored one to match.
+   * Everything the old wording produced goes with it, on both sides.
+   */
+  const resend = (message: UIMessage, text: string) => {
+    if (isBusy) return;
+    setEditingId(null);
+    void sendMessage({
+      text,
+      // The attached run and any files travelled with the original question;
+      // only the words are being rewritten, so they travel again.
+      files: message.parts.filter((part) => part.type === "file"),
+      ...(message.metadata ? { metadata: message.metadata } : {}),
+      messageId: message.id,
+    });
+  };
 
   const handleSubmit = (message: PromptInputMessage) => {
     if (!message.text.trim() && message.files.length === 0) return;
@@ -406,6 +444,7 @@ export function CoachChat({
     });
     setDraft("");
     setAttached(null);
+    setEditingId(null);
   };
 
   /**
@@ -494,6 +533,7 @@ export function CoachChat({
           {messages.map((message) => {
             const mention = mentionOf(message);
             const sources = sourcesOf(message, runs);
+            const editing = editingId === message.id;
 
             return (
               <Message from={message.role} key={message.id}>
@@ -505,92 +545,125 @@ export function CoachChat({
 
                 <MessageAttachments message={message} />
 
-                {message.parts.map((part, index) => {
-                  const key = `${message.id}-${index}`;
+                {editing && (
+                  <CoachMessageEdit
+                    onCancel={() => setEditingId(null)}
+                    onSubmit={(text) => resend(message, text)}
+                    text={textOf(message)}
+                  />
+                )}
 
-                  if (part.type === "text") {
-                    return (
-                      <MessageContent key={key}>
-                        <MessageResponse>{part.text}</MessageResponse>
-                      </MessageContent>
-                    );
-                  }
+                {!editing &&
+                  message.parts.map((part, index) => {
+                    const key = `${message.id}-${index}`;
 
-                  if (part.type === DEBRIEF_PART) {
-                    const card = cardOf(part);
-                    return card ? (
-                      <CoachCardView actions={actions} card={card} key={key} />
-                    ) : null;
-                  }
-
-                  if (part.type === "reasoning") {
-                    return (
-                      <Reasoning
-                        isStreaming={part.state === "streaming"}
-                        key={key}
-                      >
-                        <ReasoningTrigger />
-                        <ReasoningContent>{part.text}</ReasoningContent>
-                      </Reasoning>
-                    );
-                  }
-
-                  if (isToolUIPart(part)) {
-                    const name = getToolName(part);
-                    const title = isToolName(name)
-                      ? t(`coach.tools.${name}`)
-                      : name;
-
-                    if (part.state === "output-error") {
+                    if (part.type === "text") {
                       return (
-                        <p className="text-caption text-destructive" key={key}>
-                          {t("coach.toolFailed", {
-                            title,
-                            error: part.errorText,
-                          })}
-                        </p>
+                        <MessageContent key={key}>
+                          <MessageResponse>{part.text}</MessageResponse>
+                        </MessageContent>
                       );
                     }
 
-                    if (part.state !== "output-available") {
-                      return <CoachTyping key={key} label={title} />;
-                    }
-
-                    const card = asCoachCard(part.output);
-                    if (card) {
-                      return (
+                    if (part.type === DEBRIEF_PART) {
+                      const card = cardOf(part);
+                      return card ? (
                         <CoachCardView
                           actions={actions}
                           card={card}
                           key={key}
                         />
+                      ) : null;
+                    }
+
+                    if (part.type === "reasoning") {
+                      return (
+                        <Reasoning
+                          isStreaming={part.state === "streaming"}
+                          key={key}
+                        >
+                          <ReasoningTrigger />
+                          <ReasoningContent>{part.text}</ReasoningContent>
+                        </Reasoning>
                       );
                     }
 
-                    // A tool that reads rather than draws: the answer below is
-                    // the output, so this is only a note that it was read.
-                    const failure =
-                      typeof part.output === "object" &&
-                      part.output !== null &&
-                      "error" in part.output
-                        ? String((part.output as { error: unknown }).error)
-                        : null;
+                    if (isToolUIPart(part)) {
+                      const name = getToolName(part);
+                      const title = isToolName(name)
+                        ? t(`coach.tools.${name}`)
+                        : name;
 
-                    return (
-                      <p
-                        className={cn(
-                          "text-mono-badge font-mono uppercase",
-                          failure ? "text-destructive" : "text-stone",
-                        )}
-                        key={key}
-                      >
-                        {failure ?? title}
-                      </p>
-                    );
-                  }
+                      if (part.state === "output-error") {
+                        return (
+                          <p
+                            className="text-caption text-destructive"
+                            key={key}
+                          >
+                            {t("coach.toolFailed", {
+                              title,
+                              error: part.errorText,
+                            })}
+                          </p>
+                        );
+                      }
 
-                  return null;
-                })}
+                      if (part.state !== "output-available") {
+                        return <CoachTyping key={key} label={title} />;
+                      }
+
+                      const card = asCoachCard(part.output);
+                      if (card) {
+                        return (
+                          <CoachCardView
+                            actions={actions}
+                            card={card}
+                            key={key}
+                          />
+                        );
+                      }
+
+                      // A tool that reads rather than draws: the answer below is
+                      // the output, so this is only a note that it was read.
+                      const failure =
+                        typeof part.output === "object" &&
+                        part.output !== null &&
+                        "error" in part.output
+                          ? String((part.output as { error: unknown }).error)
+                          : null;
+
+                      return (
+                        <p
+                          className={cn(
+                            "text-mono-badge font-mono uppercase",
+                            failure ? "text-destructive" : "text-stone",
+                          )}
+                          key={key}
+                        >
+                          {failure ?? title}
+                        </p>
+                      );
+                    }
+
+                    return null;
+                  })}
+
+                {/* Copy and rewrite, on the athlete's own turn. Hidden while
+                    an answer is arriving for the same reason the coach's own
+                    row is: rewriting a question mid-answer would throw away
+                    the one being written. */}
+                {message.role === "user" && !editing && !isBusy && (
+                  <MessageActions>
+                    <CopyAction text={textOf(message)} />
+                    <MessageAction
+                      label={t("coach.edit")}
+                      onClick={() => setEditingId(message.id)}
+                      tooltip={t("coach.edit")}
+                    >
+                      <PencilIcon />
+                    </MessageAction>
+                  </MessageActions>
+                )}
 
                 {message.role === "assistant" && !isBusy && (
                   <>
@@ -599,12 +672,7 @@ export function CoachChat({
                       runs={sources}
                     />
                     <MessageActions>
-                      <CopyAction
-                        text={message.parts
-                          .filter((part) => part.type === "text")
-                          .map((part) => part.text)
-                          .join("\n\n")}
-                      />
+                      <CopyAction text={textOf(message)} />
                       <MessageAction
                         label={t("coach.tryAgain")}
                         onClick={() => regenerate({ messageId: message.id })}

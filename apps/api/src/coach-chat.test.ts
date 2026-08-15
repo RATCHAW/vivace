@@ -202,6 +202,47 @@ describe("POST /api/coach/chat", () => {
     expect(JSON.stringify(stored)).not.toContain("Rest.");
   });
 
+  it("replaces a rewritten question, and forgets what it produced", async () => {
+    stored = [
+      {
+        id: "user-1",
+        role: "user",
+        parts: [{ type: "text", text: "Plan my week" }],
+      },
+      {
+        id: "msg-1",
+        role: "assistant",
+        parts: [{ type: "text", text: "Four easy runs." }],
+      },
+    ];
+
+    // The edit resends *the athlete's own message*, under the id it already
+    // has — which is what tells the route this is a rewrite, not a new turn.
+    const res = await chat({
+      thread_id: THREAD_ID,
+      trigger: "submit-message",
+      message_id: "user-1",
+      message: {
+        id: "user-1",
+        role: "user",
+        parts: [{ type: "text", text: "What should I run on Sunday?" }],
+      },
+    });
+    await res.text(); // onEnd runs as the stream drains
+
+    // One question, still in its own place, in its new words — and one answer.
+    expect(stored.map((message) => message.role)).toEqual([
+      "user",
+      "assistant",
+    ]);
+    expect(stored[0].id).toBe("user-1");
+    expect(JSON.stringify(stored[0].parts)).toContain(
+      "What should I run on Sunday?",
+    );
+    expect(JSON.stringify(stored)).not.toContain("Plan my week");
+    expect(JSON.stringify(stored)).not.toContain("Four easy runs.");
+  });
+
   it("rejects a turn with nothing to answer", async () => {
     const res = await chat({ thread_id: THREAD_ID, trigger: "submit-message" });
     expect(res.status).toBe(400);
