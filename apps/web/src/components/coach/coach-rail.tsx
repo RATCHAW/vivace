@@ -313,6 +313,7 @@ export function CoachRail({ briefing, onAsk }: CoachRailProps) {
 }
 
 export interface CoachQueueProps {
+  /** `undefined` while the briefing is in flight, the same as the rail's. */
   queue: CoachBriefing["queue"] | undefined;
   onAsk: (text: string, runId?: number) => void;
   /** Opening a conversation the coach already wrote, rather than asking again. */
@@ -328,12 +329,21 @@ export interface CoachQueueProps {
  */
 export function CoachQueue({ queue, onAsk, onOpenThread }: CoachQueueProps) {
   const { t } = useTranslation();
-  if (!queue || queue.length === 0) return null;
+  // Loaded and empty is the one case with nothing to say; still loading gets
+  // the placeholders, so the column doesn't reflow when the briefing lands.
+  if (queue?.length === 0) return null;
 
   return (
-    <div className="flex flex-col gap-2.5">
+    // Pinned under the thread list rather than scrolling with it: it is at most
+    // four items, and it is the one thing on this column an athlete who has not
+    // asked anything yet is meant to see. The hairline is where the list ends.
+    <div className="border-border flex shrink-0 flex-col gap-2.5 border-t pt-6">
       <MonoLabel className="pl-1.5">{t("rail.queue")}</MonoLabel>
-      {queue.map((item) => (
+      {!queue &&
+        Array.from({ length: 2 }, (_, i) => (
+          <Skeleton className="h-[70px] w-full rounded-md" key={i} />
+        ))}
+      {queue?.map((item) => (
         <button
           className="border-border hover:bg-muted focus-visible:ring-ring/50 flex gap-2.5 rounded-md border p-3 text-left outline-none focus-visible:ring-3 focus-visible:ring-inset"
           key={item.id}

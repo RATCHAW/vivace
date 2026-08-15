@@ -272,6 +272,17 @@
   }
 }
 
+/* The same rail `<ScrollArea>` draws, for a container that has to own its own
+   scrolling — the chat transcript, which sticks to the bottom and so cannot
+   hand its scroll element to Base UI. `scrollbar-color` is what keeps the two
+   looking like one system; the thumb is `bg-muted-foreground/30`, written out
+   because a scrollbar takes a colour, not a class. */
+@utility scrollbar-subtle {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in oklab, var(--muted-foreground) 30%, transparent)
+    transparent;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

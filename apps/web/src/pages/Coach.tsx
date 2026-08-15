@@ -20,6 +20,7 @@ import { CoachThreads } from "@/components/coach-threads";
 import { MonoLabel } from "@/components/mono";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Select,
   SelectContent,
@@ -164,7 +165,10 @@ export function Coach() {
           selectThread(id);
           setThreadsOpen(false);
         }}
-        queue={briefing?.queue}
+        // A briefing that failed is reported once, in the rail. Here it is an
+        // empty queue rather than an undefined one, or the placeholders would
+        // wait for a list that is never coming.
+        queue={briefingError ? [] : briefing?.queue}
       />
     </>
   );
@@ -189,7 +193,9 @@ export function Coach() {
       <AppHeader />
 
       <main className="mx-auto grid h-[calc(100svh-4rem)] w-full max-w-[1440px] grid-cols-1 lg:grid-cols-[248px_minmax(0,1fr)] xl:grid-cols-[248px_minmax(0,1fr)_332px]">
-        <aside className="border-border hidden flex-col gap-6 overflow-y-auto border-r px-4 py-5 lg:flex">
+        {/* Clipped, not scrollable: the thread list inside carries the only
+            scroll region, so the column can't grow a second bar around it. */}
+        <aside className="border-border hidden min-h-0 flex-col gap-6 overflow-hidden border-r px-4 py-5 lg:flex">
           {conversations}
         </aside>
 
@@ -307,8 +313,12 @@ export function Coach() {
           )}
         </section>
 
-        <aside className="border-border hidden overflow-y-auto border-l px-5 py-6 xl:block">
-          {rail}
+        {/* The padding is on the content, not the panel, so the rail's thumb
+            rides the border rather than floating 20px inside it. */}
+        <aside className="border-border hidden min-h-0 overflow-hidden border-l xl:block">
+          <ScrollArea className="h-full">
+            <div className="px-5 py-6">{rail}</div>
+          </ScrollArea>
         </aside>
       </main>
     </>
