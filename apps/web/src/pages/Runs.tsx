@@ -76,7 +76,10 @@ export function Runs() {
     <>
       <AppHeader />
 
-      <main className="mx-auto w-full max-w-[1200px] px-6 pt-10 pb-20 sm:px-8">
+      {/* Wider than the Overview's measure, and the same one the Coach works in:
+          this page is a workspace built around a film, not a column of reading.
+          The extra width goes to the stage — see `STAGE` in <RunStudio>. */}
+      <main className="mx-auto w-full max-w-[1440px] px-6 pt-10 pb-20 sm:px-8">
         <header className="mb-7 flex flex-wrap items-center gap-5">
           <Button
             variant="subtle"
@@ -109,10 +112,18 @@ export function Runs() {
           ))}
         </div>
 
-        <div className="flex flex-col gap-8 lg:flex-row lg:items-start">
+        <div className="flex flex-col gap-8 lg:flex-row lg:items-start lg:gap-6">
+          {/* A rail, not a half of the page. Picking a run is navigation and the
+              film is the destination, so the list is given a measure it reads
+              well at and the rest of the row goes to the stage. It sticks
+              because the film beside it is taller than the fold: scrolling down
+              to the transport must not take the way of changing run with it. */}
           <section
             aria-label={t("runs.listLabel")}
-            className={cn("min-w-0 lg:flex-1", !showList && "hidden")}
+            className={cn(
+              "min-w-0 lg:sticky lg:top-6 lg:w-[320px] lg:shrink-0 xl:w-[368px]",
+              !showList && "hidden",
+            )}
           >
             {runsError && (
               <Alert variant="destructive">
@@ -144,9 +155,13 @@ export function Runs() {
 
             {runs && runs.length > 0 && (
               // DESIGN.md: hairline rules carry the row rhythm — no shadows.
-              // The cap is the height of the film beside it; below the
-              // breakpoint there is no film beside it, and the list is the page.
-              <div className="overflow-y-auto rounded-lg ring-1 ring-border lg:max-h-[660px]">
+              // The cap used to be the height of the film beside it, back when
+              // that was a fixed 484px; the film is measured off the display
+              // now, so the list is too — as tall as the screen can carry while
+              // pinned, and scrolling inside itself rather than moving the page.
+              // Below the breakpoint there is no film beside it, and the list is
+              // the page.
+              <div className="overflow-y-auto rounded-lg ring-1 ring-border lg:max-h-[calc(100svh_-_4rem)]">
                 {runs.map((run) => (
                   <button
                     key={run.id}
@@ -156,8 +171,11 @@ export function Runs() {
                       setStudioOpen(true);
                     }}
                     aria-pressed={selected?.id === run.id}
+                    // Tighter once it is a rail: the same padding that gives the
+                    // row room when the list is the whole page would spend a
+                    // third of a 320px column on its margins.
                     className={cn(
-                      "focus-visible:ring-ring/50 flex w-full items-center gap-5 border-b px-7 py-5 text-left outline-none last:border-b-0 focus-visible:ring-3 focus-visible:ring-inset",
+                      "focus-visible:ring-ring/50 flex w-full items-center gap-5 border-b px-7 py-5 text-left outline-none last:border-b-0 focus-visible:ring-3 focus-visible:ring-inset lg:gap-4 lg:px-5 lg:py-4",
                       selected?.id === run.id
                         ? "bg-muted"
                         : "hover:bg-muted/40",
@@ -172,7 +190,10 @@ export function Runs() {
                       )}
                     />
                     <span className="flex min-w-0 flex-col gap-1.5">
-                      <span className="text-body-md font-semibold">
+                      {/* Truncated, not wrapped: at rail width a long name would
+                          give one row three lines and break the rhythm the
+                          hairlines carry. */}
+                      <span className="text-body-md truncate font-semibold">
                         {run.name}
                       </span>
                       <span className="text-caption text-muted-foreground truncate">

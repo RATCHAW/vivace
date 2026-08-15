@@ -35,14 +35,38 @@ import {
 import { cn } from "@/lib/utils";
 
 /**
+ * How wide the film is allowed to be on a wide screen.
+ *
+ * A 9:16 film's size is settled by its *height*, so this is measured off the
+ * viewport rather than being the fixed column it used to be — `w-[272px]`, or
+ * `310px` at xl, which showed a 27" display exactly the same stamp as a 13"
+ * laptop and left the run list three times the area of the thing the athlete
+ * came to watch. `15rem` is the studio's own chrome (the picker above, the
+ * transport and the two actions below) plus room to breathe, so the film and
+ * everything attached to it land inside one screen.
+ *
+ * The floor is what a short screen gets and is already wider than the old xl
+ * column, so no display loses. The ceiling stops the film outgrowing the row it
+ * shares — it is a `max-width` on a `flex-1` column, so a narrow window hands it
+ * whatever is actually left rather than overflowing.
+ *
+ * Theatre mode has the list's space and an athlete who has just asked for the
+ * film big: it keeps less back, and lets its transport sit below the fold.
+ */
+const STAGE = "max-w-[clamp(380px,calc((100svh_-_15rem)*9/16),560px)]";
+const STAGE_THEATRE = "max-w-[clamp(420px,calc((100svh_-_11rem)*9/16),640px)]";
+
+/**
  * One run's film, and everything that shapes it.
  *
  * Two layouts, and deliberately two *trees* rather than one tree wearing
- * breakpoints. On a wide screen the studio stands beside the list: a stage the
- * width of the film, and an options card next to it. On a narrow one the list
- * *is* the page and picking a run opens this over it — a 9:16 film, a transport
- * and a panel of switches do not stack into anything readable on a phone, and
- * the design answers that with a screen, not a scroll.
+ * breakpoints. On a wide screen the film is the stage the rest of the page is
+ * arranged around: it takes the height the display can carry, the list beside it
+ * is a rail rather than the widest thing on screen, and the options card is
+ * pinned to the far edge. On a narrow one the list *is* the page and picking a
+ * run opens this over it — a 9:16 film, a transport and a panel of switches do
+ * not stack into anything readable on a phone, and the design answers that with
+ * a screen, not a scroll.
  *
  * The state that survives picking another run — template, theme, avatar — is the
  * page's, because on a phone this component unmounts every time the athlete goes
@@ -300,15 +324,17 @@ export function RunStudio({
   }
 
   return (
-    // Theatre mode hides the list, so the studio centres itself in the row it
-    // is left alone in rather than sitting against the left margin.
-    <div
-      className={cn("flex shrink-0 items-start gap-6", expanded && "mx-auto")}
-    >
+    // The studio takes everything the list rail leaves, and the film is centred
+    // in what the options card doesn't need — `mx-auto` on a `flex-1` column
+    // whose growth is capped by `STAGE`, so the free space falls either side of
+    // the film instead of behind it. The card stays against the far edge, which
+    // is what makes the film read as the stage and the panels as its margins.
+    // Theatre mode hides the list, and the same two rules centre it there.
+    <div className="flex min-w-0 flex-1 items-start gap-6">
       <div
         className={cn(
-          "flex flex-col gap-3.5",
-          expanded ? "w-[394px]" : "w-[272px] xl:w-[310px]",
+          "mx-auto flex min-w-0 flex-1 flex-col gap-3.5",
+          expanded ? STAGE_THEATRE : STAGE,
         )}
       >
         {film}
@@ -316,7 +342,7 @@ export function RunStudio({
 
       <aside
         aria-label={t("videoOptions.section")}
-        className="flex w-[264px] shrink-0 flex-col gap-5 rounded-lg border p-6 xl:w-[288px]"
+        className="flex w-[248px] shrink-0 flex-col gap-5 rounded-lg border p-5 xl:w-[288px] xl:p-6"
       >
         <MonoLabel>{t("videoOptions.section")}</MonoLabel>
         {options}
