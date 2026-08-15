@@ -308,9 +308,8 @@ describe("POST /api/coach/chat", () => {
           throw new APICallError({
             message:
               "You exceeded your current quota, please check your plan and " +
-              "billing details. * Quota exceeded for metric: " +
-              "generativelanguage.googleapis.com/generate_content_free_tier_requests",
-            url: "https://generativelanguage.googleapis.com/v1beta/models",
+              "billing details at llmgateway.io/billing.",
+            url: "https://api.llmgateway.io/v4/ai/language-model",
             requestBodyValues: {},
             statusCode: 429,
             // The real one is retried first and reaches the route wrapped in a

@@ -73,8 +73,9 @@ services:
       STRAVA_CLIENT_ID: ${STRAVA_CLIENT_ID:-}
       STRAVA_CLIENT_SECRET: ${STRAVA_CLIENT_SECRET:-}
       # Unset just means the coach answers 503; the rest of the app is fine.
-      GOOGLE_GENERATIVE_AI_API_KEY: ${GOOGLE_GENERATIVE_AI_API_KEY:-}
+      LLM_GATEWAY_API_KEY: ${LLM_GATEWAY_API_KEY:-}
       COACH_MODEL: ${COACH_MODEL:-}
+      LLM_GATEWAY_URL: ${LLM_GATEWAY_URL:-}
       # Unset means the Strava webhook refuses to validate, so no automatic
       # post-run debriefs. Everything else is unaffected.
       STRAVA_WEBHOOK_VERIFY_TOKEN: ${STRAVA_WEBHOOK_VERIFY_TOKEN:-}

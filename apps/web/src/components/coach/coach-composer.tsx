@@ -40,7 +40,13 @@ import { MonoLabel } from "@/components/mono";
 import { formatPace } from "@repo/video";
 import { cn } from "@/lib/utils";
 
-/** Gemini takes images and PDFs; anything else would just cost tokens. */
+/**
+ * What a multimodal model takes; anything else would just cost tokens.
+ *
+ * Whether the model behind `COACH_MODEL` reads either is the server's business
+ * — deepseek-v4-flash, the default, is text-only, and a text-only model turns
+ * an attachment into a failed turn rather than an ignored one.
+ */
 const ACCEPTED_FILES = "image/*,application/pdf";
 const MAX_FILE_SIZE = 8 * 1024 * 1024;
 const MAX_FILES = 4;

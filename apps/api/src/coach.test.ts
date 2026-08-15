@@ -15,7 +15,7 @@ import {
   weekStart,
 } from "./training.js";
 import { toQueue, toSignals, weeksToRace } from "./briefing.js";
-import { coachFailure } from "./coach.js";
+import { coachFailure, dropUnannouncedToolInput } from "./coach.js";
 import { titleFrom } from "./chat-store.js";
 import type { BestEffort } from "./strava.js";
 import type { Run, RunStreams } from "./schemas.js";
@@ -566,7 +566,7 @@ describe("coachFailure", () => {
   function apiError(message: string, statusCode?: number): APICallError {
     return new APICallError({
       message,
-      url: "https://generativelanguage.googleapis.com/v1beta/models",
+      url: "https://api.llmgateway.io/v4/ai/language-model",
       requestBodyValues: {},
       statusCode,
     });
@@ -583,8 +583,8 @@ describe("coachFailure", () => {
 
   const QUOTA =
     "You exceeded your current quota, please check your plan and billing " +
-    "details. * Quota exceeded for metric: " +
-    "generativelanguage.googleapis.com/generate_content_free_tier_requests";
+    "details at llmgateway.io/billing. Upstream quota exceeded for " +
+    "deepseek/deepseek-v4-flash.";
 
   it("reads a spent quota through the retries wrapping it", () => {
     expect(coachFailure(afterRetries(apiError(QUOTA, 429)))).toBe(
@@ -628,5 +628,71 @@ describe("coachFailure", () => {
         "failed",
       ]).toContain(coachFailure(error));
     }
+  });
+});
+
+describe("dropUnannouncedToolInput", () => {
+  /** What the transform lets through, and what it told us about on the way. */
+  async function through(parts: unknown[]) {
+    const dropped: string[] = [];
+    const transform = dropUnannouncedToolInput((id: string) => {
+      dropped.push(id);
+    })({ tools: {}, stopStream: () => {} });
+
+    const written = (async () => {
+      const writer = transform.writable.getWriter();
+      for (const part of parts) await writer.write(part as never);
+      await writer.close();
+    })();
+
+    const kept: unknown[] = [];
+    for await (const part of transform.readable as unknown as AsyncIterable<unknown>) {
+      kept.push(part);
+    }
+    await written;
+
+    return { kept, dropped };
+  }
+
+  const START = { type: "tool-input-start", id: "call-1", toolName: "getRuns" };
+  const DELTA = { type: "tool-input-delta", id: "call-1", delta: '{"weeks' };
+  const CALL = {
+    type: "tool-call",
+    toolCallId: "call-1",
+    toolName: "getRuns",
+    input: { weeks: 4 },
+  };
+
+  it("leaves an announced tool call's arguments alone", async () => {
+    const { kept, dropped } = await through([START, DELTA, CALL]);
+    expect(kept).toEqual([START, DELTA, CALL]);
+    expect(dropped).toEqual([]);
+  });
+
+  it("drops arguments for a tool call the stream never announced", async () => {
+    const { kept, dropped } = await through([DELTA, CALL]);
+    // The tool still runs: `tool-call` carries the whole input, and it is the
+    // delta alone the SDK would have thrown on.
+    expect(kept).toEqual([CALL]);
+    expect(dropped).toEqual(["call-1"]);
+  });
+
+  it("reports one dropped tool call however many deltas it sent", async () => {
+    const { kept, dropped } = await through([DELTA, DELTA, DELTA, CALL]);
+    expect(kept).toEqual([CALL]);
+    expect(dropped).toEqual(["call-1"]);
+  });
+
+  it("keeps the announced call while dropping the unannounced one", async () => {
+    const other = { type: "tool-input-delta", id: "call-2", delta: "{}" };
+    const { kept, dropped } = await through([START, DELTA, other]);
+    expect(kept).toEqual([START, DELTA]);
+    expect(dropped).toEqual(["call-2"]);
+  });
+
+  it("passes text through untouched", async () => {
+    const text = { type: "text-delta", id: "t1", text: "You ran well." };
+    const { kept } = await through([text]);
+    expect(kept).toEqual([text]);
   });
 });

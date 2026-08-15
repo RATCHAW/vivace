@@ -55,7 +55,7 @@ describe("posthog, unconfigured", () => {
       captureLlmGeneration({
         distinctId: "athlete-1",
         traceId: "trace-1",
-        modelId: "gemini-2.5-flash",
+        modelId: "deepseek/deepseek-v4-flash",
         latencySeconds: 1.2,
         inputTokens: 100,
         outputTokens: 50,

@@ -17,7 +17,6 @@
     "auth:generate": "auth generate --config src/auth.ts --output .better-auth-schema.ts -y"
   },
   "dependencies": {
-    "@ai-sdk/google": "^4.0.43",
     "@hono/node-server": "^1.13.0",
     "@hono/swagger-ui": "^0.6.1",
     "@hono/zod-openapi": "^1.5.2",

@@ -57,9 +57,6 @@ importers:
 
   apps/api:
     dependencies:
-      '@ai-sdk/google':
-        specifier: ^4.0.43
-        version: 4.0.43(zod@4.4.3)
       '@hono/node-server':
         specifier: ^1.13.0
         version: 1.19.17(hono@4.13.1)
@@ -408,12 +405,6 @@ packages:
 
   '@ai-sdk/gateway@4.0.51':
     resolution: {integrity: sha512-tQxWGUbg/O3A5EgekJo/C2byLVQ1r+vL6QdEVWmxUSnPhdCupcOeDbQO1tv9Um40VrdwYuSWlYzcbWvtlG5bOA==}
-    engines: {node: '>=22'}
-    peerDependencies:
-      zod: ^3.25.76 || ^4.1.8
-
-  '@ai-sdk/google@4.0.43':
-    resolution: {integrity: sha512-Aphme4OZnPn3xdmXAJMf7jZGJABJDtaHcEx/+6mCSdTuTExxe5xE7KWUogbhMpwwtFi7btiOa04rQ1dizJDlGA==}
     engines: {node: '>=22'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
@@ -6892,12 +6883,6 @@ snapshots:
       '@ai-sdk/provider': 4.0.7
       '@ai-sdk/provider-utils': 5.0.27(zod@4.4.3)
       '@vercel/oidc': 3.2.0
-      zod: 4.4.3
-
-  '@ai-sdk/google@4.0.43(zod@4.4.3)':
-    dependencies:
-      '@ai-sdk/provider': 4.0.7
-      '@ai-sdk/provider-utils': 5.0.27(zod@4.4.3)
       zod: 4.4.3
 
   '@ai-sdk/mcp@2.0.31(zod@4.4.3)':

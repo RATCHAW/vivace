@@ -327,15 +327,22 @@ Setup is one key (without it `/coach` loads and every message returns a 503;
 the rest of the app is unaffected):
 
 ```sh
-# https://aistudio.google.com/apikey → apps/api/.env
-GOOGLE_GENERATIVE_AI_API_KEY=...
-# Optional: any Google model id. Defaults to gemini-2.5-flash.
-COACH_MODEL=gemini-2.5-pro
+# https://llmgateway.io → apps/api/.env
+LLM_GATEWAY_API_KEY=...
+# Optional: any model the gateway routes. Defaults to deepseek/deepseek-v4-flash.
+COACH_MODEL=deepseek/deepseek-v4-pro
 ```
 
-Swapping providers is a change to `getCoachConfig()` in `apps/api/src/coach.ts`
-and nothing else — the tools, the prompt and both ends of the stream are
-provider-agnostic.
+The model is reached through [LLM Gateway](https://llmgateway.io), which speaks
+the AI SDK's own gateway protocol — so every vendor is one key and one model id
+rather than one SDK package each, and `COACH_MODEL` is the whole of switching
+between them. Write it `vendor/model`: a bare id lets the gateway pick the
+vendor, and a coach whose model moves underneath it answers differently for no
+reason the athlete can see.
+
+Swapping the gateway itself out is a change to `getCoachConfig()` in
+`apps/api/src/coach.ts` and nothing else — the tools, the prompt and both ends
+of the stream are provider-agnostic.
 
 How it flows, and why it looks like this:
 
