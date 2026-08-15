@@ -10,21 +10,21 @@ import type { Dictionary, Translated } from "./en";
 
 export const fr: Translated<Dictionary> = {
   meta: {
-    title: "Transformez vos courses Strava en vidéos | Vivace",
+    title: "Coach running IA et vidéos de course Strava | Vivace",
     description:
-      "Connectez Strava et transformez chaque course en film vertical avec tracé, allure et fréquence cardiaque. Téléchargez un MP4 prêt à partager.",
-    ogTitle: "Vivace — vos courses Strava, prêtes à partager",
+      "Connectez Strava pour profiter d’un coach running IA qui connaît votre historique et créer des vidéos de course avec tracé, allure et fréquence cardiaque.",
+    ogTitle: "Vivace — coaching IA et vidéos à partir de vos données Strava",
     ogDescription:
-      "Transformez une course Strava en film vertical avec tracé animé, effort en direct et MP4 à télécharger.",
+      "Recevez des conseils précis à partir de chaque course, puis transformez vos sorties préférées en vidéos verticales à partager.",
     imageAlt:
       "Vivace transforme les courses Strava en vidéos verticales avec tracé, allure et fréquence cardiaque.",
   },
 
   header: {
     backToTop: "Vivace — accueil",
-    film: "Le film",
+    film: "Replays de course",
     sports: "Sports",
-    coach: "Coach",
+    coach: "Coach IA",
     questions: "Questions",
     logIn: "Se connecter",
     connectStrava: "Connecter Strava",
@@ -38,12 +38,12 @@ export const fr: Translated<Dictionary> = {
   soon: "Bientôt",
 
   hero: {
-    badge: "La course aujourd’hui · vélo, muscu & natation ensuite",
-    titleLine1: "Vos courses Strava,",
-    titleLine2: "prêtes à partager.",
-    body: "Connectez Strava et transformez chaque course en film vertical — le tracé se dessine, l’allure et la fréquence cardiaque défilent, puis le MP4 est prêt à partager.",
+    badge: "Coach IA + replays de course · disponibles",
+    titleLine1: "Un coach IA pour chaque course.",
+    titleLine2: "Des replays prêts à partager.",
+    body: "Connectez Strava pour profiter d’un coach running IA qui connaît tout votre historique et créer des vidéos verticales avec tracé, allure et fréquence cardiaque.",
     primaryCta: "Continuer avec Strava",
-    secondaryCta: "Voir un replay",
+    secondaryCta: "Découvrir le coach",
     footnote:
       "Gratuit pendant l’alpha. Nous ne publions jamais sur Strava à votre place.",
     replay: {
@@ -62,7 +62,7 @@ export const fr: Translated<Dictionary> = {
   },
 
   howItWorks: {
-    label: "Comment ça marche",
+    label: "Comment fonctionne Vivace",
     steps: [
       {
         step: "01",
@@ -71,13 +71,13 @@ export const fr: Translated<Dictionary> = {
       },
       {
         step: "02",
-        title: "Choisir une course",
-        body: "Tout votre historique arrive en liste — GPS, splits et fréquence cardiaque compris.",
+        title: "Votre entraînement en contexte",
+        body: "Vivace rassemble vos tracés, splits, fréquence cardiaque et entraînement récent dans un tableau clair.",
       },
       {
         step: "03",
-        title: "La revoir",
-        body: "Le replay se génère en quelques secondes. Regardez-le, téléchargez le MP4, publiez-le.",
+        title: "Choisissez la suite",
+        body: "Demandez au coach quoi faire ensuite, ou transformez n’importe quelle course en vidéo verticale à partager.",
       },
     ],
   },
@@ -140,12 +140,10 @@ export const fr: Translated<Dictionary> = {
   },
 
   coach: {
-    badge: "Bientôt",
-    heading: "Un coach qui a lu toutes vos courses.",
-    body: "Demandez un plan, un affûtage, ou un avis franc sur la semaine passée. Il voit le même historique que celui dont sont faits les replays — et répond par quelque chose que vous pouvez courir demain.",
-    emailLabel: "Adresse e-mail",
-    emailPlaceholder: "vous@email.com",
-    submit: "Rejoindre la liste",
+    badge: "Disponible",
+    heading: "Un coach running IA qui a lu toutes vos courses.",
+    body: "Demandez un plan d’entraînement, un affûtage ou un avis franc sur la semaine passée. Il s’appuie sur votre historique Strava pour proposer des séances précises dès demain.",
+    cta: "Essayer le coach",
     conversation: [
       {
         from: "runner",
@@ -170,6 +168,10 @@ export const fr: Translated<Dictionary> = {
         a: "Vos courses y sont déjà, avec le GPS et la fréquence cardiaque. Se connecter avec Strava, c’est n’avoir rien à importer et aucune donnée à ressaisir.",
       },
       {
+        q: "Comment le coach running IA peut-il m’aider ?",
+        a: "Il lit votre entraînement récent, explique les tendances d’allure et de fréquence cardiaque, construit une semaine ou un plan de course, ajuste un affûtage et répond sur une sortie précise. Ses conseils reposent sur l’historique Strava que vous choisissez de partager.",
+      },
+      {
         q: "Publiez-vous quelque chose sur mon Strava ?",
         a: "Non. Nous lisons vos activités et n’écrivons jamais. Vous pouvez révoquer Vivace dans Strava à tout moment pour couper les futurs accès, puis nous contacter pour supprimer les données Vivace et fichiers déjà conservés.",
       },
@@ -190,21 +192,22 @@ export const fr: Translated<Dictionary> = {
 
   closingCta: {
     label: "Commencer",
-    heading: "Votre dernière course mérite mieux qu’un chiffre.",
-    body: "Connectez Strava et le premier replay est prêt avant que vous ayez fini de vous étirer.",
+    heading: "Chaque course peut guider la suivante.",
+    body: "Connectez Strava pour profiter d’un coach qui comprend votre entraînement et créer des replays verticaux prêts à partager.",
     cta: "Continuer avec Strava",
   },
 
   footer: {
-    tagline: "Des replays pour les courses que vous avez déjà faites.",
+    tagline:
+      "Coaching IA et replays pour les courses que vous avez déjà faites.",
     logIn: "Se connecter",
     poweredByStrava: "Propulsé par Strava",
     copyright: "© {{year}} vivace. Sans affiliation avec Strava, Inc.",
     product: {
       heading: "Produit",
-      film: "Le film",
+      film: "Replays de course",
       sports: "Sports",
-      coach: "Coach",
+      coach: "Coach IA",
     },
     company: {
       heading: "Entreprise",

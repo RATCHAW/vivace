@@ -431,10 +431,10 @@ its own. It has no session, no API client and no generated code: it never talks 
 - **Where the buttons go** — every "Connect Strava" leaves for
   `${NEXT_PUBLIC_APP_URL}/login`. `NEXT_PUBLIC_*` is inlined at build time, so the
   app's origin is a *build* input.
+- **The coach is live** — its landing-page call to action opens
+  `${NEXT_PUBLIC_APP_URL}/coach` directly.
 - **`src/styles.css` mirrors `apps/web/src/styles.css`** and
   [`apps/web/DESIGN.md`](./apps/web/DESIGN.md); keep the two in step.
-- The coach waitlist has no backend; the form posts a mail draft to
-  `NEXT_PUBLIC_WAITLIST_EMAIL`. Swap the `action` when there is an endpoint.
 
 ## Logging
 

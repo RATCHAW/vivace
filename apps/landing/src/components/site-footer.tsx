@@ -22,9 +22,9 @@ export function SiteFooter({
     {
       heading: t.product.heading,
       links: [
-        { href: `${homeHref}#film`, label: t.product.film },
-        { href: `${homeHref}#sports`, label: t.product.sports },
         { href: `${homeHref}#coach`, label: t.product.coach },
+        { href: `${homeHref}#sports`, label: t.product.sports },
+        { href: `${homeHref}#film`, label: t.product.film },
       ],
     },
     {
