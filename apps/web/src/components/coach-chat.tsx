@@ -1,12 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useChat } from "@ai-sdk/react";
-import {
-  DefaultChatTransport,
-  getToolName,
-  isToolUIPart,
-  type UIMessage,
-} from "ai";
+import { getToolName, isToolUIPart, type UIMessage } from "ai";
 import { useTranslation } from "react-i18next";
 import {
   CheckIcon,
@@ -19,13 +14,14 @@ import { useFormatters } from "@/i18n/format";
 import type { TranslationKey } from "@/i18n";
 import {
   acceptCoachPlanMutation,
-  COACH_CHAT_PATH,
   getCoachBriefingQueryKey,
-  listCoachThreadsQueryKey,
   type Run,
 } from "@/api";
-import { trackError } from "@/lib/logger";
-import { replaySessionId } from "@/lib/posthog";
+import {
+  adoptTranscript,
+  coachChatFor,
+  setCoachChatRange,
+} from "@/lib/coach-chats";
 import {
   Attachment,
   AttachmentPreview,
@@ -227,18 +223,6 @@ function readableError(error: Error): string {
   return error.message;
 }
 
-/**
- * PostHog's own header name for the replay in progress. The API reads it off
- * the coach turn and hangs it on every LLM event the answer produces, so a
- * trace in AI observability links back to the session it came from.
- *
- * Empty when PostHog is off, which is a fresh clone and every test run.
- */
-function sessionHeader(): Record<string, string> {
-  const session = replaySessionId();
-  return session ? { "X-POSTHOG-SESSION-ID": session } : {};
-}
-
 function CopyAction({ text }: { text: string }) {
   const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
@@ -331,10 +315,13 @@ export interface CoachChatProps {
 /**
  * One conversation.
  *
- * `useChat` owns the live transcript; the server owns the stored one. Only the
- * message just typed goes up — `prepareSendMessagesRequest` trims the request
- * to it, and the API reloads the history it already has. Remount this with a
- * `key` of the thread id to switch conversations.
+ * The chat itself lives in `@/lib/coach-chats`, not here: this component is a
+ * subscription to it, remounted with a `key` of the thread id to switch
+ * conversations. Leaving — for another thread, or another page — leaves the
+ * conversation and any answer still streaming intact, and coming back picks
+ * both up where they got to. Only the message just typed goes up — the
+ * transport trims the request to it, and the API reloads the history it
+ * already has.
  */
 export function CoachChat({
   threadId,
@@ -353,48 +340,23 @@ export function CoachChat({
   const [attached, setAttached] = useState<RunMention | null>(initialMention);
   const [pickerOpen, setPickerOpen] = useState(false);
 
+  const chat = coachChatFor(threadId, initialMessages);
   const { messages, sendMessage, regenerate, status, stop, error } = useChat({
-    id: threadId,
-    messages: initialMessages,
-    transport: new DefaultChatTransport({
-      api: COACH_CHAT_PATH,
-      // Same-origin in dev via the Vite proxy, but the session cookie has to be
-      // asked for explicitly all the same.
-      credentials: "include",
-      prepareSendMessagesRequest: ({ id, messages, trigger, messageId }) => ({
-        // Read per request, not once at mount: a replay rotates, and a trace
-        // pointing at yesterday's session is worse than one pointing at none.
-        // The API reads it as `$session_id` on the turn's LLM events, which is
-        // what makes a slow answer watchable — see ai-observability.ts.
-        //
-        // What is returned here replaces the transport's own headers, which is
-        // safe because it sets none — `Content-Type` is the SDK's own and is
-        // added after this.
-        headers: sessionHeader(),
-        body:
-          trigger === "regenerate-message"
-            ? {
-                thread_id: id,
-                trigger,
-                message_id: messageId,
-                range_weeks: rangeWeeks,
-              }
-            : {
-                thread_id: id,
-                trigger,
-                message: messages.at(-1),
-                range_weeks: rangeWeeks,
-              },
-      }),
-    }),
-    // The first message names the thread and every message reorders the list.
-    onFinish: () =>
-      queryClient.invalidateQueries({ queryKey: listCoachThreadsQueryKey() }),
-    // useChat sits outside React Query, so the cache-level logger in
-    // @/lib/query-client never sees this one. A stream that dies on the way to
-    // the browser leaves no server line either — this is the only report.
-    onError: (err) => trackError("coach.chat_failed", err, { threadId }),
+    chat,
   });
+
+  // The window is read at send time, and sends only come from event handlers,
+  // which run after effects — so a send never sees yesterday's selection.
+  useEffect(() => {
+    setCoachChatRange(threadId, rangeWeeks);
+  }, [threadId, rangeWeeks]);
+
+  // A conversation reopened after the webhook wrote into it: the freshly
+  // loaded server transcript wins only when it knows strictly more — the live
+  // chat is otherwise the newer of the two (see adoptTranscript).
+  useEffect(() => {
+    adoptTranscript(chat, initialMessages);
+  }, [chat, initialMessages]);
 
   const isBusy = status === "submitted" || status === "streaming";
 

@@ -12,6 +12,7 @@ import {
 } from "@/api";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { disposeCoachChat } from "@/lib/coach-chats";
 import { cn } from "@/lib/utils";
 
 /** Conversations older than today are dated; today's are just "Today". */
@@ -58,6 +59,8 @@ export function CoachThreads({ selectedId, onSelect }: CoachThreadsProps) {
   const remove = useMutation({
     ...deleteCoachThreadMutation(),
     onSuccess: async (_data, variables) => {
+      // The conversation kept alive across tab switches dies with its thread.
+      disposeCoachChat(variables.path.id);
       await invalidate();
       // Dropping the open conversation leaves nothing selected; the page picks
       // the next one up.
