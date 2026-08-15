@@ -1270,6 +1270,11 @@ app.openapi(coachChatRoute, async (c) => {
   const accessToken = await stravaAccessToken(c, session.user.id);
   if (!accessToken) return c.json({ error: "No Strava access token" }, 401);
 
+  // A rewritten question: a submit that names a message already in the
+  // transcript, rather than adding one to the end of it.
+  const editedMessageId =
+    body.trigger === "regenerate-message" ? undefined : body.message_id;
+
   if (body.trigger === "regenerate-message") {
     if (body.message_id) {
       await truncateForRegenerate(thread.id, body.message_id);
@@ -1283,6 +1288,14 @@ app.openapi(coachChatRoute, async (c) => {
       messages: [body.message],
       metadataSchema: coachMessageMetadataSchema,
     });
+    // The browser cut its own transcript at the message being replaced before
+    // it sent this; the stored one has to land in the same place, or the model
+    // would answer a question it can still see the old wording of. The row for
+    // the question itself survives — `saveMessage` writes the new words over
+    // it, keeping its place in the conversation.
+    if (editedMessageId) {
+      await truncateForRegenerate(thread.id, editedMessageId);
+    }
     await saveMessage(thread.id, message);
     const title = titleFrom(message);
     if (title) await setTitleIfUnset(thread.id, title);
@@ -1291,11 +1304,17 @@ app.openapi(coachChatRoute, async (c) => {
   const messages: UIMessage[] = await getMessages(thread.id);
 
   // The interesting part of a coach turn isn't in the URL: which thread, and
-  // whether the athlete asked something new or re-rolled the last answer.
+  // whether the athlete asked something new, rewrote the question, or re-rolled
+  // the last answer.
   track(
     c,
     "coach.turn_started",
-    { threadId: thread.id, trigger: body.trigger, messages: messages.length },
+    {
+      threadId: thread.id,
+      trigger: body.trigger,
+      edited: editedMessageId !== undefined,
+      messages: messages.length,
+    },
     "Answering a coach turn",
   );
 

@@ -201,13 +201,7 @@ export const en = {
     downloadVideo: "Download video",
     failedTitle: "Could not prepare this video",
     paused: "Video downloads are paused right now. Check back shortly.",
-    lastRendered: "Your last video was made {{options}}.",
     retry: "Try again",
-    downloadLast: "Download the last video",
-    optionTheme: "in {{theme}}",
-    optionAvatar: "with your avatar",
-    optionDot: "with the plain dot",
-    optionOther: "with different options",
   },
 
   coach: {
@@ -244,6 +238,12 @@ export const en = {
     copy: "Copy",
     copied: "Copied",
     tryAgain: "Try again",
+    edit: "Edit",
+    /** The box that replaces the bubble — named for a screen reader, since the
+     *  message it opens with is the only label a sighted athlete needs. */
+    editLabel: "Edit your message",
+    editCancel: "Cancel",
+    editSend: "Ask again",
     helpful: "Helpful",
     notHelpful: "Not helpful",
     feedbackPlaceholder: "What was wrong with it? (optional)",

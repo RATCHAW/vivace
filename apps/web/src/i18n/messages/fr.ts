@@ -207,13 +207,7 @@ export const fr: Translated<Messages> = {
     failedTitle: "Impossible de préparer cette vidéo",
     paused:
       "Les téléchargements vidéo sont en pause pour le moment. Revenez d’ici peu.",
-    lastRendered: "Votre dernière vidéo a été créée {{options}}.",
     retry: "Réessayer",
-    downloadLast: "Télécharger la dernière vidéo",
-    optionTheme: "en {{theme}}",
-    optionAvatar: "avec votre avatar",
-    optionDot: "avec le point simple",
-    optionOther: "avec d’autres options",
   },
 
   coach: {
@@ -247,6 +241,10 @@ export const fr: Translated<Messages> = {
     copy: "Copier",
     copied: "Copié",
     tryAgain: "Réessayer",
+    edit: "Modifier",
+    editLabel: "Modifier votre message",
+    editCancel: "Annuler",
+    editSend: "Redemander",
     helpful: "Utile",
     notHelpful: "Pas utile",
     feedbackPlaceholder: "Qu’est-ce qui n’allait pas ? (facultatif)",
