@@ -41,7 +41,9 @@ export function initPostHog(): void {
       maskAllInputs: true,
     },
     // Surveys are authored in PostHog and targeted at the events below, so
-    // asking a new question never needs a deploy.
+    // asking a new question never needs a deploy. It is also what loads the
+    // survey machinery the coach's thumbs read their question ids from — with
+    // this off, `getSurveys` never answers.
     disable_surveys: false,
   });
 }
@@ -76,6 +78,205 @@ export function resetPostHog(): void {
 export function replaySessionId(): string | undefined {
   if (!posthogEnabled) return undefined;
   return posthog.get_session_id() || undefined;
+}
+
+/**
+ * The survey a coach answer's thumbs up/down answers.
+ *
+ * A survey id rather than a plain event, because that is what PostHog reads
+ * back: a `survey sent` carrying `$ai_trace_id` shows up on the trace's own
+ * Feedback tab *and* in Surveys, where response rates and follow-ups are
+ * already built. The survey is authored in PostHog with presentation **API** —
+ * a first question on a 1–2 rating scale, then an open one — which is the
+ * presentation that records responses and draws nothing. The thumbs and the
+ * note are this app's own, in this app's type and both its languages.
+ *
+ * Unset is the ordinary state: no id, no thumbs. See the README.
+ */
+const coachSurveyId = import.meta.env.VITE_POSTHOG_COACH_SURVEY_ID;
+
+/** Whether to draw the thumbs at all. False on a fresh clone and in tests. */
+export const coachFeedbackEnabled = posthogEnabled && Boolean(coachSurveyId);
+
+/** What both survey events carry, and what ties them to the answer. */
+function feedbackProperties(traceId: string) {
+  return {
+    $survey_id: coachSurveyId,
+    $ai_trace_id: traceId,
+    // Lets a thumbs-down be watched rather than guessed at.
+    sessionRecordingUrl: posthog.get_session_replay_url?.(),
+  };
+}
+
+/**
+ * What this browser has already said about an answer.
+ *
+ * On disk rather than in memory because an answer is rated once, not once per
+ * mount: a thread's messages are rebuilt every time the athlete switches tab,
+ * asks something else or reloads, and each of those would otherwise offer the
+ * same answer to be rated again and count another impression against it.
+ * PostHog's own guidance for a hand-rolled survey is exactly this.
+ *
+ * It is per browser, so the same athlete on their phone could rate an answer
+ * their laptop already did. Fixing that means storing the rating on the message
+ * server-side, which is a schema and an endpoint for a number PostHog is
+ * already holding.
+ */
+const FEEDBACK_KEY = "vivace.coach-feedback";
+
+interface FeedbackRecord {
+  shown?: true;
+  rating?: "up" | "down";
+}
+
+function readFeedback(): Record<string, FeedbackRecord> {
+  try {
+    const stored: unknown = JSON.parse(
+      localStorage.getItem(FEEDBACK_KEY) ?? "{}",
+    );
+    return typeof stored === "object" && stored !== null
+      ? (stored as Record<string, FeedbackRecord>)
+      : {};
+  } catch {
+    // Unreadable or unavailable storage (Safari's private mode throws on the
+    // first read). Nothing here is worth a broken thumb: the worst case is
+    // that an answer can be rated twice.
+    return {};
+  }
+}
+
+function writeFeedback(all: Record<string, FeedbackRecord>): void {
+  const entries = Object.entries(all);
+  try {
+    localStorage.setItem(
+      FEEDBACK_KEY,
+      // The newest few hundred answers is far more than a conversation needs,
+      // and stops a long-lived browser growing a key without end.
+      JSON.stringify(Object.fromEntries(entries.slice(-200))),
+    );
+  } catch {
+    // A full or unavailable quota. The rating itself already reached PostHog —
+    // this only remembers that it did.
+  }
+}
+
+/** How the athlete rated this answer before, if they have. */
+export function coachAnswerRating(traceId: string): "up" | "down" | null {
+  return readFeedback()[traceId]?.rating ?? null;
+}
+
+/**
+ * The athlete saw the thumbs on an answer.
+ *
+ * Impressions are what turn "eleven thumbs-down" into a rate — without them
+ * PostHog can only count the athletes who felt strongly enough to click. One
+ * per answer, ever: an answer offered twice was still only one answer.
+ */
+export function trackCoachFeedbackShown(traceId: string): void {
+  if (!coachFeedbackEnabled) return;
+
+  const all = readFeedback();
+  if (all[traceId]?.shown) return;
+  writeFeedback({ ...all, [traceId]: { ...all[traceId], shown: true } });
+
+  posthog.capture("survey shown", feedbackProperties(traceId));
+}
+
+/**
+ * The survey's own question ids, once PostHog has told us what they are.
+ *
+ * A response is filed under the id of the question it answers, so that
+ * reordering the survey's questions in PostHog can't silently start filing
+ * ratings as free text. The ids are read from the survey PostHog has already
+ * fetched for this page, rather than configured — one env var is enough.
+ */
+let questionIds: (string | undefined)[] | null = null;
+
+function withQuestionIds(send: (ids: (string | undefined)[]) => void): void {
+  if (questionIds) {
+    send(questionIds);
+    return;
+  }
+  posthog.getSurveys((surveys) => {
+    const survey = surveys.find((one) => one.id === coachSurveyId);
+    questionIds = survey?.questions.map((question) => question.id) ?? [];
+    send(questionIds);
+  });
+}
+
+/**
+ * Where one question's answer goes.
+ *
+ * By id when the survey has them, by position when it doesn't — PostHog still
+ * reads the older positional form, and a rating recorded positionally is worth
+ * more than one dropped for want of an id.
+ */
+function responseKey(index: number, ids: (string | undefined)[]): string {
+  const id = ids[index];
+  if (id) return `$survey_response_${id}`;
+  return index === 0 ? "$survey_response" : `$survey_response_${index}`;
+}
+
+/**
+ * The athlete rated an answer. Returns the id that ties this rating to the
+ * note that may follow it, or null when feedback is switched off.
+ *
+ * Written as survey events by hand rather than through `displaySurvey`, which
+ * would render PostHog's own pop-up over the conversation: their widget knows
+ * nothing about this app's type scale, its two languages or the fact that it is
+ * sitting inside a chat transcript. The events are identical either way — this
+ * is a question about who draws the box, not about what PostHog receives.
+ *
+ * `1` is up and `2` is down: the two points of the survey's rating scale.
+ * A thumbs up completes the response on its own; a thumbs down leaves it open
+ * for the note, so a partial answer is still recorded if nothing else comes.
+ */
+export function rateCoachAnswer(
+  traceId: string,
+  rating: "up" | "down",
+): string | null {
+  if (!coachFeedbackEnabled) return null;
+
+  // One answer, one rating — enforced here rather than in the component,
+  // because the component is rebuilt every time the athlete leaves the thread
+  // and comes back, and its memory of the click goes with it.
+  const all = readFeedback();
+  if (all[traceId]?.rating) return null;
+  writeFeedback({ ...all, [traceId]: { ...all[traceId], rating } });
+
+  const submissionId = crypto.randomUUID();
+  withQuestionIds((ids) => {
+    posthog.capture("survey sent", {
+      ...feedbackProperties(traceId),
+      [responseKey(0, ids)]: rating === "up" ? 1 : 2,
+      $survey_submission_id: submissionId,
+      $survey_completed: rating === "up",
+    });
+  });
+  return submissionId;
+}
+
+/**
+ * What was wrong with it — the second half of a thumbs down.
+ *
+ * Same submission id as the rating it belongs to, which is what PostHog joins
+ * the two events on to show them as one response.
+ */
+export function noteCoachAnswer(
+  traceId: string,
+  submissionId: string,
+  note: string,
+): void {
+  if (!coachFeedbackEnabled) return;
+
+  withQuestionIds((ids) => {
+    posthog.capture("survey sent", {
+      ...feedbackProperties(traceId),
+      [responseKey(1, ids)]: note,
+      $survey_submission_id: submissionId,
+      $survey_completed: true,
+    });
+  });
 }
 
 /** Prefer `trackEvent` in `@/lib/logger`, which also reaches the server logs. */

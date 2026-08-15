@@ -231,6 +231,22 @@ the SDKs; nothing else imports `posthog-js` or `posthog-node`.
   is the thread, so a conversation reads as one; `$session_id` is the browser's
   replay, which reaches the API as `X-POSTHOG-SESSION-ID` on the chat request
   (set in `coach-chat.tsx`, not by patching `fetch` with `tracing_headers`).
+- **The trace id goes back to the browser on the message**, as
+  `metadata.trace_id` — written by `messageMetadata` in the chat route and
+  stored with the answer, because a rating happens after the stream is over and
+  often after a reload. Anything that wants to say something about an answer
+  later (a rating, an eval, a bug report) hangs off that id.
+- **A thumbs up/down is a survey response, not an event.** `rateCoachAnswer` and
+  `noteCoachAnswer` write `survey sent` with `$ai_trace_id` and a shared
+  `$survey_submission_id`, which is what puts a rating and its note on the
+  trace's Feedback tab as one response. It needs
+  `VITE_POSTHOG_COACH_SURVEY_ID`; without it the thumbs aren't drawn.
+- **The feedback UI is ours, the survey is PostHog's schema.** `displaySurvey`
+  would draw PostHog's own pop-up over the transcript, in neither of this app's
+  languages and in none of its type; `coach-feedback.tsx` draws the row and asks
+  the follow-up itself and sends the same events. The survey's questions still
+  have to exist — a response is filed under a question's id — but their wording
+  is never shown to an athlete.
 - **Coach transcripts stay private by default** (`privacyMode`), so the LLM
   events carry the numbers and not the conversation — including `$ai_span`'s
   tool arguments and results, which posthog.ts redacts itself. The opt-in is

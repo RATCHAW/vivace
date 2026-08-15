@@ -22,6 +22,8 @@ import {
   coachChatFor,
   setCoachChatRange,
 } from "@/lib/coach-chats";
+import { coachFeedbackEnabled } from "@/lib/posthog";
+import { CoachFeedback } from "@/components/coach/coach-feedback";
 import {
   Attachment,
   AttachmentPreview,
@@ -221,6 +223,20 @@ function readableError(error: Error): string {
     // Not JSON — a dropped connection, or the SDK's own message.
   }
   return error.message;
+}
+
+/** The PostHog trace an answer was written under, when the API sent one. */
+function traceOf(message: UIMessage): string | null {
+  const metadata = message.metadata;
+  if (
+    typeof metadata !== "object" ||
+    metadata === null ||
+    !("trace_id" in metadata)
+  ) {
+    return null;
+  }
+  const traceId = (metadata as { trace_id?: unknown }).trace_id;
+  return typeof traceId === "string" && traceId ? traceId : null;
 }
 
 function CopyAction({ text }: { text: string }) {
@@ -494,6 +510,7 @@ export function CoachChat({
           {messages.map((message) => {
             const mention = mentionOf(message);
             const sources = sourcesOf(message, runs);
+            const traceId = traceOf(message);
 
             return (
               <Message from={message.role} key={message.id}>
@@ -592,29 +609,51 @@ export function CoachChat({
                   return null;
                 })}
 
-                {message.role === "assistant" && !isBusy && (
-                  <>
-                    <Sources
-                      onOpen={(run) => onOpenRun(run.id)}
-                      runs={sources}
-                    />
-                    <MessageActions>
-                      <CopyAction
-                        text={message.parts
-                          .filter((part) => part.type === "text")
-                          .map((part) => part.text)
-                          .join("\n\n")}
-                      />
-                      <MessageAction
-                        label={t("coach.tryAgain")}
-                        onClick={() => regenerate({ messageId: message.id })}
-                        tooltip={t("coach.tryAgain")}
-                      >
-                        <RefreshCcwIcon />
-                      </MessageAction>
-                    </MessageActions>
-                  </>
-                )}
+                {message.role === "assistant" &&
+                  !isBusy &&
+                  (() => {
+                    // Copy and try again either sit in a plain row, or in the
+                    // one the thumbs own — the follow-up they open has to be a
+                    // sibling of the row rather than inside it, because the row
+                    // itself is only visible on hover.
+                    const actions = (
+                      <>
+                        <CopyAction
+                          text={message.parts
+                            .filter((part) => part.type === "text")
+                            .map((part) => part.text)
+                            .join("\n\n")}
+                        />
+                        <MessageAction
+                          label={t("coach.tryAgain")}
+                          onClick={() => regenerate({ messageId: message.id })}
+                          tooltip={t("coach.tryAgain")}
+                        >
+                          <RefreshCcwIcon />
+                        </MessageAction>
+                      </>
+                    );
+
+                    return (
+                      <>
+                        <Sources
+                          onOpen={(run) => onOpenRun(run.id)}
+                          runs={sources}
+                        />
+                        {coachFeedbackEnabled && traceId ? (
+                          <CoachFeedback
+                            countAsSeen={message.id === messages.at(-1)?.id}
+                            key={traceId}
+                            traceId={traceId}
+                          >
+                            {actions}
+                          </CoachFeedback>
+                        ) : (
+                          <MessageActions>{actions}</MessageActions>
+                        )}
+                      </>
+                    );
+                  })()}
               </Message>
             );
           })}

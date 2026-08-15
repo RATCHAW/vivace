@@ -149,6 +149,30 @@ describe("POST /api/coach/chat", () => {
     );
   });
 
+  it("hands the answer's trace id to the browser, and stores it", async () => {
+    // The athlete rates an answer after it has finished — often after a
+    // reload — so the trace it was written under has to travel with the
+    // message and be there when the transcript is read back. Without it a
+    // thumbs-down is a number PostHog can't attach to anything.
+    const res = await chat({
+      thread_id: THREAD_ID,
+      trigger: "submit-message",
+      message: {
+        id: "user-1",
+        role: "user",
+        parts: [{ type: "text", text: "Where do I start?" }],
+      },
+    });
+
+    const body = await res.text();
+    const streamed = /"trace_id":"([^"]+)"/.exec(body);
+    expect(streamed?.[1]).toBeTruthy();
+
+    const answer = stored[1];
+    expect(answer.role).toBe("assistant");
+    expect(answer.metadata).toEqual({ trace_id: streamed?.[1] });
+  });
+
   it("names the thread after the first message, and only the first", async () => {
     await chat({
       thread_id: THREAD_ID,
