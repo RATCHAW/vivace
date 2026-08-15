@@ -1348,6 +1348,13 @@ app.openapi(coachChatRoute, async (c) => {
     // what makes `saveMessage`'s upsert replace rather than duplicate.
     originalMessages: messages,
     generateMessageId: createIdGenerator({ prefix: "msg", size: 16 }),
+    // The trace this answer is being written under, sent with the first chunk
+    // and stored on the message. It is what lets the athlete's thumbs-down
+    // reach the same trace in PostHog as the tokens and tool calls that
+    // produced the answer — a rating that doesn't name a trace is a number
+    // with nothing to explain it.
+    messageMetadata: ({ part }) =>
+      part.type === "start" ? { trace_id: turn.traceId } : undefined,
     onEnd: async ({ responseMessage }) => {
       await saveMessage(thread.id, responseMessage);
       track(

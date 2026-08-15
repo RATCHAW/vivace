@@ -255,6 +255,15 @@ export const CoachMessageMetadataSchema = z
         date: z.string(),
       })
       .optional(),
+    /**
+     * The PostHog trace this answer was written under, on assistant messages.
+     *
+     * It rides on the message because that is what outlives the stream: an
+     * athlete rates an answer minutes later, or after a reload, and the rating
+     * is only worth anything if it names the trace that produced it. Written by
+     * the API (see `observeTurn` in ai-observability.ts), never by the browser.
+     */
+    trace_id: z.string().optional(),
   })
   .openapi("CoachMessageMetadata");
 

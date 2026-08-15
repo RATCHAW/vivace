@@ -531,6 +531,9 @@
               "name",
               "date"
             ]
+          },
+          "trace_id": {
+            "type": "string"
           }
         }
       },

@@ -91,6 +91,13 @@ export async function postRunDebrief(
 
   const config = getCoachConfig();
   let read = withoutModel(card);
+  /**
+   * The trace the prose was written under, so the athlete can rate a debrief
+   * the way they rate an answer they asked for. Stays unset when no model
+   * wrote anything — there is nothing to rate but the card, which is our own
+   * arithmetic.
+   */
+  let traceId: string | undefined;
   if (config) {
     const prompt = `${DEBRIEF_PROMPT}\n\nThe run:\n${JSON.stringify(card)}\n\nTheir last few weeks:\n${JSON.stringify(
       runs.slice(0, 12).map((other) => ({
@@ -109,6 +116,7 @@ export async function postRunDebrief(
       name: "post-run debrief",
       properties: { activity_id: activityId },
     });
+    traceId = turn.traceId;
 
     try {
       const { text } = await generateText({
@@ -146,6 +154,9 @@ export async function postRunDebrief(
       { type: DEBRIEF_PART, data: card },
       { type: "text", text: read },
     ] as UIMessage["parts"],
+    // Same field the chat route sends with a streamed answer: it is what the
+    // thumbs on this message will report against.
+    ...(traceId ? { metadata: { trace_id: traceId } } : {}),
   };
 
   await saveMessage(thread.id, message);
