@@ -18,6 +18,8 @@ COPY apps/web apps/web
 
 # Vite inlines VITE_* at build time, so the PostHog project is a build input
 # rather than a runtime variable. Unset simply builds without analytics.
+ARG VITE_SITE_URL
+ENV VITE_SITE_URL=$VITE_SITE_URL
 ARG VITE_POSTHOG_KEY
 ENV VITE_POSTHOG_KEY=$VITE_POSTHOG_KEY
 ARG VITE_POSTHOG_HOST

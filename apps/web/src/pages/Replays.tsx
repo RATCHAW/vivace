@@ -6,7 +6,8 @@ import { ArrowLeftIcon } from "lucide-react";
 import { useFormatters } from "@/i18n/format";
 // Fully typed off the API's OpenAPI document — see apps/web/src/api.
 import { getRunsOptions, type Run } from "@/api";
-import { AppHeader } from "@/components/app-header";
+import { AppShell } from "@/components/app-shell";
+import { StravaIcon } from "@/components/icons";
 import { MonoLabel, SoonBadge } from "@/components/mono";
 import { RunStudio } from "@/components/run-studio";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -34,6 +35,9 @@ const MAPBOX_TOKEN: string = import.meta.env.VITE_MAPBOX_TOKEN ?? "";
  *  Catalogue keys, not words — `t` isn't in scope at module level. */
 const FUTURE_FILTERS = ["sports.rides", "sports.weights"] as const;
 
+/** Where an athlete with nothing synced goes to log their first run. */
+const STRAVA_URL = "https://www.strava.com";
+
 /** Where the list stops being a column beside the film and starts being the
  *  whole page. `64rem` is Tailwind's `lg`, so the JS branch and the `lg:`
  *  classes below can never disagree about which layout is in force. */
@@ -43,7 +47,7 @@ function averagePaceSeconds(run: Run): number | null {
   return run.average_speed > 0 ? 1000 / run.average_speed : null;
 }
 
-export function Runs() {
+export function Replays() {
   const { t } = useTranslation();
   const format = useFormatters();
   // The selected run lives in the URL, so a replay can be linked to — the
@@ -73,9 +77,7 @@ export function Runs() {
   const showList = !(wide && expanded);
 
   return (
-    <>
-      <AppHeader />
-
+    <AppShell>
       {/* Wider than the Overview's measure, and the same one the Coach works in:
           this page is a workspace built around a film, not a column of reading.
           The extra width goes to the stage — see `STAGE` in <RunStudio>. */}
@@ -84,15 +86,15 @@ export function Runs() {
           <Button
             variant="subtle"
             size="icon"
-            aria-label={t("runs.backToOverview")}
+            aria-label={t("replays.backToOverview")}
             render={<Link to="/" />}
           >
             <ArrowLeftIcon />
           </Button>
-          <h1 className="font-heading text-display-lg">{t("runs.title")}</h1>
+          <h1 className="font-heading text-display-lg">{t("replays.title")}</h1>
           {runs && (
             <MonoLabel className="ml-auto">
-              {t("runs.syncCount", { count: runs.length })}
+              {t("replays.syncCount", { count: runs.length })}
             </MonoLabel>
           )}
         </header>
@@ -119,7 +121,7 @@ export function Runs() {
               because the film beside it is taller than the fold: scrolling down
               to the transport must not take the way of changing run with it. */}
           <section
-            aria-label={t("runs.listLabel")}
+            aria-label={t("replays.listLabel")}
             className={cn(
               "min-w-0 lg:sticky lg:top-6 lg:w-[320px] lg:shrink-0 xl:w-[368px]",
               !showList && "hidden",
@@ -127,7 +129,7 @@ export function Runs() {
           >
             {runsError && (
               <Alert variant="destructive">
-                <AlertTitle>{t("runs.errorTitle")}</AlertTitle>
+                <AlertTitle>{t("replays.errorTitle")}</AlertTitle>
                 <AlertDescription>{runsError.error}</AlertDescription>
               </Alert>
             )}
@@ -145,10 +147,38 @@ export function Runs() {
               </Card>
             )}
 
+            {/* The same next step the Overview offers, for the same reason:
+                "go log one on Strava and come back" named the obstacle and
+                nothing else — not when a run would appear, not that the coach
+                works before the first one does. */}
             {runs && runs.length === 0 && (
               <Card className="bg-background">
-                <CardContent className="text-muted-foreground py-10 text-center">
-                  {t("runs.noRuns")}
+                <CardContent className="flex flex-col items-start gap-4 py-8">
+                  <p className="text-body-md font-semibold">
+                    {t("replays.emptyTitle")}
+                  </p>
+                  <p className="text-body-sm text-muted-foreground">
+                    {t("replays.emptyBody")}
+                  </p>
+                  <div className="flex flex-wrap gap-3">
+                    <Button
+                      render={
+                        <a href={STRAVA_URL} rel="noreferrer" target="_blank" />
+                      }
+                      size="sm"
+                      variant="subtle"
+                    >
+                      <StravaIcon className="text-strava" />
+                      {t("home.emptyOpenStrava")}
+                    </Button>
+                    <Button
+                      render={<Link to="/coach" />}
+                      size="sm"
+                      variant="subtle"
+                    >
+                      {t("home.emptyAskCoach")}
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
             )}
@@ -252,6 +282,6 @@ export function Runs() {
           )}
         </div>
       </main>
-    </>
+    </AppShell>
   );
 }

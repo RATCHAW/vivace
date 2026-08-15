@@ -32,10 +32,30 @@ export const fr: Translated<Messages> = {
   nav: {
     home: "Accueil Vivace",
     overview: "Aperçu",
-    activities: "Activités",
+    // *Replays* est le mot déjà employé partout ailleurs dans l’app — sur la
+    // ligne d’activité, sur la plaque de connexion — et il n’est pas traduit :
+    // les coureurs francophones disent replay.
+    replays: "Replays",
     coach: "Coach",
+    account: "Compte",
+    help: "Aide",
     signOut: "Se déconnecter",
     menu: "Menu",
+  },
+
+  footer: {
+    about: "À propos",
+    privacy: "Confidentialité",
+    terms: "Conditions",
+    stravaData: "Vos données Strava",
+    contact: "Contact",
+    poweredByStrava: "Propulsé par Strava",
+  },
+
+  notFound: {
+    eyebrow: "404",
+    title: "Il n’y a rien à cette adresse.",
+    body: "Le lien est peut-être périmé, ou l’adresse comporte une faute de frappe. Tout ce que fait Vivace se trouve derrière l’un de ces boutons.",
   },
 
   theme: {
@@ -68,7 +88,7 @@ export const fr: Translated<Messages> = {
   home: {
     connectedToStrava: "Connecté à Strava",
     connectedToStravaIn: "Connecté à Strava · {{location}}",
-    watchYourRuns: "Voir vos courses",
+    watchYourRuns: "Voir vos replays",
     seasonTotals: "Totaux {{year}}",
     seasonTotalsFallback: "Totaux de la saison",
     statDistance: "Distance · {{year}}",
@@ -80,16 +100,27 @@ export const fr: Translated<Messages> = {
     latestActivities: "Dernières activités",
     seeAll: "Tout voir →",
     runsErrorTitle: "Impossible de charger vos courses",
-    noRuns:
-      "Aucune course pour l’instant — allez en enregistrer une sur Strava et revenez.",
     replay: "Replay →",
+
+    coachEyebrow: "Coach IA",
+    coachTitle: "Votre entraînement, relu pour vous",
+    coachBody:
+      "Il a déjà lu vos dernières semaines — volume, splits, fréquence cardiaque. Demandez-lui où en est le bloc, ou quoi courir cette semaine.",
+    coachBodyRace:
+      "Chaque réponse est calée sur cette date. Posez-lui n’importe quelle question.",
+    coachStart: "Parler à votre coach",
+    coachOpen: "Ouvrir le coach",
+
+    emptyTitle: "Rien de synchronisé depuis Strava",
+    emptyBody:
+      "Vos courses apparaissent ici dans la minute qui suit leur enregistrement sur Strava — il n’y a rien à importer. Le coach fonctionne déjà sans elles.",
+    emptyOpenStrava: "Ouvrir Strava",
+    emptyAskCoach: "Parler à votre coach",
+
     fromStrava: "Depuis Strava",
     profileErrorTitle: "Impossible de charger votre profil",
     loadingProfile: "Chargement de votre profil Strava",
-    factAthleteId: "Identifiant athlète",
     factUsername: "Nom d’utilisateur",
-    factSex: "Sexe",
-    factWeight: "Poids",
     factSubscription: "Abonnement",
     factMemberSince: "Membre depuis",
     stravaSubscriber: "Abonné Strava",
@@ -109,17 +140,18 @@ export const fr: Translated<Messages> = {
     hike: "Rando",
   },
 
-  runs: {
+  replays: {
     backToOverview: "Retour à l’aperçu",
     backToList: "Retour à toutes les courses",
-    title: "Vos courses",
+    title: "Vos replays",
     syncCount_one: "{{count}} activité · synchronisée depuis Strava",
     syncCount_other: "{{count}} activités · synchronisées depuis Strava",
     listLabel: "Courses",
     replayLabel: "Replay de la course",
     errorTitle: "Impossible de charger vos courses",
-    noRuns:
-      "Aucune course pour l’instant — allez en enregistrer une sur Strava et revenez.",
+    emptyTitle: "Aucun replay pour l’instant",
+    emptyBody:
+      "Un replay se fabrique à partir d’une course : le premier arrivera avec votre prochaine activité sur Strava.",
     loadRunError: "Impossible de charger cette course",
     loadingReplay: "Chargement du replay…",
     noMapboxToken:

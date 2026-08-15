@@ -40,7 +40,7 @@ function dispatchPreloadError(): Event {
 beforeAll(() => {
   Object.defineProperty(window, "location", {
     configurable: true,
-    value: { pathname: "/runs", reload },
+    value: { pathname: "/replays", reload },
   });
   // Installed once, as in main.tsx — a second listener would answer every
   // event twice and the guard would race itself.
@@ -69,7 +69,7 @@ describe("stale chunk reload", () => {
     // flashing in the moment before the document goes away.
     expect(event.defaultPrevented).toBe(true);
     expect(trackEvent).toHaveBeenCalledWith("ui.stale_chunk_reload", {
-      path: "/runs",
+      path: "/replays",
     });
     // The queue dies with the page unless it leaves as a beacon.
     expect(flushClientLogs).toHaveBeenCalledWith({ beacon: true });

@@ -23,10 +23,31 @@ export const en = {
   nav: {
     home: "Vivace home",
     overview: "Overview",
-    activities: "Activities",
+    /** Was "Activities". The landing page sells a *film*, the row action says
+     *  "Replay →", and the nav said neither — three words for one thing, and
+     *  the one in the navigation was the vaguest of them. */
+    replays: "Replays",
     coach: "Coach",
+    account: "Account",
+    help: "Help",
     signOut: "Sign out",
     menu: "Menu",
+  },
+
+  /** The links out of the app, to the marketing site. */
+  footer: {
+    about: "About",
+    privacy: "Privacy",
+    terms: "Terms",
+    stravaData: "Your Strava data",
+    contact: "Contact",
+    poweredByStrava: "Powered by Strava",
+  },
+
+  notFound: {
+    eyebrow: "404",
+    title: "There's nothing at this address.",
+    body: "The link may be out of date, or the address may have a typo in it. Everything Vivace has is behind one of these.",
   },
 
   theme: {
@@ -58,7 +79,10 @@ export const en = {
   home: {
     connectedToStrava: "Connected to Strava",
     connectedToStravaIn: "Connected to Strava · {{location}}",
-    watchYourRuns: "Watch your runs",
+    /** The button, the nav pill and the page it opens all say "replays" now —
+     *  it used to say "runs" while landing on a screen headed "Your runs" that
+     *  the navigation called "Activities". */
+    watchYourRuns: "Watch your replays",
     seasonTotals: "{{year}} totals",
     seasonTotalsFallback: "Season totals",
     statDistance: "Distance · {{year}}",
@@ -69,15 +93,29 @@ export const en = {
     latestActivities: "Latest activities",
     seeAll: "See all →",
     runsErrorTitle: "Could not load your runs",
-    noRuns: "No runs yet — go log one on Strava and come back.",
     replay: "Replay →",
+
+    /** The Coach card — the only inbound link to the coach from the Overview,
+     *  and for a first-time athlete the only sign the coach is there at all. */
+    coachEyebrow: "AI coach",
+    coachTitle: "Your training, read back to you",
+    coachBody:
+      "It has already read your last few weeks — volume, splits, heart rate. Ask it how the block is going, or what to run this week.",
+    coachBodyRace: "Every answer is planned around this date. Ask it anything.",
+    coachStart: "Talk to your coach",
+    coachOpen: "Open the coach",
+
+    /** An empty history is a first day, not a failure. */
+    emptyTitle: "Nothing synced from Strava yet",
+    emptyBody:
+      "Your runs appear here within a minute of finishing one on Strava — there is nothing to import. The coach already works without them.",
+    emptyOpenStrava: "Open Strava",
+    emptyAskCoach: "Talk to your coach",
+
     fromStrava: "From Strava",
     profileErrorTitle: "Could not load your profile",
     loadingProfile: "Loading your Strava profile",
-    factAthleteId: "Athlete ID",
     factUsername: "Username",
-    factSex: "Sex",
-    factWeight: "Weight",
     factSubscription: "Subscription",
     factMemberSince: "Member since",
     stravaSubscriber: "Strava subscriber",
@@ -98,16 +136,18 @@ export const en = {
     hike: "Hike",
   },
 
-  runs: {
+  replays: {
     backToOverview: "Back to overview",
     backToList: "Back to all runs",
-    title: "Your runs",
+    title: "Your replays",
     syncCount_one: "{{count}} activity · synced from Strava",
     syncCount_other: "{{count}} activities · synced from Strava",
     listLabel: "Runs",
     replayLabel: "Run replay",
     errorTitle: "Could not load your runs",
-    noRuns: "No runs yet — go log one on Strava and come back.",
+    emptyTitle: "No replays yet",
+    emptyBody:
+      "A replay is made from a run, so the first one arrives with your next activity on Strava.",
     loadRunError: "Could not load this run",
     loadingReplay: "Loading run replay…",
     noMapboxToken:

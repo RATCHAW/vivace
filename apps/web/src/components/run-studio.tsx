@@ -200,11 +200,11 @@ export function RunStudio({
         )}
       >
         <Loader2Icon className="text-muted-foreground size-6 animate-spin" />
-        <span className="sr-only">{t("runs.loadingReplay")}</span>
+        <span className="sr-only">{t("replays.loadingReplay")}</span>
       </div>
     ) : streamsError ? (
       <Alert variant="destructive">
-        <AlertTitle>{t("runs.loadRunError")}</AlertTitle>
+        <AlertTitle>{t("replays.loadRunError")}</AlertTitle>
         <AlertDescription>{streamsError.error}</AlertDescription>
       </Alert>
     ) : (
@@ -238,7 +238,7 @@ export function RunStudio({
       {/* The two <code> spans are part of the sentence, so the translation
           owns where they fall — a French clause puts the filename somewhere
           an English one does not. */}
-      <Trans i18nKey="runs.noMapboxToken" components={{ code: <code /> }} />
+      <Trans i18nKey="replays.noMapboxToken" components={{ code: <code /> }} />
     </p>
   );
 
@@ -279,7 +279,7 @@ export function RunStudio({
           <Button
             variant="subtle"
             size="icon-sm"
-            aria-label={t("runs.backToList")}
+            aria-label={t("replays.backToList")}
             onClick={onClose}
           >
             <ArrowLeftIcon />

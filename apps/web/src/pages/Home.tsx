@@ -2,11 +2,18 @@ import { type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import { ArrowRightIcon, SparklesIcon } from "lucide-react";
 // Fully typed off the API's OpenAPI document — see apps/web/src/api.
-import { getRunsOptions, getStravaAthleteOptions, type Run } from "@/api";
+import {
+  getCoachBriefingOptions,
+  getRunsOptions,
+  getStravaAthleteOptions,
+  type CoachBriefing,
+  type Run,
+} from "@/api";
 import { authClient } from "@/lib/auth-client";
 import { useFormatters, type Formatters } from "@/i18n/format";
-import { AppHeader } from "@/components/app-header";
+import { AppShell } from "@/components/app-shell";
 import { MonoLabel, SoonBadge } from "@/components/mono";
 import { StravaIcon } from "@/components/icons";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -21,6 +28,9 @@ import { formatClock, formatPace } from "@repo/video";
  *  apps/api/src/strava.ts. A year that fills the page may be under-counted, and
  *  the strip says so rather than quietly reporting a short total. */
 const RUNS_PAGE_SIZE = 100;
+
+/** Where an athlete with nothing synced goes to log their first run. */
+const STRAVA_URL = "https://www.strava.com";
 
 /** Sports the replay treatment is coming to. Not yet wired to anything —
  *  catalogue keys rather than words, because `t` isn't in scope up here. */
@@ -105,6 +115,99 @@ function runSummary(run: Run, format: Formatters): string {
   ).toFixed(2)} km · ${formatClock(run.moving_time)} · ${formatPace(pace)} /km`;
 }
 
+/**
+ * The coach, on the page every athlete lands on.
+ *
+ * Half of what Vivace does — the About page says it "hands it back twice", as
+ * coaching and as a film — used to have exactly one inbound link in the entire
+ * app: a nav pill spelled "Coach". Somebody signing in for the first time had
+ * no way to know what was behind it, so it was the half nobody found.
+ *
+ * It shows the briefing rather than describing it: the goal race if one is
+ * set, otherwise the first signal the coach would raise unprompted. Both come
+ * from the same `GET /api/coach/briefing` the Coach's own rail reads, so the
+ * card is never a second opinion — and both are strictly better than an
+ * invitation, because they are already about this athlete.
+ */
+function CoachCard({
+  briefing,
+  failed,
+}: {
+  briefing: CoachBriefing | undefined;
+  failed: boolean;
+}) {
+  const { t } = useTranslation();
+  const format = useFormatters();
+
+  const race = briefing?.context.race_name ? briefing.context : null;
+  const signal = briefing?.signals[0] ?? null;
+
+  return (
+    // {component.card-featured} — the one cobalt surface on the Overview, which
+    // is what makes it read as an invitation rather than another panel.
+    <Card className="bg-brand text-brand-foreground border-transparent">
+      <CardContent className="flex flex-col gap-5">
+        <div className="flex flex-col gap-2">
+          <span className="inline-flex items-center gap-2">
+            <SparklesIcon className="size-4" />
+            <MonoLabel className="text-brand-foreground/70">
+              {t("home.coachEyebrow")}
+            </MonoLabel>
+          </span>
+          <CardTitle className="text-heading-sm">
+            {t("home.coachTitle")}
+          </CardTitle>
+        </div>
+
+        {/* Loaded and useless is the one case with nothing of its own to say;
+            still loading gets a placeholder so the card doesn't reflow. */}
+        {!briefing && !failed && (
+          <Skeleton className="bg-brand-foreground/15 h-16 w-full" />
+        )}
+
+        {race && (
+          <div className="border-brand-foreground/20 flex flex-col gap-1.5 rounded-md border p-4">
+            <MonoLabel className="text-brand-foreground/70">
+              {t("rail.goalRace")}
+            </MonoLabel>
+            <span className="text-body-md font-semibold">{race.race_name}</span>
+            <span className="text-caption text-brand-foreground/70">
+              {race.race_date
+                ? format.raceDay(race.race_date)
+                : t("rail.noDate")}
+            </span>
+          </div>
+        )}
+
+        {!race && signal && (
+          <div className="border-brand-foreground/20 flex flex-col gap-1.5 rounded-md border p-4">
+            <MonoLabel className="text-brand-foreground/70">
+              {signal.label}
+            </MonoLabel>
+            <span className="text-body-md font-semibold">{signal.value}</span>
+            <span className="text-caption text-brand-foreground/70">
+              {signal.note}
+            </span>
+          </div>
+        )}
+
+        <p className="text-body-sm text-brand-foreground/80">
+          {race ? t("home.coachBodyRace") : t("home.coachBody")}
+        </p>
+
+        <Button
+          className="self-start"
+          render={<Link to="/coach" />}
+          variant="onBrand"
+        >
+          {race ? t("home.coachOpen") : t("home.coachStart")}
+          <ArrowRightIcon />
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
 export function Home() {
   const { t } = useTranslation();
   const format = useFormatters();
@@ -113,6 +216,9 @@ export function Home() {
     getStravaAthleteOptions(),
   );
   const { data: runs, error: runsError } = useQuery(getRunsOptions());
+  const { data: briefing, error: briefingError } = useQuery(
+    getCoachBriefingOptions(),
+  );
 
   const name = session?.user.name ?? "";
   const season = runs ? seasonTotals(runs) : null;
@@ -121,9 +227,7 @@ export function Home() {
     .join(", ");
 
   return (
-    <>
-      <AppHeader />
-
+    <AppShell>
       <main className="mx-auto flex w-full max-w-[1200px] flex-col gap-14 px-6 pt-14 pb-24 sm:px-8">
         <section className="flex flex-wrap items-end justify-between gap-8">
           <div className="flex items-center gap-6">
@@ -147,7 +251,7 @@ export function Home() {
           </div>
 
           {/* {component.button-primary} — the loudest pixel on the canvas */}
-          <Button render={<Link to="/runs" />}>
+          <Button render={<Link to="/replays" />}>
             {t("home.watchYourRuns")}
           </Button>
         </section>
@@ -210,7 +314,7 @@ export function Home() {
                   variant="link"
                   size="sm"
                   className="text-muted-foreground hover:text-foreground px-0 no-underline"
-                  render={<Link to="/runs" />}
+                  render={<Link to="/replays" />}
                 >
                   {t("home.seeAll")}
                 </Button>
@@ -234,10 +338,33 @@ export function Home() {
                 </div>
               )}
 
+              {/* Not a dead end. "Go log one on Strava and come back" was the
+                  entire app for a new athlete with an empty history, and it
+                  neither said when a run would appear nor mentioned that the
+                  coach already works without one. */}
               {runs && runs.length === 0 && (
-                <p className="text-body-sm text-muted-foreground border-t py-8 text-center">
-                  {t("home.noRuns")}
-                </p>
+                <div className="flex flex-col items-start gap-4 border-t pt-8">
+                  <p className="text-body-md font-semibold">
+                    {t("home.emptyTitle")}
+                  </p>
+                  <p className="text-body-sm text-muted-foreground max-w-[46ch]">
+                    {t("home.emptyBody")}
+                  </p>
+                  <div className="flex flex-wrap gap-3">
+                    <Button
+                      render={
+                        <a href={STRAVA_URL} rel="noreferrer" target="_blank" />
+                      }
+                      variant="subtle"
+                    >
+                      <StravaIcon className="text-strava" />
+                      {t("home.emptyOpenStrava")}
+                    </Button>
+                    <Button render={<Link to="/coach" />} variant="subtle">
+                      {t("home.emptyAskCoach")}
+                    </Button>
+                  </div>
+                </div>
               )}
 
               {runs && runs.length > 0 && (
@@ -245,7 +372,7 @@ export function Home() {
                   {runs.slice(0, 3).map((run) => (
                     <Link
                       key={run.id}
-                      to={`/runs?run=${run.id}`}
+                      to={`/replays?run=${run.id}`}
                       className="hover:bg-muted/40 focus-visible:ring-ring/50 flex items-center justify-between gap-6 py-4.5 outline-none focus-visible:ring-3"
                     >
                       <span className="flex min-w-0 flex-col gap-1.5">
@@ -267,6 +394,10 @@ export function Home() {
           </Card>
 
           <div className="flex flex-col gap-8">
+            {/* First in the column, ahead of the Strava facts that used to hold
+                this position with an athlete id and a body weight. */}
+            <CoachCard briefing={briefing} failed={Boolean(briefingError)} />
+
             <Card className="bg-background">
               <CardContent>
                 <CardTitle className="text-heading-sm mb-4">
@@ -285,7 +416,7 @@ export function Home() {
                     className="divide-y divide-border border-t"
                     aria-label={t("home.loadingProfile")}
                   >
-                    {Array.from({ length: 5 }, (_, i) => (
+                    {Array.from({ length: 3 }, (_, i) => (
                       <div key={i} className="flex justify-between gap-4 py-3">
                         <Skeleton className="h-3.5 w-20" />
                         <Skeleton className="h-3.5 w-32" />
@@ -294,27 +425,25 @@ export function Home() {
                   </div>
                 )}
 
+                {/* Athlete id, sex and body weight used to be here. None of the
+                    three is something an athlete came to look up, and the first
+                    is a debug field — six unactionable rows in the best space
+                    on the first screen after signing up. */}
                 {athlete && (
                   <dl className="divide-y divide-border border-t">
-                    <Fact label={t("home.factAthleteId")}>{athlete.id}</Fact>
                     {athlete.username && (
                       <Fact label={t("home.factUsername")}>
                         {athlete.username}
                       </Fact>
                     )}
-                    {athlete.sex && (
-                      <Fact label={t("home.factSex")}>{athlete.sex}</Fact>
-                    )}
-                    {/* `kg` is an SI symbol, not a word — it does not translate. */}
-                    {athlete.weight != null && athlete.weight > 0 && (
-                      <Fact label={t("home.factWeight")}>
-                        {athlete.weight} kg
-                      </Fact>
-                    )}
                     <Fact label={t("home.factSubscription")}>
                       {athlete.summit || athlete.premium ? (
-                        // {component.badge-feature} — the single cobalt stamp
-                        <Badge className="bg-brand text-brand-foreground">
+                        // Was the cobalt {component.badge-feature}. DESIGN.md
+                        // allows one cobalt stamp per viewport and the Coach
+                        // card above is now spending it — on the thing an
+                        // athlete should act on rather than on a fact about
+                        // somebody else's billing.
+                        <Badge variant="outline">
                           {t("home.stravaSubscriber")}
                         </Badge>
                       ) : (
@@ -356,6 +485,6 @@ export function Home() {
           </div>
         </section>
       </main>
-    </>
+    </AppShell>
   );
 }

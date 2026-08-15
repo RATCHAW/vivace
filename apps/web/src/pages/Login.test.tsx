@@ -63,4 +63,44 @@ describe("Login page", () => {
     });
     expect(window.location.search).toBe("?lang=en");
   });
+
+  it("comes back to the run the athlete was actually sent", async () => {
+    // A shared replay is how most people meet Vivace. Before `?next=`, signing
+    // in dropped every one of them on the Overview with the run gone.
+    window.history.replaceState(
+      null,
+      "",
+      "/login?provider=strava&next=%2Freplays%3Frun%3D123",
+    );
+
+    render(<Login />);
+
+    await waitFor(() => {
+      expect(mocks.signInWithOAuth).toHaveBeenCalledOnce();
+    });
+    expect(mocks.signInWithOAuth).toHaveBeenCalledWith(
+      expect.objectContaining({
+        callbackURL: `${window.location.origin}/replays?run=123`,
+      }),
+    );
+  });
+
+  it("refuses a destination that would leave this origin", async () => {
+    window.history.replaceState(
+      null,
+      "",
+      "/login?provider=strava&next=https%3A%2F%2Fevil.example",
+    );
+
+    render(<Login />);
+
+    await waitFor(() => {
+      expect(mocks.signInWithOAuth).toHaveBeenCalledOnce();
+    });
+    expect(mocks.signInWithOAuth).toHaveBeenCalledWith(
+      expect.objectContaining({
+        callbackURL: `${window.location.origin}/`,
+      }),
+    );
+  });
 });

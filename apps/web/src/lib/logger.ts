@@ -4,7 +4,7 @@
 //
 // Two entry points: `trackEvent` for something the user did, `trackError` for
 // something that broke. Names are dotted and low-cardinality (`ui.page_view`,
-// not `ui.page_view./runs`) because dashboards group by them — anything
+// not `ui.page_view./replays`) because dashboards group by them — anything
 // variable belongs in `context`.
 //
 // One funnel, two destinations, because the alternative — a `posthog.capture`

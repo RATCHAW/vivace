@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { authClient } from "@/lib/auth-client";
 import { trackError, trackEvent } from "@/lib/logger";
+import { NEXT_PARAM, safeNextPath } from "@/lib/next-path";
 import { StravaIcon } from "@/components/icons";
 import { LanguageToggle } from "@/components/language-toggle";
 import { MonoLabel } from "@/components/mono";
@@ -21,14 +22,23 @@ export function Login() {
     if (signInStarted.current) return;
     signInStarted.current = true;
     setError(null);
+
+    // Where the athlete was headed before the guard sent them here — a shared
+    // replay, or the coach from the landing page. Sanitised rather than
+    // trusted: this value reaches an OAuth `callbackURL`, and the sign-in
+    // screen is the worst possible place to host an open redirect.
+    const next = safeNextPath(
+      new URL(window.location.href).searchParams.get(NEXT_PARAM),
+    );
+
     // The redirect to Strava happens next, so this is the last thing we can
     // record on our side — an athlete who never comes back shows up as a
     // sign-in started with no session created after it.
-    trackEvent("auth.sign_in_started", { provider: "strava" });
+    trackEvent("auth.sign_in_started", { provider: "strava", next });
 
     const { error } = await authClient.signIn.oauth2({
       providerId: "strava",
-      callbackURL: `${window.location.origin}/`,
+      callbackURL: `${window.location.origin}${next}`,
       errorCallbackURL: `${window.location.origin}/login`,
     });
     if (error) {

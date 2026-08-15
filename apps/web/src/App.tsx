@@ -1,16 +1,18 @@
-import { lazy, Suspense, useEffect } from "react";
+import { lazy, Suspense, useEffect, type ReactElement } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Loader2Icon } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import { trackEvent } from "@/lib/logger";
+import { signInPath } from "@/lib/next-path";
 import { identifyAthlete } from "@/lib/posthog";
 import { Login } from "@/pages/Login";
 import { Home } from "@/pages/Home";
+import { NotFound } from "@/pages/NotFound";
 
-// Remotion + Mapbox are heavy — only load them when the runs page is visited.
-const Runs = lazy(() =>
-  import("@/pages/Runs").then((m) => ({ default: m.Runs })),
+// Remotion + Mapbox are heavy — only load them when the replays page is visited.
+const Replays = lazy(() =>
+  import("@/pages/Replays").then((m) => ({ default: m.Replays })),
 );
 
 // So are the AI SDK and the markdown renderer behind the coach.
@@ -27,6 +29,27 @@ function FullPageSpinner() {
       <span className="sr-only">{t("common.loading")}</span>
     </main>
   );
+}
+
+/**
+ * A surface only a signed-in athlete may see.
+ *
+ * The redirect carries where they were going, so a shared replay link survives
+ * the round trip through Strava instead of dropping everyone on the Overview —
+ * see `next-path.ts`. `replace` matters: without it the back button walks into
+ * the guard again and bounces straight back out.
+ */
+function Guarded({
+  children,
+  signedIn,
+}: {
+  children: ReactElement;
+  signedIn: boolean;
+}) {
+  const location = useLocation();
+
+  if (!signedIn) return <Navigate to={signInPath(location)} replace />;
+  return <Suspense fallback={<FullPageSpinner />}>{children}</Suspense>;
 }
 
 /**
@@ -56,8 +79,9 @@ function useIdentify(userId: string | undefined, name: string | null): void {
 
 export function App() {
   const { data: session, isPending } = authClient.useSession();
+  const signedIn = Boolean(session);
 
-  usePageViews(Boolean(session), !isPending);
+  usePageViews(signedIn, !isPending);
   useIdentify(session?.user.id, session?.user.name ?? null);
 
   if (isPending) {
@@ -68,37 +92,44 @@ export function App() {
     <Routes>
       <Route
         path="/login"
-        element={session ? <Navigate to="/" replace /> : <Login />}
+        element={signedIn ? <Navigate to="/" replace /> : <Login />}
       />
       <Route
         path="/"
-        element={session ? <Home /> : <Navigate to="/login" replace />}
-      />
-      <Route
-        path="/runs"
         element={
-          session ? (
-            <Suspense fallback={<FullPageSpinner />}>
-              <Runs />
-            </Suspense>
-          ) : (
-            <Navigate to="/login" replace />
-          )
+          <Guarded signedIn={signedIn}>
+            <Home />
+          </Guarded>
         }
       />
+      <Route
+        path="/replays"
+        element={
+          <Guarded signedIn={signedIn}>
+            <Replays />
+          </Guarded>
+        }
+      />
+      {/* Every replay link shared before the rename points here. */}
+      <Route path="/runs" element={<LegacyRunsRedirect />} />
       <Route
         path="/coach"
         element={
-          session ? (
-            <Suspense fallback={<FullPageSpinner />}>
-              <Coach />
-            </Suspense>
-          ) : (
-            <Navigate to="/login" replace />
-          )
+          <Guarded signedIn={signedIn}>
+            <Coach />
+          </Guarded>
         }
       />
-      <Route path="*" element={<Navigate to="/" replace />} />
+      {/* A page, not a silent bounce to the Overview: a stale or mistyped link
+          that quietly succeeds at the wrong address is indistinguishable from
+          the app losing the athlete's place. */}
+      <Route path="*" element={<NotFound />} />
     </Routes>
   );
+}
+
+/** `/runs?run=123` → `/replays?run=123`, query intact. */
+function LegacyRunsRedirect() {
+  const { search } = useLocation();
+  return <Navigate to={`/replays${search}`} replace />;
 }
