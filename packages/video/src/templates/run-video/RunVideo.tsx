@@ -1,17 +1,10 @@
-import {
-  AbsoluteFill,
-  Easing,
-  interpolate,
-  useCurrentFrame,
-  useVideoConfig,
-} from "remotion";
+import { AbsoluteFill, useCurrentFrame, useVideoConfig } from "remotion";
 import type { VideoActivity, VideoStreams } from "../../types";
 import {
   avatarSource,
-  DRAW_END,
-  DRAW_START,
   fadeAt,
   metricsAtProgress,
+  routeProgressAtFrame,
 } from "./data";
 import { RouteOverlay, StoryProgress, TYPE, Watermark } from "./overlay";
 import { RunMap } from "./RunMap";
@@ -45,11 +38,7 @@ export function RunVideo({
 
   // One progress value drives the trace, the camera and the live numbers, so
   // the dot on the map and the metrics always agree.
-  const routeProgress = interpolate(frame, [DRAW_START, DRAW_END], [0, 1], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-    easing: Easing.bezier(0.33, 0, 0.25, 1),
-  });
+  const routeProgress = routeProgressAtFrame(frame);
 
   const points = streams.latlng?.data ?? [];
   const hasRoute = points.length >= 2;

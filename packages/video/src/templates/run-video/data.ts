@@ -13,7 +13,7 @@ export {
 } from "../../core/format";
 export { projectRoute, type LatLng, type RoutePadding } from "../../core/geo";
 
-// Story format: 9:16 at 30fps, 20 seconds. The registry is the source — it is
+// Story format: 9:16 at 30fps, 15 seconds. The registry is the source — it is
 // what the <Composition>, the browser's <Player> and the Lambda render all read
 // — and these are the names the composition's own maths is written in.
 const TEMPLATE = getTemplate("run-video");
@@ -45,6 +45,13 @@ export function fadeAt(
 // the frame a story is paused on.
 export const DRAW_START = Math.round(0.06 * DURATION_IN_FRAMES);
 export const DRAW_END = Math.round(0.92 * DURATION_IN_FRAMES);
+
+/** Constant-speed progress through the route draw. A run is continuous motion,
+ *  so easing here would make the athlete surge off the line and crawl home. */
+export function routeProgressAtFrame(frame: number): number {
+  return clamp01((frame - DRAW_START) / (DRAW_END - DRAW_START));
+}
+
 // A whole run is compressed into the draw, so one video frame steps over many
 // stream samples. Reading a single sample makes the instantaneous channels
 // (pace, heart rate) jump between neighbouring frames; averaging this much

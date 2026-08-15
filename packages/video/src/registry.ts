@@ -102,7 +102,7 @@ export const VIDEO_TEMPLATES = [
     width: 1080,
     height: 1920,
     fps: FPS,
-    durationInFrames: 20 * FPS,
+    durationInFrames: 15 * FPS,
     usesMap: true,
     supportsAvatar: true,
     supportsTheme: false,
