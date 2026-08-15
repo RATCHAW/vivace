@@ -98,6 +98,15 @@ export function RunMap({
     });
 
     mapInstance.on("load", () => {
+      // A style can finish loading after the player has already switched to a
+      // different template. The cleanup below removes the map, but Mapbox may
+      // still deliver this queued callback; touching the removed style then
+      // throws outside React and takes the whole replay page with it. Mobile is
+      // where the race is easiest to hit because style and tile loads are
+      // slower. The idle callback already had this guard, and the load callback
+      // needs the same one before its first mutation.
+      if (disposed) return;
+
       mapInstance.addSource("route-full", {
         type: "geojson",
         data: lineString(coords),

@@ -133,8 +133,17 @@ export function RenderControls({
     start.error?.error ?? (render?.status === "error" ? render.error : null);
   // Already-rendered videos keep their download; only new renders stop.
   const paused = !renderEnabled && download == null;
+  // A finished render should fulfil the click that started it. Observing an
+  // in-flight render arms the automatic download too, so a page reload while
+  // Lambda is working still completes without asking for a second tap. A video
+  // that was already done when this component mounted is deliberately not
+  // downloaded out of the blue.
+  const autoDownloadArmed = useRef(false);
+  const observedRender = useRef<string | null>(null);
+  const autoDownloadedAt = useRef<string | null>(null);
 
   const startRender = () => {
+    autoDownloadArmed.current = true;
     trackEvent("ui.render_clicked", {
       activityId: run.id,
       template,
@@ -145,7 +154,65 @@ export function RenderControls({
     start.mutate({ path, body: { template, show_avatar: showAvatar, theme } });
   };
   const noteDownload = () =>
-    trackEvent("ui.video_downloaded", { activityId: run.id });
+    trackEvent("ui.video_downloaded", {
+      activityId: run.id,
+      automatic: false,
+    });
+
+  useEffect(() => {
+    if (render?.status === "rendering") {
+      if (observedRender.current !== render.created_at) {
+        observedRender.current = render.created_at;
+        autoDownloadArmed.current = !stale;
+        return;
+      }
+      // Changing an option while Lambda is working makes that file a different
+      // video from the one on screen. Do not download it later merely because
+      // the athlete changes the option back.
+      if (stale) autoDownloadArmed.current = false;
+      return;
+    }
+    if ((render?.status === "error" && !start.isPending) || start.isError) {
+      autoDownloadArmed.current = false;
+      return;
+    }
+    if (
+      !autoDownloadArmed.current ||
+      download == null ||
+      render?.status !== "done" ||
+      autoDownloadedAt.current === render.updated_at
+    )
+      return;
+
+    autoDownloadArmed.current = false;
+    autoDownloadedAt.current = render.updated_at;
+
+    // Use the same plain anchor as the manual button. The S3 response owns the
+    // filename and attachment headers; creating it here simply supplies the
+    // click the completed asynchronous render can no longer receive from the
+    // original button press.
+    const link = document.createElement("a");
+    link.href = download;
+    link.download = "";
+    link.hidden = true;
+    document.body.append(link);
+    link.click();
+    link.remove();
+
+    trackEvent("ui.video_downloaded", {
+      activityId: run.id,
+      automatic: true,
+    });
+  }, [
+    download,
+    render?.created_at,
+    render?.status,
+    render?.updated_at,
+    run.id,
+    stale,
+    start.isError,
+    start.isPending,
+  ]);
 
   // The tile has no room for why a render failed, so the reason is spoken once,
   // when it changes. Held in a ref rather than state: this only ever decides
@@ -183,43 +250,55 @@ export function RenderControls({
               : t("render.downloadVideo");
 
     return (
-      <Button
-        size="icon-fill"
-        // `overflow-hidden` is what keeps the progress rule inside the pill's
-        // radius rather than squaring off its bottom corners.
-        className="relative overflow-hidden"
-        aria-label={label}
-        disabled={
-          loadError != null ||
-          paused ||
-          progress != null ||
-          (download == null && (data === undefined || start.isPending))
-        }
-        onClick={download ? noteDownload : startRender}
-        render={download ? <a href={download} download /> : undefined}
-      >
-        {progress != null || start.isPending ? (
-          <Loader2Icon className="animate-spin" />
-        ) : retry ? (
-          <RotateCcwIcon />
-        ) : (
-          <DownloadIcon />
-        )}
+      <>
+        <Button
+          size="icon-fill"
+          aria-label={label}
+          disabled={
+            loadError != null ||
+            paused ||
+            progress != null ||
+            (download == null && (data === undefined || start.isPending))
+          }
+          onClick={download ? noteDownload : startRender}
+          nativeButton={download == null}
+          render={download ? <a href={download} download /> : undefined}
+        >
+          {progress != null ? (
+            <>
+              <Loader2Icon className="animate-spin" />
+              <span className="text-caption tabular-nums">
+                {Math.round(progress * 100)}%
+              </span>
+            </>
+          ) : start.isPending ? (
+            <Loader2Icon className="animate-spin" />
+          ) : retry ? (
+            <RotateCcwIcon />
+          ) : (
+            <DownloadIcon />
+          )}
+        </Button>
+
         {progress != null && (
-          // Cobalt, and the same 3px rule the run list marks its selected row
-          // with — the studio's one stamp, and the only thing on screen that
-          // has to be read at a glance from across a phone.
-          //
-          // `scaleX` rather than a width: progress lands about once a second,
-          // and a transform tween glides between those steps on the compositor
-          // instead of asking for a layout per frame.
+          // A phone needs more than a three-pixel mark inside one of four small
+          // buttons. This track spans the full action rail without adding a row
+          // that would squeeze the 9:16 film. The number remains in the button,
+          // so both the amount and the direction of travel are clear.
           <span
             aria-hidden
-            className="bg-brand absolute inset-x-0 bottom-0 h-[3px] origin-left transition-transform duration-500 ease-out"
-            style={{ transform: `scaleX(${progress})` }}
-          />
+            data-slot="render-progress"
+            className="bg-muted pointer-events-none absolute inset-x-0 -bottom-2 h-1.5 overflow-hidden rounded-full"
+          >
+            {/* `scaleX` rather than width: SSE progress lands in steps, and a
+                compositor transform glides between them without relayout. */}
+            <span
+              className="bg-brand block h-full origin-left transition-transform duration-500 ease-out"
+              style={{ transform: `scaleX(${progress})` }}
+            />
+          </span>
         )}
-      </Button>
+      </>
     );
   }
 
@@ -251,6 +330,7 @@ export function RenderControls({
       <Button
         className="w-full"
         onClick={noteDownload}
+        nativeButton={false}
         render={<a href={download} download />}
       >
         <DownloadIcon />

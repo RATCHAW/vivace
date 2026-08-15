@@ -321,7 +321,7 @@ export function RunStudio({
               Download is the loud pill because it is what they came to do; the
               other three are the ring of secondary controls around it. */}
           <div
-            className="grid w-full shrink-0 grid-cols-4 gap-2"
+            className="relative grid w-full shrink-0 grid-cols-4 gap-2"
             style={railWidth}
           >
             <Button
