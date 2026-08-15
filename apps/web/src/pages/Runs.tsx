@@ -76,8 +76,13 @@ export function Runs() {
     <>
       <AppHeader />
 
-      <main className="mx-auto w-full max-w-[1200px] px-6 pt-10 pb-20 sm:px-8">
-        <header className="mb-7 flex flex-wrap items-center gap-5">
+      <main className="mx-auto w-full max-w-[1200px] px-6 pt-8 pb-12 sm:px-8">
+        {/* The sport filter rides in the title row rather than under it. A row
+            of its own cost ~60px of the first screenful, and on this page the
+            first screenful is the film — every pixel reclaimed above it becomes
+            0.5625 of film width, because 9:16. It wraps back to its own line
+            when the row can't hold it. */}
+        <header className="mb-6 flex flex-wrap items-center gap-x-5 gap-y-3">
           <Button
             variant="subtle"
             size="icon"
@@ -87,6 +92,22 @@ export function Runs() {
             <ArrowLeftIcon />
           </Button>
           <h1 className="font-heading text-display-lg">{t("runs.title")}</h1>
+
+          <div className="flex flex-wrap gap-2">
+            <span className="bg-muted text-body-sm inline-flex h-9 items-center rounded-full px-4 font-semibold">
+              {t("sports.runs")}
+            </span>
+            {FUTURE_FILTERS.map((filter) => (
+              <span
+                key={filter}
+                className="text-body-sm text-muted-foreground/60 inline-flex h-9 items-center gap-2 rounded-full border px-3.5 font-semibold"
+              >
+                {t(filter)}
+                <SoonBadge />
+              </span>
+            ))}
+          </div>
+
           {runs && (
             <MonoLabel className="ml-auto">
               {t("runs.syncCount", { count: runs.length })}
@@ -94,25 +115,16 @@ export function Runs() {
           )}
         </header>
 
-        <div className="mb-7 flex flex-wrap gap-2">
-          <span className="bg-muted text-body-sm inline-flex h-9 items-center rounded-full px-4 font-semibold">
-            {t("sports.runs")}
-          </span>
-          {FUTURE_FILTERS.map((filter) => (
-            <span
-              key={filter}
-              className="text-body-sm text-muted-foreground/60 inline-flex h-9 items-center gap-2 rounded-full border px-3.5 font-semibold"
-            >
-              {t(filter)}
-              <SoonBadge />
-            </span>
-          ))}
-        </div>
-
         <div className="flex flex-col gap-8 lg:flex-row lg:items-start">
           <section
             aria-label={t("runs.listLabel")}
-            className={cn("min-w-0 lg:flex-1", !showList && "hidden")}
+            // A sidebar, not the other half of the page: the row's spare width
+            // belongs to the film, so the list takes a fixed measure and the
+            // studio takes everything else.
+            className={cn(
+              "min-w-0 lg:w-[300px] lg:shrink-0 xl:w-[348px]",
+              !showList && "hidden",
+            )}
           >
             {runsError && (
               <Alert variant="destructive">
@@ -144,9 +156,11 @@ export function Runs() {
 
             {runs && runs.length > 0 && (
               // DESIGN.md: hairline rules carry the row rhythm — no shadows.
-              // The cap is the height of the film beside it; below the
+              // The cap is the height of the studio beside it, which is now the
+              // screen's rather than a fixed 660 — see the film's own `max-w` in
+              // <RunStudio>, which this is the arithmetic partner of. Below the
               // breakpoint there is no film beside it, and the list is the page.
-              <div className="overflow-y-auto rounded-lg ring-1 ring-border lg:max-h-[660px]">
+              <div className="overflow-y-auto rounded-lg ring-1 ring-border lg:max-h-[calc(100svh-7rem)]">
                 {runs.map((run) => (
                   <button
                     key={run.id}
@@ -157,7 +171,10 @@ export function Runs() {
                     }}
                     aria-pressed={selected?.id === run.id}
                     className={cn(
-                      "focus-visible:ring-ring/50 flex w-full items-center gap-5 border-b px-7 py-5 text-left outline-none last:border-b-0 focus-visible:ring-3 focus-visible:ring-inset",
+                      // Tighter than the three-column layout it used to sit in:
+                      // the same row now has a 300px sidebar to fit into, and
+                      // the padding is what the date and pace need back.
+                      "focus-visible:ring-ring/50 flex w-full items-center gap-4 border-b px-5 py-5 text-left outline-none last:border-b-0 focus-visible:ring-3 focus-visible:ring-inset",
                       selected?.id === run.id
                         ? "bg-muted"
                         : "hover:bg-muted/40",

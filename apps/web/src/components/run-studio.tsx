@@ -38,8 +38,9 @@ import { cn } from "@/lib/utils";
  * One run's film, and everything that shapes it.
  *
  * Two layouts, and deliberately two *trees* rather than one tree wearing
- * breakpoints. On a wide screen the studio stands beside the list: a stage the
- * width of the film, and an options card next to it. On a narrow one the list
+ * breakpoints. On a wide screen the studio stands beside the list and is the
+ * subject of the page: the list is a fixed sidebar, the options a fixed card,
+ * and everything the row can spare goes to the stage. On a narrow one the list
  * *is* the page and picking a run opens this over it — a 9:16 film, a transport
  * and a panel of switches do not stack into anything readable on a phone, and
  * the design answers that with a screen, not a scroll.
@@ -299,23 +300,57 @@ export function RunStudio({
   }
 
   return (
-    // Theatre mode hides the list, so the studio centres itself in the row it
-    // is left alone in rather than sitting against the left margin.
+    // The studio takes the row's spare width — the list beside it is a fixed
+    // sidebar — and hands all of it to the stage. Theatre mode hides the list,
+    // and there the stage takes only what the film needs and centres, because a
+    // 400px film adrift in 1100px of panel is not a bigger film.
     <div
-      className={cn("flex shrink-0 items-start gap-6", expanded && "mx-auto")}
+      className={cn(
+        "flex min-w-0 flex-1 items-start gap-6",
+        expanded && "justify-center",
+      )}
     >
+      {/* The stage: the biggest region on the page, and the only one that says
+          so. Its own surface and hairline, DESIGN.md's elevation, because a
+          9:16 film can never fill the width it is given and the space around it
+          has to read as the film's rather than as a gap in the row. */}
       <div
         className={cn(
-          "flex flex-col gap-3.5",
-          expanded ? "w-[394px]" : "w-[272px] xl:w-[310px]",
+          "bg-muted/30 flex min-w-0 flex-col items-center rounded-xl border p-4 xl:p-5",
+          expanded ? "shrink-0" : "flex-1",
         )}
       >
-        {film}
+        <div
+          className={cn(
+            // The film is measured off the screen, not off the row: 9:16 turns
+            // every pixel of width into 1.78 of height, so the widest useful
+            // film is the one whose transport is still above the fold. The
+            // subtrahend is everything else in that column — app header, page
+            // header, stage padding, the picker above and the transport below —
+            // and what is left over is the film's own height. A taller display
+            // therefore gets a bigger film with no breakpoint, which is what the
+            // old fixed 272/310 could not do.
+            //
+            // The floor is those old widths, so a short screen is no worse off
+            // than it was: under about 900px of viewport there is no room to
+            // grow a 9:16 film, and shrinking it to lift a transport above a
+            // fold it was already under is a trade nobody asked for.
+            "flex min-w-[272px] flex-col gap-3.5",
+            expanded
+              ? // Theatre spends the rows below the film as well — that is what
+                // it is for — so it measures off the frame alone and the stage
+                // wraps whatever comes out.
+                "w-[calc((100svh-6rem)*9/16)]"
+              : "w-full max-w-[calc((100svh-20rem)*9/16)] xl:min-w-[310px]",
+          )}
+        >
+          {film}
+        </div>
       </div>
 
       <aside
         aria-label={t("videoOptions.section")}
-        className="flex w-[264px] shrink-0 flex-col gap-5 rounded-lg border p-6 xl:w-[288px]"
+        className="flex w-[264px] shrink-0 flex-col gap-5 rounded-lg border p-6 xl:w-[280px]"
       >
         <MonoLabel>{t("videoOptions.section")}</MonoLabel>
         {options}
