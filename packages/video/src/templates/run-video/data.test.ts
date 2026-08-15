@@ -19,6 +19,7 @@ import {
   projectRoute,
   ROUTE_PADDING,
   RUNNER_CLEARANCE,
+  routeProgressAtFrame,
   sampleIndex,
   smoothingHalfWidth,
   VIDEO_HEIGHT,
@@ -49,6 +50,18 @@ describe("the draw window", () => {
     expect(DRAW_START).toBeGreaterThan(0);
     expect(DRAW_END).toBeLessThan(DURATION_IN_FRAMES - 1);
     expect((DRAW_END - DRAW_START) / DURATION_IN_FRAMES).toBeGreaterThan(0.8);
+  });
+
+  it("moves through the route at a constant speed", () => {
+    const quarter = DRAW_START + (DRAW_END - DRAW_START) / 4;
+    const halfway = DRAW_START + (DRAW_END - DRAW_START) / 2;
+    const threeQuarters = DRAW_START + (3 * (DRAW_END - DRAW_START)) / 4;
+
+    expect(routeProgressAtFrame(DRAW_START - 1)).toBe(0);
+    expect(routeProgressAtFrame(quarter)).toBeCloseTo(0.25);
+    expect(routeProgressAtFrame(halfway)).toBeCloseTo(0.5);
+    expect(routeProgressAtFrame(threeQuarters)).toBeCloseTo(0.75);
+    expect(routeProgressAtFrame(DRAW_END + 1)).toBe(1);
   });
 });
 
