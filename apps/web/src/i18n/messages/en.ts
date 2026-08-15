@@ -201,13 +201,7 @@ export const en = {
     downloadVideo: "Download video",
     failedTitle: "Could not prepare this video",
     paused: "Video downloads are paused right now. Check back shortly.",
-    lastRendered: "Your last video was made {{options}}.",
     retry: "Try again",
-    downloadLast: "Download the last video",
-    optionTheme: "in {{theme}}",
-    optionAvatar: "with your avatar",
-    optionDot: "with the plain dot",
-    optionOther: "with different options",
   },
 
   coach: {
