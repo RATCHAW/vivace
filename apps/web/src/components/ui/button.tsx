@@ -40,6 +40,12 @@ const buttonVariants = cva(
         // button-lg — hero CTA, {typography.button-lg}
         lg: "h-14 gap-2.5 px-8 text-heading-sm font-medium has-data-[icon=inline-end]:pr-6 has-data-[icon=inline-start]:pl-6 [&_svg:not([class*='size-'])]:size-6",
         icon: "size-12",
+        // The same 48px pill, filling the column it is handed instead of being
+        // a square. For a row of icon actions laid out on a grid — the studio's
+        // Share / Coach / Options / Download under the film on a phone — where
+        // the cells have to divide the film's width evenly rather than each
+        // keep the `icon` measure and leave the gaps uneven.
+        "icon-fill": "h-12 w-full",
         "icon-xs": "size-8 [&_svg:not([class*='size-'])]:size-3.5",
         // The touch bump is on both axes: a 36×44 pill is a lopsided oval the
         // moment the variant carries a border, and a 36px-wide tap target is

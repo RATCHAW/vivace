@@ -1,7 +1,8 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { DownloadIcon, Loader2Icon } from "lucide-react";
+import { toast } from "sonner";
+import { DownloadIcon, Loader2Icon, RotateCcwIcon } from "lucide-react";
 import type { TemplateId, ThemeName } from "@repo/video";
 import {
   getRunRenderOptions,
@@ -29,16 +30,34 @@ import {
 const RENDER_FLAG = "video-render";
 
 /**
- * The foot of the video options panel: one button that says *Download video*
- * whatever state the render is in. Rendering is our problem, not the athlete's
- * — they asked for the file, so a run with no MP4 yet starts a Lambda render
- * under the same label and the panel spends the wait saying it is preparing the
- * video rather than naming the machinery. Everything shown here is the
- * persisted render state, so reloading mid-render resumes the progress bar and
- * an already-rendered run downloads on the first click.
+ * Where this is drawn, and therefore how much room it has to say things in.
  *
- * It draws no margin of its own — `<RunStudio>` owns the box it sits in, and on
- * a phone that box is a sheet whose bottom edge is the render button.
+ * `"panel"` is the foot of the video options card: a full-width pill under the
+ * switches that made the film, with the progress bar and any failure in the
+ * same column.
+ *
+ * `"tile"` is one cell of the studio's action grid on a phone, beside Share,
+ * Coach and Options — an icon, and nothing else. It is exactly one cell and
+ * never grows: the grid is measured off the film, and the film is measured off
+ * the height the grid leaves, so anything that made this taller would take a
+ * slice out of the picture and then re-wrap itself in the narrower row it had
+ * just caused. So the progress the panel spells out becomes a rule along the
+ * bottom edge of the pill, and a failure — a sentence, with nowhere in a 48px
+ * square to put it — is said once as a toast, leaving the tile to carry the
+ * standing half of the message by turning into a retry.
+ */
+type RenderLayout = "panel" | "tile";
+
+/**
+ * One button that says *Download video* whatever state the render is in.
+ *
+ * Rendering is our problem, not the athlete's — they asked for the file, so a
+ * run with no MP4 yet starts a Lambda render under the same label and spends the
+ * wait saying it is preparing the video rather than naming the machinery.
+ * Everything shown here is the persisted render state, so reloading mid-render
+ * resumes the progress and an already-rendered run downloads on the first click.
+ *
+ * It draws no margin of its own — `<RunStudio>` owns the box it sits in.
  *
  * `template`, `showAvatar` and `theme` are what the film in the player is
  * playing, and they travel with the render request. A run holds one render per
@@ -54,11 +73,13 @@ export function RenderControls({
   template,
   showAvatar,
   theme,
+  layout = "panel",
 }: {
   run: Run;
   template: TemplateId;
   showAvatar: boolean;
   theme: ThemeName;
+  layout?: RenderLayout;
 }) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
@@ -100,6 +121,108 @@ export function RenderControls({
     );
   }, [run.id, template, render?.status, queryClient]);
 
+  // The state both layouts read, resolved once — they differ in how much room
+  // they have to describe it, never in what they think is true.
+  const progress = render?.status === "rendering" ? render.progress : null;
+  // Only a finished render made with the options in force is this video; one
+  // made with another answer is a file for a film nobody is looking at, so it
+  // is not offered — the button below renders the current answer instead.
+  const download =
+    render?.status === "done" && !stale ? render.output_url : null;
+  const failure =
+    start.error?.error ?? (render?.status === "error" ? render.error : null);
+  // Already-rendered videos keep their download; only new renders stop.
+  const paused = !renderEnabled && download == null;
+
+  const startRender = () => {
+    trackEvent("ui.render_clicked", {
+      activityId: run.id,
+      template,
+      retry: render?.status === "error",
+      showAvatar,
+      theme,
+    });
+    start.mutate({ path, body: { template, show_avatar: showAvatar, theme } });
+  };
+  const noteDownload = () =>
+    trackEvent("ui.video_downloaded", { activityId: run.id });
+
+  // The tile has no room for why a render failed, so the reason is spoken once,
+  // when it changes. Held in a ref rather than state: this only ever decides
+  // whether a sentence has already been said, and re-rendering to record that
+  // would be a render nobody looks at.
+  const spoken = useRef<string | null>(null);
+  useEffect(() => {
+    if (layout !== "tile" || failure == null) {
+      spoken.current = failure;
+      return;
+    }
+    if (spoken.current === failure) return;
+    spoken.current = failure;
+    toast.error(t("render.failedTitle"), { description: failure });
+  }, [layout, failure, t]);
+
+  if (layout === "tile") {
+    // A retry is a different thing to ask for than a download, and here the icon
+    // is the only word the button has.
+    const retry = download == null && render?.status === "error";
+    // One label, doing the work the panel spreads over a button, a progress bar
+    // and an alert — it is the button's accessible name and the only name this
+    // icon has.
+    const label =
+      loadError != null
+        ? t("render.loadErrorTitle")
+        : progress != null
+          ? t("render.preparingPercent", {
+              percent: Math.round(progress * 100),
+            })
+          : paused
+            ? t("render.paused")
+            : retry
+              ? t("render.retry")
+              : t("render.downloadVideo");
+
+    return (
+      <Button
+        size="icon-fill"
+        // `overflow-hidden` is what keeps the progress rule inside the pill's
+        // radius rather than squaring off its bottom corners.
+        className="relative overflow-hidden"
+        aria-label={label}
+        disabled={
+          loadError != null ||
+          paused ||
+          progress != null ||
+          (download == null && (data === undefined || start.isPending))
+        }
+        onClick={download ? noteDownload : startRender}
+        render={download ? <a href={download} download /> : undefined}
+      >
+        {progress != null || start.isPending ? (
+          <Loader2Icon className="animate-spin" />
+        ) : retry ? (
+          <RotateCcwIcon />
+        ) : (
+          <DownloadIcon />
+        )}
+        {progress != null && (
+          // Cobalt, and the same 3px rule the run list marks its selected row
+          // with — the studio's one stamp, and the only thing on screen that
+          // has to be read at a glance from across a phone.
+          //
+          // `scaleX` rather than a width: progress lands about once a second,
+          // and a transform tween glides between those steps on the compositor
+          // instead of asking for a layout per frame.
+          <span
+            aria-hidden
+            className="bg-brand absolute inset-x-0 bottom-0 h-[3px] origin-left transition-transform duration-500 ease-out"
+            style={{ transform: `scaleX(${progress})` }}
+          />
+        )}
+      </Button>
+    );
+  }
+
   if (loadError) {
     return (
       <Alert variant="destructive">
@@ -109,11 +232,11 @@ export function RenderControls({
     );
   }
 
-  if (render?.status === "rendering") {
+  if (progress != null) {
     return (
       <Progress
         className="px-1"
-        value={Math.round(render.progress * 100)}
+        value={Math.round(progress * 100)}
         aria-label={t("render.progressLabel")}
       >
         <ProgressLabel>{t("render.preparing")}</ProgressLabel>
@@ -122,20 +245,12 @@ export function RenderControls({
     );
   }
 
-  // Only a finished render made with the options in force is this video; one
-  // made with another answer is a file for a film nobody is looking at, so it
-  // is not offered — the button below renders the current answer instead.
-  const download =
-    render?.status === "done" && !stale ? render.output_url : null;
-
   if (download) {
     // The video on file is the one the player is showing.
     return (
       <Button
         className="w-full"
-        onClick={() =>
-          trackEvent("ui.video_downloaded", { activityId: run.id })
-        }
+        onClick={noteDownload}
         render={<a href={download} download />}
       >
         <DownloadIcon />
@@ -144,11 +259,7 @@ export function RenderControls({
     );
   }
 
-  const failure =
-    start.error?.error ?? (render?.status === "error" ? render.error : null);
-
-  // Already-rendered videos keep their download above; only new renders stop.
-  if (!renderEnabled) {
+  if (paused) {
     return (
       <p className="text-caption text-muted-foreground text-center">
         {t("render.paused")}
@@ -167,19 +278,7 @@ export function RenderControls({
       <Button
         className="w-full"
         disabled={data === undefined || start.isPending}
-        onClick={() => {
-          trackEvent("ui.render_clicked", {
-            activityId: run.id,
-            template,
-            retry: render?.status === "error",
-            showAvatar,
-            theme,
-          });
-          start.mutate({
-            path,
-            body: { template, show_avatar: showAvatar, theme },
-          });
-        }}
+        onClick={startRender}
       >
         {start.isPending ? (
           <Loader2Icon className="animate-spin" />

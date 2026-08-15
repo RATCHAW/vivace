@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Trans, useTranslation } from "react-i18next";
 import {
   ArrowLeftIcon,
-  ChevronDownIcon,
-  ChevronUpIcon,
   Loader2Icon,
+  Share2Icon,
+  SlidersHorizontalIcon,
+  SparklesIcon,
 } from "lucide-react";
 import {
   avatarSource,
@@ -28,10 +30,15 @@ import { VideoOptions } from "@/components/video-options";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+  Sheet,
+  SheetBody,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import { trackEvent } from "@/lib/logger";
+import { useElementWidth } from "@/lib/use-element-width";
+import { useShareRun } from "@/lib/use-share-run";
 import { cn } from "@/lib/utils";
 
 /**
@@ -67,6 +74,12 @@ const STAGE_THEATRE = "max-w-[clamp(420px,calc((100svh_-_11rem)*9/16),640px)]";
  * run opens this over it — a 9:16 film, a transport and a panel of switches do
  * not stack into anything readable on a phone, and the design answers that with
  * a screen, not a scroll.
+ *
+ * The two also differ in who draws the transport. The wide layout can spend
+ * three rows under the picture; the phone cannot, because every row under a film
+ * measured off the leftover height is taken out of the film. There the controls
+ * go over the picture (Remotion's own) and everything else collapses into one
+ * row of four icons. See `FilmChrome`.
  *
  * The state that survives picking another run — template, theme, avatar — is the
  * page's, because on a phone this component unmounts every time the athlete goes
@@ -104,9 +117,15 @@ export function RunStudio({
 }) {
   const { t } = useTranslation();
   const format = useFormatters();
-  // Collapsed to start: the film is what the athlete came for, and on a phone
-  // the sheet open would leave it a stamp.
+  // Closed to start: the film is what the athlete came for, and a sheet over it
+  // on arrival is a question nobody asked.
   const [optionsOpen, setOptionsOpen] = useState(false);
+  const share = useShareRun(run);
+  // The phone's whole layout hangs off the film's width, and the film's width
+  // hangs off the height left on the screen — a number CSS can hand the frame
+  // but not the picker above it. So it is measured. Wide screens size the film
+  // off a column they already know the width of, and never attach this.
+  const [measureFilm, filmWidth] = useElementWidth<HTMLDivElement>();
 
   const { data: streams, error: streamsError } = useQuery(
     getRunStreamsOptions({ path: { id: String(run.id) } }),
@@ -149,70 +168,78 @@ export function RunStudio({
   const entry = getTemplate(template);
   const avatarSupported = entry.supportsAvatar;
   const filmTheme = entry.supportsTheme ? theme : DEFAULT_THEME;
-  // A template that honours neither has nothing to collapse, so the sheet drops
-  // its disclosure and becomes what it already was: the render button.
+  // A template that honours neither has nothing to open a sheet for, so the
+  // Options tile is drawn greyed rather than dropped — a row of actions that
+  // changes length as you click down the catalogue reads as a bug.
   const hasOptions = entry.supportsTheme || avatarSupported;
   const fit = narrow ? "height" : "width";
+  // Both the loading placeholder and the film it stands in for answer this, so
+  // the picker is the right width from the first paint rather than after one.
+  const frameRef = narrow ? measureFilm : undefined;
+  // Line the picker and the action grid up with the film's edge. A max-width
+  // rather than a width, so before the first measurement they simply fill the
+  // column instead of collapsing to nothing.
+  const railWidth = { maxWidth: filmWidth ?? undefined };
 
-  const film = (
-    <>
-      {/* Which cut is playing, above the film it names. */}
-      <div className="shrink-0">
-        <TemplateSelect
-          template={template}
-          input={input}
-          onChange={onChooseTemplate}
-        />
+  /** Which cut is playing, above the film it names. */
+  const picker = (
+    <TemplateSelect
+      template={template}
+      input={input}
+      onChange={onChooseTemplate}
+    />
+  );
+
+  const stage =
+    !streams && !streamsError ? (
+      <div
+        ref={frameRef}
+        className={cn(
+          "flex items-center justify-center rounded-lg border bg-black",
+          filmFrame(fit),
+        )}
+      >
+        <Loader2Icon className="text-muted-foreground size-6 animate-spin" />
+        <span className="sr-only">{t("runs.loadingReplay")}</span>
       </div>
+    ) : streamsError ? (
+      <Alert variant="destructive">
+        <AlertTitle>{t("runs.loadRunError")}</AlertTitle>
+        <AlertDescription>{streamsError.error}</AlertDescription>
+      </Alert>
+    ) : (
+      <RunPlayer
+        // Prefixed, and it has to be: the render panel beside it is keyed on
+        // the same run and template, and two siblings sharing a key is not a
+        // warning here but a leak. React maps a parent's children by key when
+        // one of them changes, so the duplicate evicts the first from that
+        // map, and the fiber nobody looked up is never deleted — the old
+        // player stayed in the DOM, frozen, under the new one, once per
+        // switch.
+        key={`player:${run.id}:${template}`}
+        template={template}
+        activity={run}
+        streams={streams ?? {}}
+        mapboxToken={mapboxToken}
+        avatarUrl={showAvatar && avatarSupported ? avatarUrl : ""}
+        theme={filmTheme}
+        fit={fit}
+        chrome={narrow ? "player" : "studio"}
+        frameRef={frameRef}
+        expanded={expanded}
+        // Theatre mode is a wide-screen idea; the phone studio is already the
+        // whole screen, so the control simply isn't there.
+        onToggleExpanded={narrow ? undefined : onToggleExpanded}
+      />
+    );
 
-      {!streams && !streamsError ? (
-        <div
-          className={cn(
-            "flex items-center justify-center rounded-lg border bg-black",
-            filmFrame(fit),
-          )}
-        >
-          <Loader2Icon className="text-muted-foreground size-6 animate-spin" />
-          <span className="sr-only">{t("runs.loadingReplay")}</span>
-        </div>
-      ) : streamsError ? (
-        <Alert variant="destructive">
-          <AlertTitle>{t("runs.loadRunError")}</AlertTitle>
-          <AlertDescription>{streamsError.error}</AlertDescription>
-        </Alert>
-      ) : (
-        <RunPlayer
-          // Prefixed, and it has to be: the render panel beside it is keyed on
-          // the same run and template, and two siblings sharing a key is not a
-          // warning here but a leak. React maps a parent's children by key when
-          // one of them changes, so the duplicate evicts the first from that
-          // map, and the fiber nobody looked up is never deleted — the old
-          // player stayed in the DOM, frozen, under the new one, once per
-          // switch.
-          key={`player:${run.id}:${template}`}
-          template={template}
-          activity={run}
-          streams={streams ?? {}}
-          mapboxToken={mapboxToken}
-          avatarUrl={showAvatar && avatarSupported ? avatarUrl : ""}
-          theme={filmTheme}
-          fit={fit}
-          expanded={expanded}
-          // Theatre mode is a wide-screen idea; the phone studio is already the
-          // whole screen, so the control simply isn't there.
-          onToggleExpanded={narrow ? undefined : onToggleExpanded}
-        />
-      )}
-
-      {!mapboxToken && entry.usesMap && (
-        <p className="text-caption text-stone shrink-0">
-          {/* The two <code> spans are part of the sentence, so the translation
-              owns where they fall — a French clause puts the filename somewhere
-              an English one does not. */}
-          <Trans i18nKey="runs.noMapboxToken" components={{ code: <code /> }} />
-        </p>
-      )}
-    </>
+  const mapboxNote = !mapboxToken && entry.usesMap && (
+    <p className="text-caption text-stone w-full shrink-0">
+      {/* The two <code> spans are part of the sentence, so the translation
+          owns where they fall — a French clause puts the filename somewhere
+          an English one does not. */}
+      <Trans i18nKey="runs.noMapboxToken" components={{ code: <code /> }} />
+    </p>
   );
 
   const options = hasOptions && (
@@ -232,7 +259,7 @@ export function RunStudio({
 
   // Rendering happens on Lambda from the API's copy of the run, so it stands
   // even when the browser could not load the streams.
-  const render = (
+  const render = (layout: "panel" | "tile") => (
     <RenderControls
       // Its own namespace — see the player's key above.
       key={`render:${run.id}:${template}`}
@@ -240,6 +267,7 @@ export function RunStudio({
       template={template}
       showAvatar={showAvatar && avatarSupported}
       theme={filmTheme}
+      layout={layout}
     />
   );
 
@@ -270,55 +298,91 @@ export function RunStudio({
 
         {/* The film is measured off what is left of the screen rather than off
             the column, so `min-h-0` here is load-bearing: without it the flex
-            item floors at its content and pushes the sheet off the bottom.
-            See `filmFrame("height")`. */}
-        <div className="flex min-h-0 flex-1 flex-col gap-3 px-4 pt-3.5 pb-4">
-          {film}
+            item floors at its content and pushes the row of actions off the
+            bottom. See `filmFrame("height")`.
+
+            Three rows and nothing else — picker, film, actions — because that
+            is all a phone can show at once without the film becoming a stamp.
+            The transport that used to sit between the last two is over the
+            picture now, and the sheet that used to sit under them opens on top
+            of it. The safe-area pad keeps the actions clear of a home
+            indicator. */}
+        <div className="flex min-h-0 flex-1 flex-col items-center gap-3 px-4 pt-3.5 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+          <div className="w-full shrink-0" style={railWidth}>
+            {picker}
+          </div>
+
+          {stage}
+
+          {/* Everything the athlete can do with the film they are watching, on
+              one row measured off the film itself. Icons alone: at four across
+              the width of a 9:16 phone film there is no room for a word, and a
+              row that wrapped would take another slice out of the picture.
+              Download is the loud pill because it is what they came to do; the
+              other three are the ring of secondary controls around it. */}
+          <div
+            className="grid w-full shrink-0 grid-cols-4 gap-2"
+            style={railWidth}
+          >
+            <Button
+              size="icon-fill"
+              variant="subtle"
+              aria-label={t("player.share")}
+              onClick={share}
+            >
+              <Share2Icon />
+            </Button>
+
+            {/* The coach reads the run you are watching: `?run=` arrives at the
+                Coach screen as an attached run, so the first question is about
+                this session without naming it. */}
+            <Button
+              size="icon-fill"
+              variant="subtle"
+              aria-label={t("player.askCoach")}
+              onClick={() =>
+                trackEvent("ui.ask_coach_clicked", { activityId: run.id })
+              }
+              render={<Link to={`/coach?run=${run.id}`} />}
+            >
+              <SparklesIcon />
+            </Button>
+
+            <Button
+              size="icon-fill"
+              variant="subtle"
+              aria-label={t("videoOptions.section")}
+              aria-expanded={optionsOpen}
+              disabled={!hasOptions}
+              onClick={() => setOptionsOpen(true)}
+            >
+              <SlidersHorizontalIcon />
+            </Button>
+
+            {render("tile")}
+          </div>
+
+          {mapboxNote}
         </div>
 
-        <Collapsible
-          open={optionsOpen}
-          onOpenChange={setOptionsOpen}
-          // DESIGN.md: a hairline and a surface, never the drop shadow the
-          // mock-up floats this on. The safe-area pad is what keeps the render
-          // button clear of a home indicator.
-          //
-          // Only the shut sheet is in flow, so the space it reserves above is
-          // its own height whatever state the render panel is in. Opening it
-          // must not take that space from the film: the stage above is
-          // `flex-1`, and giving a growing sheet its height back would squeeze
-          // a 9:16 film down to a stamp — measured at 62×111 on a 390×844
-          // screen before the panel was floated.
-          className="bg-card relative flex shrink-0 flex-col gap-3.5 border-t px-4 pt-3.5 pb-[calc(1rem+env(safe-area-inset-bottom))]"
-          render={<aside aria-label={t("videoOptions.section")} />}
-        >
-          {hasOptions ? (
-            <>
-              <CollapsibleTrigger className="flex w-full items-center gap-3 text-left outline-none">
-                <MonoLabel>{t("videoOptions.section")}</MonoLabel>
-                <span className="text-caption text-muted-foreground ml-auto inline-flex items-center gap-1 font-semibold">
-                  {optionsOpen
-                    ? t("videoOptions.hide")
-                    : t("videoOptions.edit")}
-                  {optionsOpen ? (
-                    <ChevronDownIcon className="size-3.5" />
-                  ) : (
-                    <ChevronUpIcon className="size-3.5" />
-                  )}
-                </span>
-              </CollapsibleTrigger>
-              {/* Opens upward, over the film, anchored to the top of the sheet
-                  it belongs to — `bottom-full`. It carries its own ground and
-                  hairline because it is over the video, not over the sheet. */}
-              <CollapsibleContent className="bg-card absolute inset-x-0 bottom-full max-h-[55vh] overflow-y-auto overscroll-contain border-t px-4 py-4">
-                {options}
-              </CollapsibleContent>
-            </>
-          ) : (
-            <MonoLabel>{t("videoOptions.section")}</MonoLabel>
-          )}
-          {render}
-        </Collapsible>
+        {/* Over the film rather than under it: the options are a detour off
+            watching, and the picture keeps the height it had while they are
+            open. DESIGN.md's largest radius on the leading edge only — a panel
+            that arrives from the bottom of the screen has no bottom corners. */}
+        <Sheet open={optionsOpen} onOpenChange={setOptionsOpen}>
+          <SheetContent
+            side="bottom"
+            className="max-h-[80svh] rounded-t-xl"
+            render={<aside aria-label={t("videoOptions.section")} />}
+          >
+            <SheetHeader>
+              <SheetTitle>{t("videoOptions.section")}</SheetTitle>
+            </SheetHeader>
+            <SheetBody className="pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
+              {options}
+            </SheetBody>
+          </SheetContent>
+        </Sheet>
       </div>
     );
   }
@@ -337,7 +401,9 @@ export function RunStudio({
           expanded ? STAGE_THEATRE : STAGE,
         )}
       >
-        {film}
+        <div className="shrink-0">{picker}</div>
+        {stage}
+        {mapboxNote}
       </div>
 
       <aside
@@ -346,7 +412,7 @@ export function RunStudio({
       >
         <MonoLabel>{t("videoOptions.section")}</MonoLabel>
         {options}
-        {render}
+        {render("panel")}
       </aside>
     </div>
   );

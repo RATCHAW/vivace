@@ -129,8 +129,6 @@ export const en = {
 
   videoOptions: {
     section: "Video options",
-    edit: "Edit",
-    hide: "Hide",
     themeGroup: "Video theme",
     templateSelect: "Video template",
     runAsAvatar: "Run as your avatar",
@@ -197,6 +195,9 @@ export const en = {
   render: {
     loadErrorTitle: "Could not load the video state",
     preparing: "Preparing your video…",
+    /** The same sentence where the only thing drawing the progress is a 3px
+     *  rule — the phone's Download tile, whose icon has no room for a number. */
+    preparingPercent: "Preparing your video… {{percent}}%",
     progressLabel: "Video preparation progress",
     downloadVideo: "Download video",
     failedTitle: "Could not prepare this video",
