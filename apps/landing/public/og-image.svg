@@ -1,5 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
-  <title>Vivace — Strava runs, made to share</title>
+  <!-- This file is the source; og-image.png is what crawlers fetch. Editing one
+       without the other ships a social card that contradicts the page, so:
+         rsvg-convert -w 1200 -h 630 og-image.svg -o og-image.png
+       What it shows has to stay what `meta.imageAlt` says it shows — a test in
+       src/i18n/i18n.test.ts fails if that description drops either product. -->
+  <title>Vivace — an AI running coach and shareable run replays from Strava</title>
   <rect width="1200" height="630" fill="#000"/>
   <path d="M0 126H1200M0 252H1200M0 378H1200M0 504H1200M200 0V630M400 0V630M600 0V630M800 0V630M1000 0V630" stroke="#fff" stroke-opacity=".055"/>
 
@@ -11,23 +16,32 @@
     <text x="70" y="39" fill="#fff" font-family="Inter, Arial, sans-serif" font-size="30" font-weight="650" letter-spacing="-1">vivace</text>
   </g>
 
-  <text x="64" y="236" fill="#8d969e" font-family="JetBrains Mono, Menlo, monospace" font-size="18" font-weight="600" letter-spacing="2.8">YOUR RUN · REPLAYED</text>
-  <text x="64" y="310" fill="#fff" font-family="Inter, Arial, sans-serif" font-size="68" font-weight="560" letter-spacing="-2.2">Strava runs,</text>
-  <text x="64" y="384" fill="#fff" font-family="Inter, Arial, sans-serif" font-size="68" font-weight="560" letter-spacing="-2.2">made to share.</text>
-  <text x="67" y="448" fill="#b7bdc2" font-family="Inter, Arial, sans-serif" font-size="24">Route · pace · heart rate · 9:16 MP4</text>
+  <text x="64" y="236" fill="#8d969e" font-family="JetBrains Mono, Menlo, monospace" font-size="18" font-weight="600" letter-spacing="2.8">AI COACH · RUN REPLAYS</text>
+  <text x="64" y="310" fill="#fff" font-family="Inter, Arial, sans-serif" font-size="58" font-weight="560" letter-spacing="-2">AI coach for every run.</text>
+  <text x="64" y="376" fill="#fff" font-family="Inter, Arial, sans-serif" font-size="58" font-weight="560" letter-spacing="-2">Replays made to share.</text>
+  <text x="67" y="440" fill="#b7bdc2" font-family="Inter, Arial, sans-serif" font-size="24">Grounded in your Strava history · 9:16 MP4</text>
 
-  <g transform="translate(725 79)">
-    <rect width="411" height="472" rx="48" fill="#16181a" stroke="#fff" stroke-opacity=".14"/>
-    <path d="M119 85C76 124 85 178 133 192C182 206 157 258 204 271C255 285 223 337 278 360C305 371 324 390 328 418" fill="none" stroke="#4f55f1" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
-    <circle cx="119" cy="85" r="10" fill="#fff"/>
-    <circle cx="328" cy="418" r="14" fill="#4f55f1" stroke="#fff" stroke-width="6"/>
+  <g transform="translate(800 79)">
+    <rect width="336" height="206" rx="34" fill="#16181a" stroke="#fff" stroke-opacity=".14"/>
+    <text x="26" y="42" fill="#8d969e" font-family="JetBrains Mono, Menlo, monospace" font-size="13" font-weight="600" letter-spacing="2.4">AI COACH</text>
+    <rect x="76" y="58" width="234" height="42" rx="15" fill="#494fdf"/>
+    <text x="94" y="85" fill="#fff" font-family="Inter, Arial, sans-serif" font-size="16">Half marathon in October.</text>
+    <rect x="26" y="112" width="262" height="64" rx="15" fill="#202326" stroke="#fff" stroke-opacity=".12"/>
+    <text x="44" y="138" fill="#fff" font-family="Inter, Arial, sans-serif" font-size="16">Long run Sunday:</text>
+    <text x="44" y="161" fill="#fff" font-family="Inter, Arial, sans-serif" font-size="16">14 km at 6:05 /km.</text>
+  </g>
+
+  <g transform="translate(800 311)">
+    <rect width="336" height="240" rx="34" fill="#16181a" stroke="#fff" stroke-opacity=".14"/>
+    <text x="26" y="40" fill="#8d969e" font-family="JetBrains Mono, Menlo, monospace" font-size="13" font-weight="600" letter-spacing="2.4">RUN REPLAY</text>
+    <path d="M56 74C28 106 46 134 84 144C122 154 100 178 136 190C148 194 158 194 164 190" fill="none" stroke="#4f55f1" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="56" cy="74" r="8" fill="#fff"/>
+    <circle cx="164" cy="190" r="11" fill="#4f55f1" stroke="#fff" stroke-width="5"/>
     <g fill="#fff" font-family="Inter, Arial, sans-serif">
-      <text x="39" y="408" font-size="15" font-weight="650" opacity=".6">DISTANCE</text>
-      <text x="39" y="443" font-size="30" font-weight="600">10.24 km</text>
-    </g>
-    <g fill="#fff" font-family="Inter, Arial, sans-serif">
-      <text x="255" y="69" font-size="15" font-weight="650" opacity=".6">PACE</text>
-      <text x="255" y="104" font-size="30" font-weight="600">5:12 /km</text>
+      <text x="206" y="120" font-size="12" font-weight="650" opacity=".6">DISTANCE</text>
+      <text x="206" y="148" font-size="23" font-weight="600">10.24 km</text>
+      <text x="206" y="186" font-size="12" font-weight="650" opacity=".6">PACE</text>
+      <text x="206" y="214" font-size="23" font-weight="600">5:12 /km</text>
     </g>
   </g>
 </svg>

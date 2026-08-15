@@ -3,8 +3,15 @@ import robots from "@/app/robots";
 import sitemap from "@/app/sitemap";
 import { LOCALES } from "@/i18n/config";
 import { CONTENT_PAGE_KEYS } from "@/i18n/content-pages";
+import { getDictionary } from "@/i18n/dictionaries";
 import { createPageMetadata, homePagePaths } from "./metadata";
 import { coachUrl, resolveSiteUrl, signInUrl, siteUrl } from "./site";
+import { homeStructuredData, siteStructuredData } from "./structured-data";
+
+/** The `@type` of every node in a graph, for asserting what a page claims. */
+function types(graph: unknown[]): string[] {
+  return graph.map((node) => (node as { "@type": string })["@type"]);
+}
 
 describe("app handoff", () => {
   it("carries the language and starts Strava sign-in", () => {
@@ -80,5 +87,43 @@ describe("page metadata", () => {
         images: [{ url: "/og-image.png" }],
       },
     });
+  });
+});
+
+describe("structured data", () => {
+  it("says only what is true of every page, site-wide", () => {
+    // An FAQPage here would follow the layout onto /en/privacy and claim six
+    // answers that page does not render.
+    expect(types(siteStructuredData())).toEqual(["Organization", "WebSite"]);
+  });
+
+  it("describes the product and the questions on the home page", () => {
+    expect(types(homeStructuredData("en", getDictionary("en")))).toEqual([
+      "SoftwareApplication",
+      "FAQPage",
+    ]);
+  });
+
+  it.each(LOCALES)("%s quotes its own catalogue's answers", (locale) => {
+    const copy = getDictionary(locale);
+    const [app, faq] = homeStructuredData(locale, copy) as [
+      { url: string; description: string; inLanguage: string },
+      { mainEntity: { name: string; acceptedAnswer: { text: string } }[] },
+    ];
+
+    expect(app).toMatchObject({
+      url: `${siteUrl}/${locale}`,
+      description: copy.meta.description,
+      inLanguage: locale,
+    });
+    // Every rendered question, so a reworded answer can never leave stale
+    // markup behind — and never fewer, which is how an FAQPage starts lying.
+    expect(faq.mainEntity).toEqual(
+      copy.questions.items.map((item) => ({
+        "@type": "Question",
+        name: item.q,
+        acceptedAnswer: { "@type": "Answer", text: item.a },
+      })),
+    );
   });
 });

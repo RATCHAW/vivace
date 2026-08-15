@@ -55,15 +55,22 @@ export interface ContentPage {
 
 const en: Record<ContentPageKey, ContentPage> = {
   about: {
-    title: "About Vivace | Strava Run Videos",
+    title: "About Vivace | AI Running Coach & Strava Run Videos",
     description:
-      "Vivace turns Strava runs into shareable vertical films with an animated route, live effort and a clean summary.",
+      "Vivace pairs an AI running coach grounded in your Strava history with shareable vertical films of the runs you already did.",
     eyebrow: "About Vivace",
     heading: "Runs deserve a finish line after the finish line.",
-    lead: "Vivace turns the activity already in Strava into a short vertical film that feels worth watching and sharing.",
+    lead: "Vivace reads the training already in Strava and hands it back twice: as coaching you can act on, and as a short vertical film worth sharing.",
     sections: [
       {
-        heading: "What Vivace makes",
+        heading: "Coaching from your own training",
+        paragraphs: [
+          "The AI coach answers with your history in front of it — recent volume, splits, heart rate and how the last few weeks actually went. Ask for a race build, a taper or an honest read on last week, and the answer names sessions you can run.",
+          "It only reads. Vivace never writes to Strava, and the coach never invents a number your activities do not contain.",
+        ],
+      },
+      {
+        heading: "What a replay makes",
         paragraphs: [
           "A replay follows the run as it happened: the route draws, distance and pace move with it, heart rate shows where the effort changed, and the final numbers land as a summary.",
           "Each film is rendered as a 1080 × 1920 MP4, ready for a phone, a story or a reel without another editing app.",
@@ -72,13 +79,13 @@ const en: Record<ContentPageKey, ContentPage> = {
       {
         heading: "Why it starts with running",
         paragraphs: [
-          "Running is where route, splits, elevation and effort tell the clearest story together. Starting there lets the format stay simple while the activity remains personal.",
+          "Running is where route, splits, elevation and effort tell the clearest story together. Starting there keeps the coaching specific and the format simple while the activity remains personal.",
         ],
       },
       {
         heading: "What comes next",
         paragraphs: [
-          "Rides, strength sessions, swims and hikes are on the roadmap. They will ship only when their replays are as useful and legible as the running film.",
+          "Rides, strength sessions, swims and hikes are on the roadmap. They will ship only when their coaching and their replays are as useful and legible as the running ones.",
         ],
       },
     ],
@@ -138,13 +145,13 @@ const en: Record<ContentPageKey, ContentPage> = {
     eyebrow: "Privacy",
     heading: "Privacy, in plain language.",
     lead: "Vivace uses your information to show your own activities, make your films and provide the features you choose. We do not sell your personal data.",
-    updated: "Last updated 14 August 2026",
+    updated: "Last updated 15 August 2026",
     sections: [
       {
         heading: "Information we receive",
         paragraphs: [
           "When you connect Strava, Strava sends us an account identifier, basic profile information and OAuth tokens. The permissions you approve can let Vivace read your activities, including activities marked private, plus route streams, heart rate, gear and profile details such as location or weight when available.",
-          "Vivace also receives information you create in the product, such as render choices, coach conversations, goals and accepted plans. Operational logs record requests, errors and security events. The locale cookie remembers whether you chose English or French.",
+          "Vivace also receives information you create in the product, such as render choices, coach conversations, the ratings and notes you leave on coach answers, goals and accepted plans. Operational logs record requests, errors and security events. The locale cookie remembers whether you chose English or French.",
         ],
       },
       {
@@ -158,7 +165,8 @@ const en: Record<ContentPageKey, ContentPage> = {
         heading: "Storage and service providers",
         paragraphs: [
           "Account and product records are stored in Vivace's database. Rendered MP4 files are produced with Remotion on AWS and stored in S3. A generated file can be accessible to anyone who has its public URL, so share that URL as you would share the video itself.",
-          "The coach uses Google's AI service to generate answers from the context needed for your request. PostHog may process product analytics, error information and masked landing-page sessions when analytics is enabled. Hosting, database and logging providers process the information needed to operate the service.",
+          "The coach reaches a language model through LLM Gateway, which routes each request to the model provider Vivace has selected. Only the training context needed to answer that question is sent, and the provider's own terms govern its processing.",
+          "PostHog may process product analytics, error information, masked session recordings and coach usage measurements such as token counts, latency and answer ratings when analytics is enabled. The text of coach conversations is kept out of those measurements by default. Hosting, database and logging providers process the information needed to operate the service.",
         ],
       },
       {
@@ -245,7 +253,7 @@ const en: Record<ContentPageKey, ContentPage> = {
     eyebrow: "Strava data use",
     heading: "Your Strava data stays about you.",
     lead: "Vivace reads the data needed to show your history, make your films and answer your own training questions. It does not write to your Strava account.",
-    updated: "Last updated 14 August 2026",
+    updated: "Last updated 15 August 2026",
     sections: [
       {
         heading: "Permissions requested",
@@ -256,7 +264,7 @@ const en: Record<ContentPageKey, ContentPage> = {
       {
         heading: "What Vivace does with the data",
         paragraphs: [
-          "The app uses it to list your own activities, calculate the replay frames, render MP4 files and provide training context to features you choose to use. We do not sell Strava data, post to Strava or expose your raw activity data to other Vivace users.",
+          "The app uses it to list your own activities, calculate the replay frames, render MP4 files and give the AI coach the training context it needs to answer your questions. We do not sell Strava data, post to Strava or expose your raw activity data to other Vivace users.",
         ],
       },
       {
@@ -294,15 +302,22 @@ const en: Record<ContentPageKey, ContentPage> = {
 
 const fr: Record<ContentPageKey, ContentPage> = {
   about: {
-    title: "À propos de Vivace | Vidéos de course Strava",
+    title: "À propos de Vivace | Coach running IA et vidéos Strava",
     description:
-      "Vivace transforme les courses Strava en films verticaux à partager, avec tracé animé, effort en direct et bilan clair.",
+      "Vivace associe un coach running IA nourri par votre historique Strava à des films verticaux à partager, créés depuis les courses déjà faites.",
     eyebrow: "À propos de Vivace",
     heading: "Une course mérite une suite après la ligne d’arrivée.",
-    lead: "Vivace transforme l’activité déjà présente dans Strava en un court film vertical qui mérite d’être regardé et partagé.",
+    lead: "Vivace lit l’entraînement déjà présent dans Strava et vous le rend deux fois : en coaching à appliquer, et en un court film vertical qui mérite d’être partagé.",
     sections: [
       {
-        heading: "Ce que crée Vivace",
+        heading: "Un coaching tiré de votre entraînement",
+        paragraphs: [
+          "Le coach IA répond avec votre historique sous les yeux : volume récent, splits, fréquence cardiaque et déroulé réel des dernières semaines. Demandez une préparation, un affûtage ou un bilan honnête de la semaine passée, et la réponse nomme des séances que vous pouvez courir.",
+          "Il ne fait que lire. Vivace n’écrit jamais sur Strava, et le coach n’invente aucun chiffre absent de vos activités.",
+        ],
+      },
+      {
+        heading: "Ce que crée un replay",
         paragraphs: [
           "Le replay suit la course telle qu’elle s’est passée : le tracé se dessine, la distance et l’allure avancent avec lui, la fréquence cardiaque montre où l’effort change, puis les chiffres finaux composent le bilan.",
           "Chaque film est rendu en MP4 1080 × 1920, prêt pour un téléphone, une story ou un reel sans autre application de montage.",
@@ -311,13 +326,13 @@ const fr: Record<ContentPageKey, ContentPage> = {
       {
         heading: "Pourquoi commencer par la course",
         paragraphs: [
-          "La course est l’activité où tracé, splits, dénivelé et effort racontent le mieux une histoire ensemble. Commencer par elle permet de garder un format simple sans effacer ce qui rend chaque sortie personnelle.",
+          "La course est l’activité où tracé, splits, dénivelé et effort racontent le mieux une histoire ensemble. Commencer par elle garde un coaching précis et un format simple sans effacer ce qui rend chaque sortie personnelle.",
         ],
       },
       {
         heading: "La suite",
         paragraphs: [
-          "Le vélo, la musculation, la natation et la randonnée sont prévus. Ils ne sortiront que lorsque leurs replays seront aussi utiles et lisibles que celui de la course.",
+          "Le vélo, la musculation, la natation et la randonnée sont prévus. Ils ne sortiront que lorsque leur coaching et leurs replays seront aussi utiles et lisibles que ceux de la course.",
         ],
       },
     ],
@@ -377,13 +392,13 @@ const fr: Record<ContentPageKey, ContentPage> = {
     eyebrow: "Confidentialité",
     heading: "La confidentialité, sans détour.",
     lead: "Vivace utilise vos informations pour afficher vos propres activités, créer vos films et fournir les fonctions que vous choisissez. Nous ne vendons pas vos données personnelles.",
-    updated: "Dernière mise à jour : 14 août 2026",
+    updated: "Dernière mise à jour : 15 août 2026",
     sections: [
       {
         heading: "Informations reçues",
         paragraphs: [
           "Lorsque vous connectez Strava, Strava nous transmet un identifiant de compte, des informations de profil de base et des jetons OAuth. Les autorisations acceptées peuvent permettre à Vivace de lire vos activités, y compris celles marquées privées, ainsi que les flux GPS, la fréquence cardiaque, le matériel et des informations de profil comme la localisation ou le poids lorsqu’elles sont disponibles.",
-          "Vivace reçoit aussi les informations créées dans le produit, comme les choix de rendu, les conversations avec le coach, les objectifs et les plans acceptés. Les journaux techniques consignent requêtes, erreurs et événements de sécurité. Le cookie de langue retient votre choix entre le français et l’anglais.",
+          "Vivace reçoit aussi les informations créées dans le produit, comme les choix de rendu, les conversations avec le coach, les notes et commentaires laissés sur ses réponses, les objectifs et les plans acceptés. Les journaux techniques consignent requêtes, erreurs et événements de sécurité. Le cookie de langue retient votre choix entre le français et l’anglais.",
         ],
       },
       {
@@ -397,7 +412,8 @@ const fr: Record<ContentPageKey, ContentPage> = {
         heading: "Conservation et prestataires",
         paragraphs: [
           "Les données de compte et de produit sont conservées dans la base de données de Vivace. Les MP4 sont générés avec Remotion sur AWS et stockés dans S3. Un fichier généré peut être accessible à toute personne possédant son URL publique ; partagez donc cette URL comme vous partageriez la vidéo elle-même.",
-          "Le coach utilise le service d’IA de Google pour produire une réponse à partir du contexte nécessaire à votre demande. PostHog peut traiter des analytics produit, des erreurs et des sessions masquées de la landing page lorsque les analytics sont activés. Des prestataires d’hébergement, de base de données et de journalisation traitent les informations nécessaires au fonctionnement du service.",
+          "Le coach atteint un modèle de langage via LLM Gateway, qui achemine chaque demande vers le fournisseur de modèle retenu par Vivace. Seul le contexte d’entraînement nécessaire à la réponse est transmis, et les conditions de ce fournisseur régissent son traitement.",
+          "PostHog peut traiter des analytics produit, des erreurs, des enregistrements de session masqués et des mesures d’usage du coach comme le nombre de jetons, la latence et les notes attribuées aux réponses lorsque les analytics sont activés. Le texte des conversations avec le coach est tenu à l’écart de ces mesures par défaut. Des prestataires d’hébergement, de base de données et de journalisation traitent les informations nécessaires au fonctionnement du service.",
         ],
       },
       {
@@ -484,7 +500,7 @@ const fr: Record<ContentPageKey, ContentPage> = {
     eyebrow: "Données Strava",
     heading: "Vos données Strava restent centrées sur vous.",
     lead: "Vivace lit les données nécessaires pour afficher votre historique, créer vos films et répondre à vos propres questions d’entraînement. Rien n’est écrit sur votre compte Strava.",
-    updated: "Dernière mise à jour : 14 août 2026",
+    updated: "Dernière mise à jour : 15 août 2026",
     sections: [
       {
         heading: "Autorisations demandées",
@@ -495,7 +511,7 @@ const fr: Record<ContentPageKey, ContentPage> = {
       {
         heading: "Utilisation par Vivace",
         paragraphs: [
-          "L’application utilise ces données pour lister vos propres activités, calculer les images du replay, générer les MP4 et fournir du contexte d’entraînement aux fonctions que vous choisissez. Nous ne vendons pas les données Strava, ne publions rien sur Strava et n’exposons pas vos données d’activité brutes aux autres utilisateurs de Vivace.",
+          "L’application utilise ces données pour lister vos propres activités, calculer les images du replay, générer les MP4 et fournir au coach IA le contexte d’entraînement nécessaire à ses réponses. Nous ne vendons pas les données Strava, ne publions rien sur Strava et n’exposons pas vos données d’activité brutes aux autres utilisateurs de Vivace.",
         ],
       },
       {

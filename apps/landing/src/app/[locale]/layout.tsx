@@ -5,7 +5,7 @@ import { StructuredData } from "@/components/structured-data";
 import { getDictionary } from "@/i18n/dictionaries";
 import { isLocale, LOCALES, type Locale } from "@/i18n/config";
 import { createPageMetadata, homePagePaths } from "@/lib/metadata";
-import { siteUrl } from "@/lib/site";
+import { siteStructuredData } from "@/lib/structured-data";
 import "../../styles.css";
 
 /**
@@ -56,31 +56,12 @@ export default async function LocaleLayout({
   // under a German tag.
   if (!isLocale(locale)) notFound();
 
-  const structuredData = [
-    {
-      "@context": "https://schema.org",
-      "@type": "Organization",
-      "@id": `${siteUrl}/#organization`,
-      name: "Vivace",
-      url: siteUrl,
-      logo: `${siteUrl}/apple-touch-icon.png`,
-      email: "hello@vivace.run",
-    },
-    {
-      "@context": "https://schema.org",
-      "@type": "WebSite",
-      "@id": `${siteUrl}/#website`,
-      name: "Vivace",
-      url: siteUrl,
-      publisher: { "@id": `${siteUrl}/#organization` },
-      inLanguage: LOCALES,
-    },
-  ];
-
   return (
     <html lang={locale}>
       <body>
-        <StructuredData data={structuredData} />
+        {/* Site-wide only. What is specific to a document — the product, the
+            FAQ — is emitted by that document, not from here. */}
+        <StructuredData data={siteStructuredData()} />
         {children}
         <Analytics />
       </body>

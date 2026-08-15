@@ -17,7 +17,7 @@ export const fr: Translated<Dictionary> = {
     ogDescription:
       "Recevez des conseils précis à partir de chaque course, puis transformez vos sorties préférées en vidéos verticales à partager.",
     imageAlt:
-      "Vivace transforme les courses Strava en vidéos verticales avec tracé, allure et fréquence cardiaque.",
+      "Une réponse du coach Vivace qui planifie la sortie longue du dimanche, à côté d’un replay de course montrant tracé, distance et allure.",
   },
 
   header: {
@@ -181,7 +181,7 @@ export const fr: Translated<Dictionary> = {
       },
       {
         q: "Quelle différence avec Strava Flyover ?",
-        a: "Strava Flyover permet d’explorer une activité sur une carte 3D dans Strava. Vivace crée un film vertical fixe de 20 secondes avec tracé, allure, fréquence cardiaque et bilan, puis fournit un MP4 à partager partout.",
+        a: "Strava Flyover permet d’explorer une activité sur une carte 3D dans Strava. Vivace crée un court film vertical à partir de la même sortie — tracé, allure, fréquence cardiaque et bilan — puis fournit un MP4 à partager partout. Il lit aussi votre historique d’entraînement, si bien que la même sortie peut vous dire quoi faire ensuite.",
       },
       {
         q: "Combien ça coûte ?",
