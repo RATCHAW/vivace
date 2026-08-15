@@ -7,7 +7,6 @@ import {
   type ThemeName,
 } from "@repo/video";
 import { useVideoLabels } from "@/i18n/video";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
@@ -35,7 +34,6 @@ export function VideoOptions({
   onThemeChange,
   avatarSupported,
   avatarUrl,
-  name,
   pending,
   failed,
   showAvatar,
@@ -48,7 +46,6 @@ export function VideoOptions({
   /** False when the chosen template draws no runner to put a face on. */
   avatarSupported: boolean;
   avatarUrl: string;
-  name: string;
   pending: boolean;
   failed: boolean;
   showAvatar: boolean;
@@ -67,13 +64,6 @@ export function VideoOptions({
       {avatarSupported && (
         // DESIGN.md: a hairline and a surface, no elevation shadow.
         <div className="bg-muted/40 flex items-center gap-3 rounded-md border px-4 py-3.5">
-          <Avatar className="ph-no-capture size-8 shrink-0">
-            <AvatarImage src={avatarUrl || undefined} alt="" />
-            <AvatarFallback>
-              {name.charAt(0).toUpperCase() || "?"}
-            </AvatarFallback>
-          </Avatar>
-
           <Label
             htmlFor="show-avatar"
             className="flex min-w-0 flex-col items-start gap-1"

@@ -198,7 +198,6 @@ export function RunStudio({
       onThemeChange={onThemeChange}
       avatarSupported={avatarSupported}
       avatarUrl={avatarUrl}
-      name={athlete?.firstname ?? ""}
       pending={athlete === undefined && athleteError == null}
       failed={athleteError != null}
       showAvatar={showAvatar}
