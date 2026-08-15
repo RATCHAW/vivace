@@ -507,7 +507,14 @@ export function CoachChat({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <Conversation>
-        <ConversationContent className="mx-auto flex w-full max-w-[760px] flex-col gap-7 px-1 py-6">
+        {/* The thread scrolls under the header's hairline, which slices a line
+            of the answer in half. The canvas fades in over the top instead, so
+            what leaves the viewport reads as passing behind it. */}
+        <div
+          aria-hidden
+          className="from-background pointer-events-none absolute inset-x-0 top-0 z-10 h-6 bg-linear-to-b to-transparent"
+        />
+        <ConversationContent className="mx-auto flex w-full max-w-[760px] flex-col gap-6 px-4 pt-6 pb-4 sm:px-6">
           {messages.length === 0 && (
             <div className="flex flex-col items-start gap-4 py-10">
               <span className="bg-brand text-brand-foreground flex size-11 items-center justify-center rounded-full">
@@ -666,7 +673,7 @@ export function CoachChat({
         <ConversationScrollButton />
       </Conversation>
 
-      <div className="mx-auto w-full max-w-[760px] shrink-0 px-1 pb-6">
+      <div className="mx-auto w-full max-w-[760px] shrink-0 px-4 pb-4 sm:px-6 sm:pb-6">
         <CoachComposer
           attached={attached}
           draft={draft}
@@ -681,8 +688,6 @@ export function CoachChat({
           status={status}
           suggestions={suggestions}
         />
-
-        <MonoLabel className="mt-3 block">{t("coach.grounded")}</MonoLabel>
       </div>
     </div>
   );
