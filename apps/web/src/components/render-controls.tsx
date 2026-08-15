@@ -1,17 +1,14 @@
 import { useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import type { TFunction } from "i18next";
 import { DownloadIcon, Loader2Icon } from "lucide-react";
-import { getTemplate, type TemplateId, type ThemeName } from "@repo/video";
-import { useVideoLabels, type VideoLabels } from "@/i18n/video";
+import type { TemplateId, ThemeName } from "@repo/video";
 import {
   getRunRenderOptions,
   getRunRenderQueryKey,
   startRunRenderMutation,
   subscribeRunRenderProgress,
   type Run,
-  type RunRender,
   type RunRenderState,
 } from "@/api";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -45,11 +42,12 @@ const RENDER_FLAG = "video-render";
  *
  * `template`, `showAvatar` and `theme` are what the film in the player is
  * playing, and they travel with the render request. A run holds one render per
- * template, so
- * switching template swaps which one this panel is about rather than replacing
- * it; within a template, a finished render made with a different answer is a
- * different video, so the panel offers that one for download and this one to
- * render, rather than passing the old MP4 off as the new choice.
+ * template, so switching template swaps which one this panel is about rather
+ * than replacing it; within a template, a finished render made with a different
+ * answer is a different video, so the same button renders that answer instead
+ * of passing the old MP4 off as the new choice. Changing an option therefore
+ * never adds a second button — it only changes what the one button has to do
+ * before the file exists.
  */
 export function RenderControls({
   run,
@@ -63,7 +61,6 @@ export function RenderControls({
   theme: ThemeName;
 }) {
   const { t } = useTranslation();
-  const labels = useVideoLabels();
   const queryClient = useQueryClient();
   // On unless PostHog says otherwise, so no key (or no flag) changes nothing.
   const renderEnabled = useFeatureFlag(RENDER_FLAG, true);
@@ -125,9 +122,13 @@ export function RenderControls({
     );
   }
 
-  const download = render?.status === "done" ? render.output_url : null;
+  // Only a finished render made with the options in force is this video; one
+  // made with another answer is a file for a film nobody is looking at, so it
+  // is not offered — the button below renders the current answer instead.
+  const download =
+    render?.status === "done" && !stale ? render.output_url : null;
 
-  if (download && !stale) {
+  if (download) {
     // The video on file is the one the player is showing.
     return (
       <Button
@@ -145,9 +146,6 @@ export function RenderControls({
 
   const failure =
     start.error?.error ?? (render?.status === "error" ? render.error : null);
-  // Past that return, a finished render can only be one made with the other
-  // options — a file worth keeping hold of, but not the film in the player.
-  const previous = stale ? download : null;
 
   // Already-rendered videos keep their download above; only new renders stop.
   if (!renderEnabled) {
@@ -165,13 +163,6 @@ export function RenderControls({
           <AlertTitle>{t("render.failedTitle")}</AlertTitle>
           <AlertDescription>{failure}</AlertDescription>
         </Alert>
-      )}
-      {previous && render && (
-        <p className="text-caption text-muted-foreground">
-          {t("render.lastRendered", {
-            options: describeOptions(template, render, t, labels),
-          })}
-        </p>
       )}
       <Button
         className="w-full"
@@ -203,53 +194,6 @@ export function RenderControls({
           ? t("render.retry")
           : t("render.downloadVideo")}
       </Button>
-      {/* Rendering replaces the stored file, so the one that already exists is
-          offered while it is still there. */}
-      {previous && (
-        <Button
-          variant="subtle"
-          className="w-full"
-          onClick={() =>
-            trackEvent("ui.video_downloaded", { activityId: run.id })
-          }
-          render={<a href={previous} download />}
-        >
-          <DownloadIcon />
-          {t("render.downloadLast")}
-        </Button>
-      )}
     </div>
   );
-}
-
-/**
- * What the stored film was made with, in the athlete's terms.
- *
- * Only the options this template actually honours: telling someone their Route
- * poster was rendered "with the plain dot" describes a marker it never draws.
- */
-// `RunRender` carries the `| null` of the state wrapper it is generated from;
-// the caller has already checked, so this takes the render itself.
-//
-// `t` and the label lookups are passed rather than reached for: this is a
-// string builder, not a component, and hooks are the caller's business.
-function describeOptions(
-  template: TemplateId,
-  render: NonNullable<RunRender>,
-  t: TFunction,
-  labels: VideoLabels,
-): string {
-  const entry = getTemplate(template);
-  const parts: string[] = [];
-  if (entry.supportsTheme) {
-    parts.push(
-      t("render.optionTheme", { theme: labels.themeLabel(render.theme) }),
-    );
-  }
-  if (entry.supportsAvatar) {
-    parts.push(
-      render.show_avatar ? t("render.optionAvatar") : t("render.optionDot"),
-    );
-  }
-  return parts.join(", ") || t("render.optionOther");
 }
