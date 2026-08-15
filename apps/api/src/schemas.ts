@@ -310,7 +310,13 @@ export const CoachChatRequestSchema = z
       .default("submit-message"),
     /** Required when `trigger` is `submit-message`. */
     message: CoachMessageSchema.optional(),
-    /** The message to regenerate from, when `trigger` is `regenerate-message`. */
+    /**
+     * The message this turn starts from, when it isn't a new one at the end of
+     * the transcript: the assistant reply to throw away when `trigger` is
+     * `regenerate-message`, or — on a `submit-message` — the question already
+     * stored that `message` is the athlete's rewrite of. Either way everything
+     * after it is forgotten, exactly as far back as the browser forgot it.
+     */
     message_id: z.string().optional(),
     /**
      * The window selected in the thread header. It reaches the model as part of

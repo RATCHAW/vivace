@@ -77,6 +77,12 @@ function createEntry(
                 thread_id: id,
                 trigger,
                 message: messages.at(-1),
+                // Set only when the athlete rewrote a question already in the
+                // conversation. The SDK has cut its own transcript back to it
+                // and reused its id; naming it here is what has the server cut
+                // the stored one to the same place instead of appending a
+                // second copy of the question.
+                ...(messageId ? { message_id: messageId } : {}),
                 range_weeks: options.rangeWeeks,
               },
       }),

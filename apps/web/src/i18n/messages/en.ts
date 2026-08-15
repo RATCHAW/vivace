@@ -231,6 +231,12 @@ export const en = {
     copy: "Copy",
     copied: "Copied",
     tryAgain: "Try again",
+    edit: "Edit",
+    /** The box that replaces the bubble — named for a screen reader, since the
+     *  message it opens with is the only label a sighted athlete needs. */
+    editLabel: "Edit your message",
+    editCancel: "Cancel",
+    editSend: "Ask again",
     helpful: "Helpful",
     notHelpful: "Not helpful",
     feedbackPlaceholder: "What was wrong with it? (optional)",
