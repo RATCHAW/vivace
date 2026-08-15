@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { APICallError, RetryError } from "ai";
 import {
   clock,
   decodePolyline,
@@ -14,6 +15,7 @@ import {
   weekStart,
 } from "./training.js";
 import { toQueue, toSignals, weeksToRace } from "./briefing.js";
+import { coachFailure } from "./coach.js";
 import { titleFrom } from "./chat-store.js";
 import type { BestEffort } from "./strava.js";
 import type { Run, RunStreams } from "./schemas.js";
@@ -556,5 +558,75 @@ describe("titleFrom", () => {
         ],
       }),
     ).toBeNull();
+  });
+});
+
+describe("coachFailure", () => {
+  /** What the provider throws: a sentence written for the account holder. */
+  function apiError(message: string, statusCode?: number): APICallError {
+    return new APICallError({
+      message,
+      url: "https://generativelanguage.googleapis.com/v1beta/models",
+      requestBodyValues: {},
+      statusCode,
+    });
+  }
+
+  /** What the SDK throws once `maxRetries` is spent on that. */
+  function afterRetries(last: Error): RetryError {
+    return new RetryError({
+      message: `Failed after 3 attempts. Last error: ${last.message}`,
+      reason: "maxRetriesExceeded",
+      errors: [last, last, last],
+    });
+  }
+
+  const QUOTA =
+    "You exceeded your current quota, please check your plan and billing " +
+    "details. * Quota exceeded for metric: " +
+    "generativelanguage.googleapis.com/generate_content_free_tier_requests";
+
+  it("reads a spent quota through the retries wrapping it", () => {
+    expect(coachFailure(afterRetries(apiError(QUOTA, 429)))).toBe(
+      "rate_limited",
+    );
+  });
+
+  it("reads a quota the provider did not answer 429 for", () => {
+    expect(coachFailure(apiError(QUOTA, 400))).toBe("rate_limited");
+  });
+
+  it("calls an overloaded model unavailable", () => {
+    expect(
+      coachFailure(
+        apiError("The model is overloaded. Please try again later.", 503),
+      ),
+    ).toBe("unavailable");
+  });
+
+  it("calls a request that never landed unavailable", () => {
+    expect(coachFailure(apiError("fetch failed"))).toBe("unavailable");
+  });
+
+  it("falls back to failed for anything it cannot place", () => {
+    expect(coachFailure(new Error("Cannot read properties of undefined"))).toBe(
+      "failed",
+    );
+    expect(coachFailure("not an error at all")).toBe("failed");
+  });
+
+  it("never returns anything the provider wrote", () => {
+    for (const error of [
+      afterRetries(apiError(QUOTA, 429)),
+      apiError("The model is overloaded. Please try again later.", 503),
+      new Error("ECONNREFUSED 127.0.0.1:443"),
+    ]) {
+      expect([
+        "not_configured",
+        "rate_limited",
+        "unavailable",
+        "failed",
+      ]).toContain(coachFailure(error));
+    }
   });
 });

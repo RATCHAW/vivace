@@ -8,7 +8,13 @@
 // than as JSON, so the shape of those outputs is part of the UI and changing
 // one means changing `coach-cards.tsx` with it.
 import { google } from "@ai-sdk/google";
-import { tool, type LanguageModel, type ToolSet } from "ai";
+import {
+  APICallError,
+  RetryError,
+  tool,
+  type LanguageModel,
+  type ToolSet,
+} from "ai";
 import { z } from "zod";
 import {
   fetchAthlete,
@@ -56,8 +62,8 @@ export interface CoachConfig {
 
 /**
  * Null until an API key is configured — the chat route turns that into a 503
- * with instructions rather than a crash, the same way the render routes treat
- * a missing Remotion Lambda deployment.
+ * with a `not_configured` reason rather than a crash, the same way the render
+ * routes treat a missing Remotion Lambda deployment.
  */
 export function getCoachConfig(): CoachConfig | null {
   // The name @ai-sdk/google reads by default; set it and the provider is wired.
@@ -67,10 +73,51 @@ export function getCoachConfig(): CoachConfig | null {
   return { model: google(modelId), modelId };
 }
 
+/** What the operator has to do about it. Logged, never sent to the browser. */
 export const COACH_NOT_CONFIGURED =
-  "The coach is not configured on this server. Get a key from " +
+  "No model API key is configured. Get a key from " +
   "https://aistudio.google.com/apikey and set GOOGLE_GENERATIVE_AI_API_KEY in " +
   "apps/api/.env.";
+
+/**
+ * Why a turn produced no answer, as a token rather than a sentence.
+ *
+ * The provider's own message is written for whoever holds the API key — a
+ * quota metric, a model id, a retry-in, a link to a billing page — and it
+ * reaches the browser verbatim unless something maps it first. The chat route
+ * sends one of these instead and apps/web writes the sentence, in the athlete's
+ * language; the real error is already in the log line and on the PostHog trace.
+ *
+ * Adding a reason means adding its copy to both catalogues in
+ * `apps/web/src/i18n/messages` — an unknown token falls back to `failed`, so a
+ * new one is a vaguer sentence rather than a broken screen.
+ */
+export type CoachFailure =
+  "not_configured" | "rate_limited" | "unavailable" | "failed";
+
+export function coachFailure(error: unknown): CoachFailure {
+  // `maxRetries` wraps the thing that actually broke: the SDK retried a 429
+  // three times and threw "Failed after 3 attempts. Last error: …".
+  const cause = RetryError.isInstance(error) ? error.lastError : error;
+
+  if (APICallError.isInstance(cause)) {
+    if (cause.statusCode === 429) return "rate_limited";
+    // No status at all is a connection that never landed.
+    if (cause.statusCode === undefined || cause.statusCode >= 500) {
+      return "unavailable";
+    }
+  }
+
+  // Providers disagree about which status carries a quota, and Gemini answers
+  // an overloaded model with a 503 whose message is the only thing that says
+  // so. The wording is a hint, never the classification's only source.
+  const message = cause instanceof Error ? cause.message.toLowerCase() : "";
+  if (/quota|rate limit|too many requests/.test(message)) return "rate_limited";
+  if (/overloaded|unavailable|timed out|timeout/.test(message)) {
+    return "unavailable";
+  }
+  return "failed";
+}
 
 /**
  * Thinking-capable Gemini models (2.5 and up) stream their reasoning when asked;

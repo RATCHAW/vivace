@@ -1866,7 +1866,7 @@
         },
         "responses": {
           "200": {
-            "description": "A UI message stream of the coach's reply.",
+            "description": "A UI message stream of the coach's reply. A turn that fails after the stream is open ends in an error chunk carrying a `CoachFailure` reason — `rate_limited`, `unavailable`, `failed` — never the provider's own message.",
             "content": {
               "text/event-stream": {
                 "schema": {
@@ -1906,7 +1906,7 @@
             }
           },
           "503": {
-            "description": "No model API key is configured on this server.",
+            "description": "No model API key is configured on this server; `error` is the `not_configured` reason, and the instructions are in the server log.",
             "content": {
               "application/json": {
                 "schema": {

@@ -227,6 +227,19 @@ export const en = {
     emptyBody:
       "Ask for a plan, a taper, or an honest read on last week. I can see every run you’ve synced from Strava.",
     errorTitle: "The coach could not answer",
+    /**
+     * One line per `CoachFailure` the API can send. What the athlete can do
+     * about it, never what broke — the provider's own message is a note to
+     * whoever holds the API key, and it stays in the server's log.
+     */
+    errors: {
+      notConfigured: "The coach isn’t available in this app right now.",
+      rateLimited:
+        "The coach is answering a lot of questions right now. Give it a minute and ask again.",
+      unavailable:
+        "The coach can’t be reached at the moment. Try again shortly.",
+      failed: "Something went wrong writing that answer. Try asking again.",
+    },
     planAccepted: "That’s your week. It’s in the rail now.",
     copy: "Copy",
     copied: "Copied",
@@ -237,7 +250,7 @@ export const en = {
     feedbackSend: "Send",
     feedbackThanks: "Thanks — that helps.",
     sources: "From",
-    toolFailed: "{{title}} failed: {{error}}",
+    toolFailed: "{{title}} failed",
     workingReading: "Reading your Strava history",
     workingWriting: "Writing",
 

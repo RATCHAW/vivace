@@ -203,12 +203,33 @@ function sourcesOf(message: UIMessage, runs: Run[] | undefined): Run[] {
 }
 
 /**
- * The chat transport throws the response body verbatim, which for this API is
- * the `ApiError` JSON — so a missing key would otherwise reach the athlete as
- * `{"error":"The coach is not configured…"}`. `@/api`'s interceptor unwraps this
- * for the generated client; the stream doesn't go through it.
+ * The sentence for each reason the API can give for an unanswered turn — the
+ * `CoachFailure` union in `apps/api/src/coach.ts`. A reason the catalogue has
+ * never heard of reads as `failed`, so the two can be added in either order.
  */
-function readableError(error: Error): string {
+const FAILURE_COPY = {
+  not_configured: "coach.errors.notConfigured",
+  rate_limited: "coach.errors.rateLimited",
+  unavailable: "coach.errors.unavailable",
+  failed: "coach.errors.failed",
+} satisfies Record<string, TranslationKey>;
+
+function isFailure(reason: string): reason is keyof typeof FAILURE_COPY {
+  return reason in FAILURE_COPY;
+}
+
+/**
+ * What the athlete is told when a turn produced no answer.
+ *
+ * Never the error itself. A failed turn arrives here two ways — as the stream's
+ * error text, or as the response body, which the chat transport throws verbatim
+ * rather than through `@/api`'s interceptor — and both of them carry a reason
+ * the API chose. Anything else is a dropped connection or the SDK's own
+ * wording, which is a developer's sentence and reads as the generic line; the
+ * error the athlete can do nothing about is on the server, in the log.
+ */
+function failureKey(error: Error): TranslationKey {
+  let reason = error.message;
   try {
     const body: unknown = JSON.parse(error.message);
     if (
@@ -217,12 +238,12 @@ function readableError(error: Error): string {
       "error" in body &&
       typeof body.error === "string"
     ) {
-      return body.error;
+      reason = body.error;
     }
   } catch {
-    // Not JSON — a dropped connection, or the SDK's own message.
+    // Not JSON — the stream's error chunk, or a connection that dropped.
   }
-  return error.message;
+  return isFailure(reason) ? FAILURE_COPY[reason] : FAILURE_COPY.failed;
 }
 
 /** The PostHog trace an answer was written under, when the API sent one. */
@@ -559,12 +580,12 @@ export function CoachChat({
                       : name;
 
                     if (part.state === "output-error") {
+                      // `errorText` is whatever the tool threw — a stack's worth
+                      // of Strava SDK wording, written for us and not for the
+                      // athlete. The API logs it; this says which tool it was.
                       return (
                         <p className="text-caption text-destructive" key={key}>
-                          {t("coach.toolFailed", {
-                            title,
-                            error: part.errorText,
-                          })}
+                          {t("coach.toolFailed", { title })}
                         </p>
                       );
                     }
@@ -667,7 +688,7 @@ export function CoachChat({
           {error && (
             <Alert variant="destructive">
               <AlertTitle>{t("coach.errorTitle")}</AlertTitle>
-              <AlertDescription>{readableError(error)}</AlertDescription>
+              <AlertDescription>{t(failureKey(error))}</AlertDescription>
             </Alert>
           )}
         </ConversationContent>
