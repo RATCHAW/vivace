@@ -12,7 +12,8 @@ import { PAGE_INSET, SAFE_WIDTH, TYPE } from "../../core/layout";
 import { countUpValue, MetricValue, Numeral, Unit } from "../../core/numerals";
 import { hashSeed } from "../../core/seed";
 import { MetricLabel, Rule, Stage } from "../../core/Stage";
-import { getTheme, type Theme } from "../../core/theme";
+import { videoTheme } from "../../core/greenscreen";
+import type { Theme } from "../../core/theme";
 import {
   beatProgress,
   easeOutCubic,
@@ -34,6 +35,8 @@ export type MinimalNumbersProps = {
   activity: VideoActivity;
   /** One of `THEME_NAMES`; anything else falls back to the default. */
   theme: string;
+  /** Cut the canvas as a chroma key plate — see `core/greenscreen.ts`. */
+  greenscreen?: boolean;
 };
 
 /**
@@ -47,10 +50,11 @@ export type MinimalNumbersProps = {
 export function MinimalNumbers({
   activity,
   theme: themeName,
+  greenscreen,
 }: MinimalNumbersProps) {
   const frame = useCurrentFrame();
   const { fps, durationInFrames } = useVideoConfig();
-  const theme = getTheme(themeName);
+  const theme = videoTheme(themeName, greenscreen);
   const plan = useMemo(
     () => minimalNumbersPlan(activity, fps, durationInFrames),
     [activity, fps, durationInFrames],

@@ -1,4 +1,5 @@
 import { AbsoluteFill, useCurrentFrame, useVideoConfig } from "remotion";
+import { KEY_COLOR } from "../../core/greenscreen";
 import type { VideoActivity, VideoStreams } from "../../types";
 import {
   avatarSource,
@@ -6,7 +7,13 @@ import {
   metricsAtProgress,
   routeProgressAtFrame,
 } from "./data";
-import { RouteOverlay, StoryProgress, TYPE, Watermark } from "./overlay";
+import {
+  overlayInk,
+  RouteOverlay,
+  StoryProgress,
+  TYPE,
+  Watermark,
+} from "./overlay";
 import { RunMap } from "./RunMap";
 import { RouteFallback } from "./RouteFallback";
 
@@ -19,6 +26,12 @@ export type RunVideoProps = {
   /** The athlete's Strava picture, riding the head of the trace in place of the
    *  dot. Empty — the default — keeps the dot. */
   avatarUrl: string;
+  /** Cut the canvas as a chroma key plate — see `core/greenscreen.ts`. Here it
+   *  also takes the basemap out: the map *is* this template's background, and a
+   *  film made to have its background replaced cannot be built on one. What is
+   *  left is the trace, the runner and the live numbers, over the athlete's own
+   *  footage. */
+  greenscreen?: boolean;
 };
 
 /** The replay is one shot: the route drawing under live metrics, with the camera
@@ -29,6 +42,7 @@ export function RunVideo({
   streams,
   mapboxToken,
   avatarUrl,
+  greenscreen = false,
 }: RunVideoProps) {
   const frame = useCurrentFrame();
   const { fps, width, height, durationInFrames } = useVideoConfig();
@@ -42,7 +56,12 @@ export function RunVideo({
 
   const points = streams.latlng?.data ?? [];
   const hasRoute = points.length >= 2;
-  const hasMap = hasRoute && mapboxToken !== "";
+  // A keyed film never mounts the map, token or not: tiles are somebody else's
+  // photograph of the ground, and this cut exists to put the athlete's own
+  // footage there instead.
+  const hasMap = hasRoute && mapboxToken !== "" && !greenscreen;
+  const plate = greenscreen ? KEY_COLOR : "#000000";
+  const ink = overlayInk(greenscreen);
   // An athlete with no Strava picture gets the dot, whatever the option said.
   const avatar = avatarSource(avatarUrl);
   const live = metricsAtProgress(activity, streams, routeProgress, fps);
@@ -52,7 +71,7 @@ export function RunVideo({
   const hudOpacity = fadeAt(t, 0, 0.03, 1.01, 1.02);
 
   return (
-    <AbsoluteFill style={{ backgroundColor: "#000000", color: "#ffffff" }}>
+    <AbsoluteFill style={{ backgroundColor: plate, color: "#ffffff" }}>
       {/* The map plate is the film — it stays mounted and lit for every frame;
           remounting it would cost a Mapbox style load mid-video. */}
       <AbsoluteFill>
@@ -72,33 +91,43 @@ export function RunVideo({
             width={width}
             height={height}
             avatarUrl={avatar}
+            plate={plate}
+            trackColor={ink.track}
           />
         ) : null}
 
         {/* Scrims keep type legible over the map without breaking the
-            no-drop-shadow rule — elevation via canvas luminance only. */}
-        <div
-          style={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            right: 0,
-            height: 560,
-            background:
-              "linear-gradient(to bottom, rgba(0,0,0,0.88), rgba(0,0,0,0))",
-          }}
-        />
-        <div
-          style={{
-            position: "absolute",
-            bottom: 0,
-            left: 0,
-            right: 0,
-            height: 780,
-            background:
-              "linear-gradient(to top, rgba(0,0,0,0.92), rgba(0,0,0,0))",
-          }}
-        />
+            no-drop-shadow rule — elevation via canvas luminance only. There is
+            no map on the key plate, and a gradient that fades *into* the key
+            colour is the one shape a chroma key cannot cut cleanly: it would
+            leave a dark halo across the top and bottom of the athlete's own
+            footage. */}
+        {!greenscreen && (
+          <>
+            <div
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                right: 0,
+                height: 560,
+                background:
+                  "linear-gradient(to bottom, rgba(0,0,0,0.88), rgba(0,0,0,0))",
+              }}
+            />
+            <div
+              style={{
+                position: "absolute",
+                bottom: 0,
+                left: 0,
+                right: 0,
+                height: 780,
+                background:
+                  "linear-gradient(to top, rgba(0,0,0,0.92), rgba(0,0,0,0))",
+              }}
+            />
+          </>
+        )}
 
         {hasMap && (
           <div
@@ -115,9 +144,14 @@ export function RunVideo({
         )}
       </AbsoluteFill>
 
-      <RouteOverlay activity={activity} live={live} opacity={hudOpacity} />
+      <RouteOverlay
+        activity={activity}
+        live={live}
+        opacity={hudOpacity}
+        ink={ink}
+      />
       <Watermark />
-      <StoryProgress progress={t} />
+      <StoryProgress progress={t} ink={ink} />
     </AbsoluteFill>
   );
 }

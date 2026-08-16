@@ -343,6 +343,9 @@
           "theme": {
             "$ref": "#/components/schemas/VideoTheme"
           },
+          "greenscreen": {
+            "type": "boolean"
+          },
           "progress": {
             "type": "number",
             "minimum": 0,
@@ -377,6 +380,7 @@
           "status",
           "show_avatar",
           "theme",
+          "greenscreen",
           "progress",
           "output_url",
           "error",
@@ -416,6 +420,11 @@
           },
           "theme": {
             "$ref": "#/components/schemas/VideoTheme"
+          },
+          "greenscreen": {
+            "type": "boolean",
+            "default": false,
+            "example": true
           }
         }
       },

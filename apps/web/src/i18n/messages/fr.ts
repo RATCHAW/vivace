@@ -180,6 +180,11 @@ export const fr: Translated<Messages> = {
     avatarPending: "Vérification de votre profil Strava…",
     avatarFailed: "Votre profil Strava n’a pas pu être lu.",
     avatarMissing: "Ajoutez une photo sur Strava pour l’utiliser.",
+    greenscreen: "Fond vert",
+    greenscreenHint:
+      "Rend le fond en vert incrustable : détourez-le et mettez votre propre vidéo derrière la course.",
+    greenscreenMap:
+      "Remplace la carte par du vert incrustable : détourez-le et faites courir le tracé sur votre propre vidéo.",
   },
 
   video: {

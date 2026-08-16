@@ -165,6 +165,10 @@ export const RunRenderOptionsSchema = z
     /** Which of the three looks to cut it in. Ignored by a template whose
      *  `supportsTheme` is false — the replay's plate is a Mapbox style. */
     theme: VideoThemeSchema.default(DEFAULT_THEME),
+    /** Cut the canvas as a chroma key plate, so the athlete can key it away and
+     *  put their own footage behind the run. Honoured by every template — it is
+     *  a delivery format rather than a look, so it has no `supports…` flag. */
+    greenscreen: z.boolean().default(false).openapi({ example: true }),
   })
   .openapi("RunRenderOptions");
 
@@ -189,6 +193,7 @@ export const RunRenderSchema = z
      *  wrong MP4. */
     show_avatar: z.boolean(),
     theme: VideoThemeSchema,
+    greenscreen: z.boolean(),
     /** Overall Lambda render progress, 0–1. */
     progress: z.number().min(0).max(1).openapi({ example: 0.42 }),
     output_url: z.string().nullable().openapi({

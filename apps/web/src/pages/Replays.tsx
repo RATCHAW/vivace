@@ -59,6 +59,7 @@ export function Replays() {
   // here rather than in the studio because on a phone the studio unmounts every
   // time the athlete goes back to the list.
   const [showAvatar, setShowAvatar] = useState(false);
+  const [greenscreen, setGreenscreen] = useState(false);
   const [chosen, setChosen] = useState<TemplateId>(DEFAULT_TEMPLATE_ID);
   const [theme, setTheme] = useState<ThemeName>(DEFAULT_THEME);
 
@@ -271,6 +272,14 @@ export function Replays() {
                 // and this switch decides what gets rendered.
                 trackEvent("ui.video_option_changed", {
                   option: "show_avatar",
+                  value: next,
+                });
+              }}
+              greenscreen={greenscreen}
+              onGreenscreenChange={(next) => {
+                setGreenscreen(next);
+                trackEvent("ui.video_option_changed", {
+                  option: "greenscreen",
                   value: next,
                 });
               }}

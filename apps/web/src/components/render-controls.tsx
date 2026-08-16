@@ -59,9 +59,9 @@ type RenderLayout = "panel" | "tile";
  *
  * It draws no margin of its own — `<RunStudio>` owns the box it sits in.
  *
- * `template`, `showAvatar` and `theme` are what the film in the player is
- * playing, and they travel with the render request. A run holds one render per
- * template, so switching template swaps which one this panel is about rather
+ * `template`, `showAvatar`, `theme` and `greenscreen` are what the film in the
+ * player is playing, and they travel with the render request. A run holds one
+ * render per template, so switching template swaps which one this is about rather
  * than replacing it; within a template, a finished render made with a different
  * answer is a different video, so the same button renders that answer instead
  * of passing the old MP4 off as the new choice. Changing an option therefore
@@ -73,12 +73,14 @@ export function RenderControls({
   template,
   showAvatar,
   theme,
+  greenscreen,
   layout = "panel",
 }: {
   run: Run;
   template: TemplateId;
   showAvatar: boolean;
   theme: ThemeName;
+  greenscreen: boolean;
   layout?: RenderLayout;
 }) {
   const { t } = useTranslation();
@@ -95,7 +97,9 @@ export function RenderControls({
   // film made with another answer is a different video, not this one.
   const stale =
     render != null &&
-    (render.show_avatar !== showAvatar || render.theme !== theme);
+    (render.show_avatar !== showAvatar ||
+      render.theme !== theme ||
+      render.greenscreen !== greenscreen);
 
   const start = useMutation({
     ...startRunRenderMutation(),
@@ -150,8 +154,12 @@ export function RenderControls({
       retry: render?.status === "error",
       showAvatar,
       theme,
+      greenscreen,
     });
-    start.mutate({ path, body: { template, show_avatar: showAvatar, theme } });
+    start.mutate({
+      path,
+      body: { template, show_avatar: showAvatar, theme, greenscreen },
+    });
   };
   const noteDownload = () =>
     trackEvent("ui.video_downloaded", {

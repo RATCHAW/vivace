@@ -23,6 +23,7 @@ const tz = { withTimezone: true } as const;
 export interface StoredRenderOptions {
   show_avatar?: boolean;
   theme?: ThemeName;
+  greenscreen?: boolean;
 }
 
 export const runRender = pgTable(

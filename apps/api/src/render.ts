@@ -34,6 +34,9 @@ export interface RenderTarget {
 export interface RenderOptions {
   showAvatar: boolean;
   theme: ThemeName;
+  /** Cut the film's canvas as a chroma key plate, so the athlete can drop their
+   *  own footage in behind it. Every template honours this one. */
+  greenscreen: boolean;
 }
 
 const DEFAULT_REGION = "us-east-1";
@@ -88,6 +91,9 @@ export function renderPropsHash(
     // rendered before themes existed still hashes to what it hashed to then —
     // adding the option didn't mark a single athlete's finished film stale.
     ...(options.theme === DEFAULT_THEME ? {} : { theme: options.theme }),
+    // Same trick, and the same reason: a film nobody asked to key hashes
+    // exactly as it did before the option existed.
+    ...(options.greenscreen ? { greenscreen: true } : {}),
   });
   return createHash("sha256").update(canonical).digest("hex").slice(0, 32);
 }
@@ -97,10 +103,14 @@ export async function startLambdaRender(
   target: RenderTarget,
   run: Run,
   streams: RunStreams,
-  /** The athlete's Strava picture URL when the avatar option is on, else "". */
-  avatarUrl: string,
-  /** The look to cut it in; a template that isn't themed ignores it. */
-  theme: ThemeName = DEFAULT_THEME,
+  cut: {
+    /** The athlete's Strava picture URL when the avatar option is on, else "". */
+    avatarUrl: string;
+    /** The look to cut it in; a template that isn't themed ignores it. */
+    theme?: ThemeName;
+    /** Cut it on the chroma key plate. */
+    greenscreen?: boolean;
+  },
 ): Promise<{ renderId: string; bucketName: string }> {
   const { template, region, functionName, serveUrl } = target;
   const profile = getProfile(template);
@@ -117,8 +127,9 @@ export async function startLambdaRender(
       // the client. Empty renders the plain route canvas fallback, and a
       // template that draws no map never sees it at all.
       mapboxToken: template.usesMap ? (process.env.MAPBOX_TOKEN ?? "") : "",
-      avatarUrl,
-      theme,
+      avatarUrl: cut.avatarUrl,
+      theme: cut.theme ?? DEFAULT_THEME,
+      greenscreen: cut.greenscreen ?? false,
     },
     codec: "h264",
     // Public so output_url is directly downloadable from the browser.

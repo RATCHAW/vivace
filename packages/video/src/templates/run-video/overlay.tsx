@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { AbsoluteFill } from "remotion";
 import { VivaceMark } from "../../brand/vivace-mark";
+import { flattenOver } from "../../core/greenscreen";
 import type { VideoActivity } from "../../types";
 import {
   formatClock,
@@ -25,6 +26,35 @@ const ON_DARK_MUTE = "rgba(255,255,255,0.72)";
 const ON_DARK_FAINT = "rgba(255,255,255,0.64)";
 // {colors.hairline-dark}, one step up for rules that carry a layout.
 const RULE = "rgba(255,255,255,0.16)";
+const TRACK = "rgba(255,255,255,0.22)";
+
+/**
+ * The HUD's inks, over the map and over the key plate.
+ *
+ * Every translucent one was mixed against the black under the map, so on the
+ * key plate it is flattened over that same black rather than restyled: a
+ * 72%-white label over chroma green composites to pale green, and the key eats
+ * it along with the background. Flattened, it is the grey it always looked like
+ * — and it survives the cut.
+ */
+const OVER_MAP = {
+  mute: ON_DARK_MUTE,
+  faint: ON_DARK_FAINT,
+  rule: RULE,
+  track: TRACK,
+};
+
+const OVER_KEY: Ink = {
+  mute: flattenOver(ON_DARK_MUTE, "#000000"),
+  faint: flattenOver(ON_DARK_FAINT, "#000000"),
+  rule: flattenOver(RULE, "#000000"),
+  track: flattenOver(TRACK, "#000000"),
+};
+
+export type Ink = typeof OVER_MAP;
+
+export const overlayInk = (greenscreen: boolean): Ink =>
+  greenscreen ? OVER_KEY : OVER_MAP;
 
 const SANS = "'Inter Variable', Inter, system-ui, sans-serif";
 const MONO =
@@ -53,11 +83,11 @@ const PAGE_PADDING = `107px ${PAGE_INSET}px`;
 function MonoLabel({
   children,
   size = TYPE.mono,
-  color = ON_DARK_MUTE,
+  color,
 }: {
   children: ReactNode;
   size?: number;
-  color?: string;
+  color: string;
 }) {
   return (
     <div
@@ -73,19 +103,21 @@ function MonoLabel({
   );
 }
 
-function Rule({ margin = 0 }: { margin?: number | string }) {
-  return <div style={{ height: 1, backgroundColor: RULE, margin }} />;
+function Rule({ ink, margin = 0 }: { ink: Ink; margin?: number | string }) {
+  return <div style={{ height: 1, backgroundColor: ink.rule, margin }} />;
 }
 
 function MetricTile({
   label,
   value,
   unit,
+  ink,
   size = TYPE.tileValue,
 }: {
   label: string;
   value: ReactNode;
   unit?: string;
+  ink: Ink;
   size?: number;
 }) {
   return (
@@ -95,7 +127,7 @@ function MetricTile({
           fontFamily: MONO,
           fontSize: TYPE.tileLabel,
           letterSpacing: "0.14em",
-          color: ON_DARK_FAINT,
+          color: ink.faint,
         }}
       >
         {label}
@@ -117,7 +149,7 @@ function MetricTile({
               fontSize: TYPE.tileUnit,
               fontWeight: 500,
               marginLeft: 10,
-              color: ON_DARK_FAINT,
+              color: ink.faint,
             }}
           >
             {unit}
@@ -137,10 +169,13 @@ export function RouteOverlay({
   activity,
   live,
   opacity,
+  ink,
 }: {
   activity: VideoActivity;
   live: LiveMetrics;
   opacity: number;
+  /** Which set of inks the plate underneath calls for — see `overlayInk`. */
+  ink: Ink;
 }) {
   return (
     <AbsoluteFill
@@ -153,7 +188,7 @@ export function RouteOverlay({
       }}
     >
       <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
-        <MonoLabel>{formatStartDate(activity)}</MonoLabel>
+        <MonoLabel color={ink.mute}>{formatStartDate(activity)}</MonoLabel>
         <h1
           style={{
             margin: 0,
@@ -186,14 +221,14 @@ export function RouteOverlay({
               fontSize: TYPE.heroUnit,
               fontWeight: 500,
               letterSpacing: "0.08em",
-              color: ON_DARK_MUTE,
+              color: ink.mute,
             }}
           >
             KM
           </span>
         </div>
 
-        <Rule margin="44px 0" />
+        <Rule ink={ink} margin="44px 0" />
 
         <div
           style={{
@@ -202,19 +237,30 @@ export function RouteOverlay({
             gap: 32,
           }}
         >
-          <MetricTile label="TIME" value={formatClock(live.elapsedSeconds)} />
+          <MetricTile
+            label="TIME"
+            value={formatClock(live.elapsedSeconds)}
+            ink={ink}
+          />
           <MetricTile
             label="PACE"
             value={formatPace(live.paceSecondsPerKm)}
             unit="/KM"
+            ink={ink}
           />
           {live.heartrate != null ? (
-            <MetricTile label="HEART RATE" value={live.heartrate} unit="BPM" />
+            <MetricTile
+              label="HEART RATE"
+              value={live.heartrate}
+              unit="BPM"
+              ink={ink}
+            />
           ) : (
             <MetricTile
               label="ELEV GAIN"
               value={Math.round(live.elevationGainMeters)}
               unit="M"
+              ink={ink}
             />
           )}
         </div>
@@ -268,7 +314,13 @@ export function Watermark() {
 
 /** The bar across the top that says how much of the story is left — the format's
  *  own furniture, filling once across the single shot. */
-export function StoryProgress({ progress }: { progress: number }) {
+export function StoryProgress({
+  progress,
+  ink,
+}: {
+  progress: number;
+  ink: Ink;
+}) {
   return (
     <div
       style={{
@@ -278,7 +330,7 @@ export function StoryProgress({ progress }: { progress: number }) {
         right: 53,
         height: 8,
         borderRadius: 9999,
-        backgroundColor: "rgba(255,255,255,0.22)",
+        backgroundColor: ink.track,
         overflow: "hidden",
       }}
     >
