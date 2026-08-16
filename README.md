@@ -32,8 +32,8 @@ appear in the product as coming next, but are not implemented yet.
 
 - Node.js 22 (the version used by CI and the Docker images; Node.js ≥20.19 is
   supported) and Docker
-- pnpm 10.17 — `corepack enable` picks up the pinned version from
-  `packageManager`, or install it directly with `npm i -g pnpm@10.17.0`
+- pnpm 11.21 — `corepack enable` picks up the pinned version from
+  `packageManager`, or install it directly with `npm i -g pnpm@11.21.0`
 - A Strava API application: create one at <https://www.strava.com/settings/api>
   - Set **Authorization Callback Domain** to `localhost`
 
@@ -629,8 +629,8 @@ HUSKY=0 git commit       # skip them for a whole shell session
 
 ## License
 
-[CC BY-NC-SA 4.0](./LICENSE) — anyone may use, modify, and share this source code,
-**but** derivatives must stay under the same license (ShareAlike ≈ "keep it open
-source") and **commercial use is not permitted** (NonCommercial). Note this is
-therefore not an OSI-approved "open source" license, which by definition would have
-to allow commercial use.
+[GNU AGPL v3.0](./LICENSE) — anyone may use, modify, share and sell this source
+code, **but** derivatives must stay under the same license, and running a modified
+version as a network service counts as distribution: its users have to be offered
+the complete corresponding source (section 13). That network clause is what
+separates the AGPL from the plain GPL, and it is the point of choosing it here.
