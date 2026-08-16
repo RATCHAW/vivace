@@ -1,7 +1,7 @@
 {
   "name": "strava-login-app",
   "private": true,
-  "license": "CC-BY-NC-SA-4.0",
+  "license": "AGPL-3.0-only",
   "packageManager": "pnpm@11.21.0",
   "scripts": {
     "prepare": "husky || true",

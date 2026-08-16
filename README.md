@@ -629,8 +629,8 @@ HUSKY=0 git commit       # skip them for a whole shell session
 
 ## License
 
-[CC BY-NC-SA 4.0](./LICENSE) — anyone may use, modify, and share this source code,
-**but** derivatives must stay under the same license (ShareAlike ≈ "keep it open
-source") and **commercial use is not permitted** (NonCommercial). Note this is
-therefore not an OSI-approved "open source" license, which by definition would have
-to allow commercial use.
+[GNU AGPL v3.0](./LICENSE) — anyone may use, modify, share and sell this source
+code, **but** derivatives must stay under the same license, and running a modified
+version as a network service counts as distribution: its users have to be offered
+the complete corresponding source (section 13). That network clause is what
+separates the AGPL from the plain GPL, and it is the point of choosing it here.
