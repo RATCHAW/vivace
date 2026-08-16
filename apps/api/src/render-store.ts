@@ -37,6 +37,8 @@ function fromDb(row: RunRenderSelect): RunRenderRow {
       // A row written before themes existed carries none, and the film it
       // describes was cut in the default one.
       theme: themeOf(row.options.theme),
+      // Same for a row written before the key plate: it was cut on black.
+      greenscreen: row.options.greenscreen ?? false,
     },
   };
 }
@@ -49,6 +51,7 @@ export function toRunRender(row: RunRenderRow): RunRender {
     status: row.status,
     show_avatar: row.options.showAvatar,
     theme: row.options.theme,
+    greenscreen: row.options.greenscreen,
     progress: row.progress,
     output_url: row.outputUrl,
     error: row.error,
@@ -104,6 +107,7 @@ export async function saveStartedRender(input: {
     options: {
       show_avatar: input.options.showAvatar,
       theme: input.options.theme,
+      greenscreen: input.options.greenscreen,
     },
     propsHash: input.propsHash,
   };

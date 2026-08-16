@@ -647,7 +647,10 @@ app.openapi(startRunRenderRoute, async (c) => {
   const theme = getTemplate(template).supportsTheme
     ? (body?.theme ?? DEFAULT_THEME)
     : DEFAULT_THEME;
-  const options = { showAvatar, theme };
+  // No `supportsGreenscreen` to check: the key plate is a delivery format, not
+  // a look, and every template in the catalogue cuts one.
+  const greenscreen = body?.greenscreen ?? false;
+  const options = { showAvatar, theme, greenscreen };
 
   const target = resolveRenderTarget(template);
   if (!target) {
@@ -681,7 +684,14 @@ app.openapi(startRunRenderRoute, async (c) => {
     track(
       c,
       "render.reused",
-      { activityId, template, status: existing.status, showAvatar, theme },
+      {
+        activityId,
+        template,
+        status: existing.status,
+        showAvatar,
+        theme,
+        greenscreen,
+      },
       "Returned the existing render",
     );
     return c.json({ render: toRunRender(existing) }, 200);
@@ -702,8 +712,7 @@ app.openapi(startRunRenderRoute, async (c) => {
       target,
       run,
       streams,
-      athlete?.profile ?? "",
-      theme,
+      { avatarUrl: athlete?.profile ?? "", theme, greenscreen },
     );
     const row = await saveStartedRender({
       userId: session.user.id,
@@ -727,6 +736,7 @@ app.openapi(startRunRenderRoute, async (c) => {
         bucketName,
         showAvatar,
         theme,
+        greenscreen,
         retry: Boolean(existing),
       },
       "Started a Lambda render",

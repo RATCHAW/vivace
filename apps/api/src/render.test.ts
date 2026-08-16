@@ -1,7 +1,11 @@
 import { createHash } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { DEFAULT_TEMPLATE_ID, getTemplate } from "@repo/video";
-import { renderPropsHash, resolveRenderTarget } from "./render.js";
+import {
+  renderPropsHash,
+  resolveRenderTarget,
+  type RenderOptions,
+} from "./render.js";
 
 const TEMPLATE = DEFAULT_TEMPLATE_ID;
 const PROFILE = getTemplate(TEMPLATE).profile.toUpperCase();
@@ -89,49 +93,69 @@ describe("resolveRenderTarget", () => {
 });
 
 describe("renderPropsHash", () => {
+  /** The cut every assertion starts from: the answers a render that was never
+   *  configured is made with. Spelled once, so a new option is one edit here
+   *  rather than one per assertion — and so the ones below name only what they
+   *  are actually about. */
+  const cut = (options: Partial<RenderOptions> = {}): RenderOptions => ({
+    showAvatar: false,
+    theme: "charcoal",
+    greenscreen: false,
+    ...options,
+  });
+
   it("is stable for the same cut", () => {
-    expect(
-      renderPropsHash(TEMPLATE, { showAvatar: true, theme: "charcoal" }),
-    ).toBe(renderPropsHash(TEMPLATE, { showAvatar: true, theme: "charcoal" }));
+    expect(renderPropsHash(TEMPLATE, cut({ showAvatar: true }))).toBe(
+      renderPropsHash(TEMPLATE, cut({ showAvatar: true })),
+    );
   });
 
   it("separates the options that make a different video", () => {
-    expect(
-      renderPropsHash(TEMPLATE, { showAvatar: true, theme: "charcoal" }),
-    ).not.toBe(
-      renderPropsHash(TEMPLATE, { showAvatar: false, theme: "charcoal" }),
+    expect(renderPropsHash(TEMPLATE, cut({ showAvatar: true }))).not.toBe(
+      renderPropsHash(TEMPLATE, cut()),
     );
   });
 
   it("separates templates, so one cut never serves another's MP4", () => {
-    expect(
-      renderPropsHash(TEMPLATE, { showAvatar: false, theme: "charcoal" }),
-    ).not.toBe(
-      renderPropsHash("other-template" as never, {
-        showAvatar: false,
-        theme: "charcoal",
-      }),
+    expect(renderPropsHash(TEMPLATE, cut())).not.toBe(
+      renderPropsHash("other-template" as never, cut()),
     );
   });
 
   it("separates the look, but leaves the default one out of the hash", () => {
     // A theme other than the default is a different film, and the browser has
     // to be offered a re-render for it.
-    expect(
-      renderPropsHash(TEMPLATE, { showAvatar: false, theme: "cream" }),
-    ).not.toBe(
-      renderPropsHash(TEMPLATE, { showAvatar: false, theme: "charcoal" }),
+    expect(renderPropsHash(TEMPLATE, cut({ theme: "cream" }))).not.toBe(
+      renderPropsHash(TEMPLATE, cut()),
     );
     // …and the default one hashes to what it hashed to before themes existed,
     // so adding the option marked no athlete's finished video stale.
-    expect(
-      renderPropsHash(TEMPLATE, { showAvatar: false, theme: "charcoal" }),
-    ).toBe(
+    expect(renderPropsHash(TEMPLATE, cut())).toBe(
       createHash("sha256")
         .update(JSON.stringify({ template: TEMPLATE, show_avatar: false }))
         .digest("hex")
         .slice(0, 32),
     );
+  });
+
+  it("separates the key plate, and leaves a film nobody keys where it was", () => {
+    // A greenscreen cut is a different file from the same run on black.
+    expect(renderPropsHash(TEMPLATE, cut({ greenscreen: true }))).not.toBe(
+      renderPropsHash(TEMPLATE, cut()),
+    );
+    // The option off hashes to what it hashed to before the option existed —
+    // the same promise the default theme keeps.
+    expect(renderPropsHash(TEMPLATE, cut())).toBe(
+      createHash("sha256")
+        .update(JSON.stringify({ template: TEMPLATE, show_avatar: false }))
+        .digest("hex")
+        .slice(0, 32),
+    );
+    // …and it composes with the look rather than replacing it: cream keyed and
+    // cream on paper are two films.
+    expect(
+      renderPropsHash(TEMPLATE, cut({ theme: "cream", greenscreen: true })),
+    ).not.toBe(renderPropsHash(TEMPLATE, cut({ theme: "cream" })));
   });
 
   it("ignores where the render ran", () => {
@@ -140,14 +164,9 @@ describe("renderPropsHash", () => {
     // file they already have.
     process.env.REMOTION_SERVE_URL =
       "https://s3/sites/vivace-abc123/index.html";
-    const before = renderPropsHash(TEMPLATE, {
-      showAvatar: false,
-      theme: "charcoal",
-    });
+    const before = renderPropsHash(TEMPLATE, cut());
     process.env.REMOTION_SERVE_URL =
       "https://s3/sites/vivace-def456/index.html";
-    expect(
-      renderPropsHash(TEMPLATE, { showAvatar: false, theme: "charcoal" }),
-    ).toBe(before);
+    expect(renderPropsHash(TEMPLATE, cut())).toBe(before);
   });
 });

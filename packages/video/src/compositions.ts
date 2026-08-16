@@ -46,6 +46,9 @@ export interface VideoProps extends Record<string, unknown> {
   avatarUrl: string;
   /** One of `THEME_NAMES`. A template that doesn't support themes ignores it. */
   theme: string;
+  /** Cut the canvas as a chroma key plate. Every template honours this one —
+   *  see `core/greenscreen.ts`. */
+  greenscreen: boolean;
 }
 
 export const VIDEO_COMPONENTS: Record<TemplateId, ComponentType<VideoProps>> = {

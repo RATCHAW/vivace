@@ -70,17 +70,25 @@ export const TEMPLATE_DEFAULT_PROPS: Record<
     streams: {},
     mapboxToken: "",
     avatarUrl: "",
+    greenscreen: false,
   },
-  "split-rush": { activity: placeholderRun, streams: {}, theme: DEFAULT_THEME },
+  "split-rush": {
+    activity: placeholderRun,
+    streams: {},
+    theme: DEFAULT_THEME,
+    greenscreen: false,
+  },
   "living-poster": {
     activity: placeholderRun,
     streams: {},
     theme: DEFAULT_THEME,
+    greenscreen: false,
   },
   "minimal-numbers": {
     activity: placeholderRun,
     streams: {},
     theme: DEFAULT_THEME,
+    greenscreen: false,
   },
 };
 

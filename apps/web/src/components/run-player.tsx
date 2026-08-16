@@ -77,6 +77,7 @@ export function RunPlayer({
   mapboxToken,
   avatarUrl,
   theme,
+  greenscreen,
   fit = "width",
   chrome = "studio",
   frameRef,
@@ -94,6 +95,10 @@ export function RunPlayer({
   avatarUrl: string;
   /** Which of the three looks to cut it in. */
   theme: ThemeName;
+  /** Cut the canvas as a chroma key plate. Every template honours it, and the
+   *  player shows it as it will be exported — green and all, because what the
+   *  athlete is judging is whether the type still reads once it is keyed. */
+  greenscreen: boolean;
   /** Whether the frame is measured off its column or off the space left in the
    *  column. See `filmFrame`. */
   fit?: FilmFit;
@@ -166,7 +171,14 @@ export function RunPlayer({
       <Player
         ref={player}
         component={VIDEO_COMPONENTS[template]}
-        inputProps={{ activity, streams, mapboxToken, avatarUrl, theme }}
+        inputProps={{
+          activity,
+          streams,
+          mapboxToken,
+          avatarUrl,
+          theme,
+          greenscreen,
+        }}
         durationInFrames={durationInFrames}
         fps={fps}
         compositionWidth={width}

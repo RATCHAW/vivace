@@ -176,6 +176,13 @@ export const en = {
     avatarPending: "Checking your Strava profile…",
     avatarFailed: "Your Strava profile could not be read.",
     avatarMissing: "Add a photo on Strava to use this.",
+    greenscreen: "Green screen",
+    greenscreenHint:
+      "Renders the background in key green, so you can cut it out and put your own video behind the run.",
+    /** A template whose background is a basemap trades it for the plate, and
+     *  the athlete should read that before they throw the switch. */
+    greenscreenMap:
+      "Drops the map for key green, so you can cut it out and run the route over your own video.",
   },
 
   /**

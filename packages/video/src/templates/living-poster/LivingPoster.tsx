@@ -11,7 +11,8 @@ import {
 import { MetricValue } from "../../core/numerals";
 import { hashSeed } from "../../core/seed";
 import { MetricLabel, Stage } from "../../core/Stage";
-import { getTheme, type Theme } from "../../core/theme";
+import { videoTheme } from "../../core/greenscreen";
+import type { Theme } from "../../core/theme";
 import {
   easeInOutCubic,
   easeOutBack,
@@ -34,6 +35,8 @@ export type LivingPosterProps = {
   streams: VideoStreams;
   /** One of `THEME_NAMES`; anything else falls back to the default. */
   theme: string;
+  /** Cut the canvas as a chroma key plate — see `core/greenscreen.ts`. */
+  greenscreen?: boolean;
 };
 
 /**
@@ -51,10 +54,11 @@ export function LivingPoster({
   activity,
   streams,
   theme: themeName,
+  greenscreen,
 }: LivingPosterProps) {
   const frame = useCurrentFrame();
   const { fps, durationInFrames } = useVideoConfig();
-  const theme = getTheme(themeName);
+  const theme = videoTheme(themeName, greenscreen);
   const plan = useMemo(
     () => posterPlan(activity, streams, fps, durationInFrames),
     [activity, streams, fps, durationInFrames],
@@ -90,7 +94,11 @@ export function LivingPoster({
 
   return (
     <Stage theme={theme} seed={hashSeed(activity.id, "living-poster")}>
-      <Grid theme={theme} opacity={gridIn * 0.5} />
+      {/* The grid is stock texture — it is there to stop the plate reading as
+          empty. On the key plate there is no plate to furnish, and a half-
+          transparent hairline over chroma green keys out as a smear of spill
+          rather than as a line, so the poster is drawn on nothing. */}
+      {!greenscreen && <Grid theme={theme} opacity={gridIn * 0.5} />}
       <Route
         plan={plan}
         theme={theme}
@@ -187,7 +195,9 @@ function Route({
             cx={startX}
             cy={startY}
             r={Math.max(0, plan.strokeWidth * 1.15 * startScale)}
-            fill={theme.canvas}
+            // `plate`, not `canvas`: on the key plate this disc has to stay
+            // opaque, or the start marker keys out into a hole in the route.
+            fill={theme.plate}
             stroke={theme.ink}
             strokeWidth={plan.strokeWidth * 0.55}
           />
@@ -198,7 +208,7 @@ function Route({
             cy={endY}
             r={Math.max(0, plan.strokeWidth * 1.3 * finishScale)}
             fill={theme.accentStrong}
-            stroke={theme.canvas}
+            stroke={theme.plate}
             strokeWidth={plan.strokeWidth * 0.4}
           />
         )}

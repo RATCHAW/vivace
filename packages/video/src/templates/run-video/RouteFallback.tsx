@@ -9,7 +9,8 @@ const ROUTE_COLOR = "#494fdf";
 const toSvgPoints = (points: [number, number][]) =>
   points.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
 
-/** No Mapbox token yet: draw the route on the bare canvas-dark plate so the
+/** No Mapbox token yet — or a film cut for keying, where a basemap is the one
+ *  thing that must not be in the frame: draw the route on the bare plate so the
  *  video still tells the story. Same trace + runner-dot language as the map. */
 export function RouteFallback({
   points,
@@ -17,12 +18,19 @@ export function RouteFallback({
   width,
   height,
   avatarUrl,
+  plate,
+  trackColor,
 }: {
   points: LatLng[];
   progress: number;
   width: number;
   height: number;
   avatarUrl: string;
+  /** What the route is drawn on: canvas-dark, or the chroma key colour. */
+  plate: string;
+  /** The unrun part of the route. Opaque on the key plate — a 22%-white over
+   *  chroma green composites to pale green and is cut away with it. */
+  trackColor: string;
 }) {
   const projected = useMemo(
     () => projectRoute(points, width, height, ROUTE_PADDING),
@@ -37,12 +45,12 @@ export function RouteFallback({
   const [runnerX, runnerY] = projected[idx];
 
   return (
-    <AbsoluteFill style={{ backgroundColor: "#000000" }}>
+    <AbsoluteFill style={{ backgroundColor: plate }}>
       <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
         <polyline
           points={toSvgPoints(projected)}
           fill="none"
-          stroke="rgba(255,255,255,0.22)"
+          stroke={trackColor}
           strokeWidth={5}
           strokeLinecap="round"
           strokeLinejoin="round"

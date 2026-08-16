@@ -81,9 +81,10 @@ const STAGE_THEATRE = "max-w-[clamp(420px,calc((100svh_-_11rem)*9/16),640px)]";
  * go over the picture (Remotion's own) and everything else collapses into one
  * row of four icons. See `FilmChrome`.
  *
- * The state that survives picking another run — template, theme, avatar — is the
- * page's, because on a phone this component unmounts every time the athlete goes
- * back to the list, and a choice that resets itself is worse than no choice.
+ * The state that survives picking another run — template, theme, avatar, key
+ * plate — is the page's, because on a phone this component unmounts every time
+ * the athlete goes back to the list, and a choice that resets itself is worse
+ * than no choice.
  */
 export function RunStudio({
   run,
@@ -94,6 +95,8 @@ export function RunStudio({
   onThemeChange,
   showAvatar,
   onShowAvatarChange,
+  greenscreen,
+  onGreenscreenChange,
   narrow,
   expanded,
   onToggleExpanded,
@@ -108,6 +111,8 @@ export function RunStudio({
   onThemeChange: (next: ThemeName) => void;
   showAvatar: boolean;
   onShowAvatarChange: (next: boolean) => void;
+  greenscreen: boolean;
+  onGreenscreenChange: (next: boolean) => void;
   /** Below the breakpoint this is a screen of its own, over the list. */
   narrow: boolean;
   expanded: boolean;
@@ -168,10 +173,6 @@ export function RunStudio({
   const entry = getTemplate(template);
   const avatarSupported = entry.supportsAvatar;
   const filmTheme = entry.supportsTheme ? theme : DEFAULT_THEME;
-  // A template that honours neither has nothing to open a sheet for, so the
-  // Options tile is drawn greyed rather than dropped — a row of actions that
-  // changes length as you click down the catalogue reads as a bug.
-  const hasOptions = entry.supportsTheme || avatarSupported;
   const fit = narrow ? "height" : "width";
   // Both the loading placeholder and the film it stands in for answer this, so
   // the picker is the right width from the first paint rather than after one.
@@ -223,6 +224,7 @@ export function RunStudio({
         mapboxToken={mapboxToken}
         avatarUrl={showAvatar && avatarSupported ? avatarUrl : ""}
         theme={filmTheme}
+        greenscreen={greenscreen}
         fit={fit}
         chrome={narrow ? "player" : "studio"}
         frameRef={frameRef}
@@ -242,7 +244,9 @@ export function RunStudio({
     </p>
   );
 
-  const options = hasOptions && (
+  // Always something to open: every template in the catalogue can be cut on the
+  // key plate, whatever else it does or doesn't honour.
+  const options = (
     <VideoOptions
       template={template}
       theme={theme}
@@ -254,6 +258,8 @@ export function RunStudio({
       failed={athleteError != null}
       showAvatar={showAvatar}
       onShowAvatarChange={onShowAvatarChange}
+      greenscreen={greenscreen}
+      onGreenscreenChange={onGreenscreenChange}
     />
   );
 
@@ -267,6 +273,7 @@ export function RunStudio({
       template={template}
       showAvatar={showAvatar && avatarSupported}
       theme={filmTheme}
+      greenscreen={greenscreen}
       layout={layout}
     />
   );
@@ -353,7 +360,6 @@ export function RunStudio({
               variant="subtle"
               aria-label={t("videoOptions.section")}
               aria-expanded={optionsOpen}
-              disabled={!hasOptions}
               onClick={() => setOptionsOpen(true)}
             >
               <SlidersHorizontalIcon />
