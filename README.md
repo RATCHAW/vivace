@@ -32,8 +32,8 @@ appear in the product as coming next, but are not implemented yet.
 
 - Node.js 22 (the version used by CI and the Docker images; Node.js ≥20.19 is
   supported) and Docker
-- pnpm 10.17 — `corepack enable` picks up the pinned version from
-  `packageManager`, or install it directly with `npm i -g pnpm@10.17.0`
+- pnpm 11.21 — `corepack enable` picks up the pinned version from
+  `packageManager`, or install it directly with `npm i -g pnpm@11.21.0`
 - A Strava API application: create one at <https://www.strava.com/settings/api>
   - Set **Authorization Callback Domain** to `localhost`
 
