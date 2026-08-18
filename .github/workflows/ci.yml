@@ -88,7 +88,11 @@ jobs:
     timeout-minutes: 20
     services:
       postgres:
-        image: postgres:18-alpine
+        # Pinned by digest, and to the same one docker-compose.yml runs locally:
+        # zizmor fails an unpinned image, and a suite that passes here against a
+        # different Postgres than the one on your machine is worth less than the
+        # minutes it costs. Bump both together.
+        image: postgres:18-alpine@sha256:a1d02e4bd40c94d3bf2bdd3678c137388e76d9efcd23c285e9429d336a834b44
         env:
           POSTGRES_USER: app
           POSTGRES_PASSWORD: app
