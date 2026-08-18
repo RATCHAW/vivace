@@ -14,6 +14,7 @@
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
     "db:seed": "tsx src/db/seed.ts",
+    "invite:smoke": "tsx scripts/invite-smoke.ts",
     "auth:generate": "auth generate --config src/auth.ts --output .better-auth-schema.ts -y"
   },
   "dependencies": {
