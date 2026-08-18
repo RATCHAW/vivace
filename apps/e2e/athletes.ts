@@ -107,9 +107,13 @@ export const ATHLETES: Record<"ayoub" | "sam", FixtureAthlete> = {
         distance: 10180,
         elevationGain: 92,
         averageHeartrate: 161,
-        // The other side of the road all the way round, and a wide loop through
-        // the middle third — so the two traces are visibly two.
-        lane: (t) => 18 + 150 * Math.max(0, Math.sin((t - 0.25) * Math.PI * 2)),
+        // The other side of the road all the way round, drifting the way two
+        // people do, and a wider swing through the middle third — so the two
+        // traces are visibly two even when the whole route is on screen.
+        lane: (t) =>
+          20 +
+          6 * Math.sin(t * 37) +
+          60 * Math.max(0, Math.sin((t - 0.25) * Math.PI * 2)),
         // Out hard and hangs on — the mirror of Ayoub's, so the gap between the
         // two dots opens one way and then closes the other.
         shape: (t) => 1.05 - t * 0.11,
