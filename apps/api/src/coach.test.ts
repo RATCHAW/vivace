@@ -15,7 +15,13 @@ import {
   weekStart,
 } from "./training.js";
 import { toQueue, toSignals, weeksToRace } from "./briefing.js";
-import { coachFailure, dropUnannouncedToolInput } from "./coach.js";
+import {
+  buildQuestionnaire,
+  coachFailure,
+  coachSystemPrompt,
+  dropUnannouncedToolInput,
+  mondayFirst,
+} from "./coach.js";
 import { titleFrom } from "./chat-store.js";
 import type { BestEffort } from "./strava.js";
 import type { Run, RunStreams } from "./schemas.js";
@@ -558,6 +564,154 @@ describe("titleFrom", () => {
         ],
       }),
     ).toBeNull();
+  });
+});
+
+describe("buildQuestionnaire", () => {
+  /** A choice question as the model would write one. */
+  const pick = {
+    question: "Which race are you training for?",
+    kind: "single" as const,
+    choices: [{ label: "5K" }, { label: "Half" }, { label: "Marathon" }],
+  };
+
+  it("names the fields itself, so two questions cannot collide", () => {
+    const card = buildQuestionnaire(" Two things ", [
+      pick,
+      { question: "How many days a week?", kind: "number", unit: " days " },
+    ]);
+
+    expect(card).toMatchObject({
+      card: "questionnaire",
+      intro: "Two things",
+      questions: [
+        {
+          id: "q1",
+          choices: [
+            { value: "c1", label: "5K" },
+            { value: "c2", label: "Half" },
+            { value: "c3", label: "Marathon" },
+          ],
+        },
+        { id: "q2", unit: "days", choices: [] },
+      ],
+    });
+  });
+
+  it("drops a choice the athlete could not tell apart", () => {
+    const card = buildQuestionnaire(null, [
+      {
+        ...pick,
+        choices: [{ label: "Half" }, { label: "Half " }, { label: "5K" }],
+      },
+    ]);
+
+    expect(card).toMatchObject({
+      questions: [
+        {
+          choices: [
+            { value: "c1", label: "Half" },
+            { value: "c2", label: "5K" },
+          ],
+        },
+      ],
+    });
+  });
+
+  it("refuses a choice question that has nothing to choose between", () => {
+    expect(
+      buildQuestionnaire(null, [{ ...pick, choices: [{ label: "Half" }] }]),
+    ).toMatchObject({ error: expect.stringContaining("Question 1") });
+  });
+
+  it("drops a unit and a placeholder a choice question cannot use", () => {
+    // The browser labels a choice question's free-text box itself, in the
+    // athlete's language — the model's example answer has nowhere to go.
+    const card = buildQuestionnaire(undefined, [
+      { ...pick, unit: "km", placeholder: "e.g. 5K" },
+    ]);
+
+    expect(card).toMatchObject({
+      intro: null,
+      questions: [{ unit: null, placeholder: null }],
+    });
+  });
+
+  it("leaves no question the athlete cannot get past", () => {
+    const card = buildQuestionnaire(null, [pick, { ...pick, kind: "multi" }]);
+
+    // No `required` anywhere in the shape: Skip is always a way on, which is
+    // half of what lets the form stand where the composer does.
+    for (const question of (card as { questions: object[] }).questions) {
+      expect(question).not.toHaveProperty("required");
+    }
+  });
+});
+
+describe("mondayFirst", () => {
+  /** A week the model wrote, as `day` numbers and nothing else. */
+  function week(days: number[]) {
+    return days.map((day) => ({ day, km: day }));
+  }
+
+  it("leaves a Monday-zero week alone, in order", () => {
+    expect(mondayFirst(week([0, 1, 2, 3, 4, 5, 6])).map((s) => s.day)).toEqual([
+      0, 1, 2, 3, 4, 5, 6,
+    ]);
+  });
+
+  it("shifts the 1…7 week a model writes when asked for Monday first", () => {
+    expect(mondayFirst(week([1, 2, 3, 4, 5, 6, 7])).map((s) => s.day)).toEqual([
+      0, 1, 2, 3, 4, 5, 6,
+    ]);
+  });
+
+  it("keeps each session's own values on the day it shifts", () => {
+    expect(mondayFirst(week([7, 1])).map((s) => [s.day, s.km])).toEqual([
+      [0, 1],
+      [6, 7],
+    ]);
+  });
+
+  it("sorts a week that arrived out of order", () => {
+    expect(mondayFirst(week([6, 0, 3])).map((s) => s.day)).toEqual([0, 3, 6]);
+  });
+
+  it("moves only the 7 in a week that already counts from 0", () => {
+    // Six days would move to fix one, and a 7 means Sunday under either
+    // numbering — so it lands on Sunday and the rest are left where they are.
+    expect(mondayFirst(week([0, 1, 2, 3, 4, 5, 7])).map((s) => s.day)).toEqual([
+      0, 1, 2, 3, 4, 5, 6,
+    ]);
+  });
+
+  it("never leaves 0…6, whatever the model counted in", () => {
+    for (const days of [
+      [0, 1, 2, 3, 4, 5, 6],
+      [1, 2, 3, 4, 5, 6, 7],
+      [0, 0, 7, 7],
+      [7],
+      [1],
+    ]) {
+      for (const session of mondayFirst(week(days))) {
+        expect(session.day).toBeGreaterThanOrEqual(0);
+        expect(session.day).toBeLessThanOrEqual(6);
+      }
+    }
+  });
+});
+
+describe("coachSystemPrompt", () => {
+  it("says nothing about language for an English athlete", () => {
+    expect(coachSystemPrompt("2026-08-18", 6)).not.toContain(
+      "askAthlete` draws",
+    );
+  });
+
+  it("asks for the form in French, and for the prose in English", () => {
+    const prompt = coachSystemPrompt("2026-08-18", 6, undefined, "fr");
+    expect(prompt).toContain("reading the app in French");
+    expect(prompt).toContain("Everything you write yourself stays in English");
   });
 });
 

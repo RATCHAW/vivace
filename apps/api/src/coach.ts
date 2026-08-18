@@ -211,13 +211,26 @@ Some tools draw something the athlete can see:
   same numbers. Write the read the chart cannot: what it means and what to do.
   Two or three sentences, naming at most a couple of specific figures.
 
+Asking back: when something you genuinely cannot look up would change your
+answer — which race, what hurts, which days they can run, how a session felt —
+ask it with \`askAthlete\` instead of writing the question into your reply. It
+draws the questions as a form the athlete taps through, one at a time, and their
+answers arrive as their next message. Rules: at most one form per turn, and only
+the questions the tools cannot answer for you. Every question can be skipped and
+every choice question carries its own free-text box, so list the answers you
+expect and never an "Other" — the athlete always has a way past you. Under the
+form, one short line at most: they are answering, not reading. Then act on what
+comes back — whatever belongs to their goals goes straight into
+\`setAthleteContext\`, and a question they skipped is one you do not ask again.
+
 Memory: \`getAthleteContext\` is the goal race, target time and long-run day.
 Call \`setAthleteContext\` the moment the athlete tells you any of it — a race,
 a date, a target, an injury, the days they can run — so the next thread starts
 knowing. Never ask for something the context already holds.
 
 Planning: when the athlete asks for a week, a plan or a taper, write it with
-\`proposeWeek\`. Seven days, day 0 is Monday, rest days included with 0 km. Build
+\`proposeWeek\`. Seven days numbered 0 = Monday … 6 = Sunday, never 1 to 7, rest
+days included with 0 km. Build
 it around the goal race and the load numbers, not around a template.
 
 Boundaries: you coach running, not medicine. Pain that persists, or anything
@@ -225,6 +238,14 @@ that sounds like an injury, gets one sentence pointing at a physio or doctor —
 then get back to what they can safely do meanwhile. If a tool fails or the
 athlete has no runs yet, say so instead of inventing numbers.
 `.trim();
+
+/** The languages apps/web ships in, as the chat request sends them. */
+export type CoachLanguage = "en" | "fr";
+
+const LANGUAGE_NAMES: Record<CoachLanguage, string> = {
+  en: "English",
+  fr: "French",
+};
 
 /**
  * The system prompt with today's date and the window the athlete has selected
@@ -237,6 +258,7 @@ export function coachSystemPrompt(
   today: string,
   rangeWeeks: number,
   attached?: AttachedRun,
+  language: CoachLanguage = "en",
 ): string {
   const lines = [
     BASE_SYSTEM_PROMPT,
@@ -245,6 +267,15 @@ export function coachSystemPrompt(
   if (attached) {
     lines.push(
       `The athlete attached a run to this message: "${attached.name}" on ${attached.date}, Strava activity id ${attached.id}. "This run", "it" and "that session" mean that one — read it rather than asking which.`,
+    );
+  }
+  if (language !== "en") {
+    // Deliberately narrow. What the coach writes is prose, and this app's
+    // server-generated prose is English in both languages; `askAthlete` is the
+    // one thing it puts on screen as an interface, and an English form inside a
+    // French screen reads as a bug rather than as an accent.
+    lines.push(
+      `The athlete is reading the app in ${LANGUAGE_NAMES[language]}. \`askAthlete\` draws an interface rather than something you said, so write its questions, hints and choices in ${LANGUAGE_NAMES[language]}. Everything you write yourself stays in English.`,
     );
   }
   return lines.join("\n\n");
@@ -444,6 +475,158 @@ export async function buildRunDebriefCard(
   };
 }
 
+// --- asking the athlete something ---------------------------------------------
+
+/**
+ * How much one questionnaire may hold.
+ *
+ * The caps are the feature, not a safety rail. Left alone a model asks a dozen
+ * things at once, and a dozen-step form in the middle of a conversation is a
+ * form nobody finishes — five questions is about as far as an athlete will tap
+ * before typing "just tell me" instead.
+ */
+const MAX_QUESTIONS = 5;
+const MAX_CHOICES = 6;
+
+/** What kind of answer a question takes, and so what the browser draws. */
+export type AnswerKind = "single" | "multi" | "text" | "number";
+
+/** One option on a `single` or `multi` question. */
+export interface AskedChoice {
+  /** Stable within the question — this is the form field's value, not its text. */
+  value: string;
+  label: string;
+  hint: string | null;
+}
+
+/**
+ * One question.
+ *
+ * There is deliberately no `required`. A question the athlete cannot get past
+ * is a conversation the coach has taken hostage, and this one stands where
+ * their text box usually does — so every question is skippable, and every
+ * choice question carries a free-text box for an answer the model didn't
+ * think of (see `coach-questionnaire.tsx`). Those two together are the way out.
+ */
+export interface AskedQuestion {
+  /** `q1`…`q5`. Assigned here, so a model can't collide two form fields. */
+  id: string;
+  question: string;
+  hint: string | null;
+  kind: AnswerKind;
+  /** Empty for `text` and `number`. */
+  choices: AskedChoice[];
+  unit: string | null;
+  placeholder: string | null;
+}
+
+export interface QuestionnaireCard {
+  card: "questionnaire";
+  intro: string | null;
+  questions: AskedQuestion[];
+}
+
+/** What the model passes in, before any of it is trusted. */
+interface ProposedQuestion {
+  question: string;
+  hint?: string | null;
+  kind: AnswerKind;
+  choices?: { label: string; hint?: string | null }[] | null;
+  unit?: string | null;
+  placeholder?: string | null;
+}
+
+/**
+ * The questionnaire as the browser can actually render it, or the reason it
+ * can't.
+ *
+ * Ids and choice values are assigned here rather than asked for: they are form
+ * field names, and two questions the model happened to call the same thing
+ * would silently merge into one answer. Everything the model wrote — the words
+ * — is kept verbatim.
+ *
+ * Pure, and exported for the tests: the shape it produces is the contract with
+ * `coach-questionnaire.tsx`, and it is the one part of the tool that can be
+ * checked without a model or a Strava token.
+ */
+export function buildQuestionnaire(
+  intro: string | null | undefined,
+  proposed: ProposedQuestion[],
+): QuestionnaireCard | { error: string } {
+  const questions: AskedQuestion[] = [];
+
+  for (const [index, item] of proposed.entries()) {
+    const picks = item.kind === "single" || item.kind === "multi";
+    // A label repeated inside one question is two options the athlete cannot
+    // tell apart; dropped rather than rejected, because the rest of the
+    // question is usually fine and a re-ask costs the athlete a round trip.
+    const labels = picks
+      ? [...new Set((item.choices ?? []).map((choice) => choice.label.trim()))]
+          .filter(Boolean)
+          .slice(0, MAX_CHOICES)
+      : [];
+
+    if (picks && labels.length < 2) {
+      return {
+        error:
+          `Question ${index + 1} is a "${item.kind}" question with fewer than ` +
+          "two distinct choices. Give it two to six, or ask it as text.",
+      };
+    }
+
+    questions.push({
+      id: `q${index + 1}`,
+      question: item.question.trim(),
+      hint: item.hint?.trim() || null,
+      kind: item.kind,
+      choices: labels.map((label, position) => ({
+        value: `c${position + 1}`,
+        label,
+        hint:
+          (item.choices ?? [])
+            .find((choice) => choice.label.trim() === label)
+            ?.hint?.trim() || null,
+      })),
+      unit: item.kind === "number" ? item.unit?.trim() || null : null,
+      // A choice question's free-text box is labelled "Other" by the browser,
+      // in the athlete's language — the model's example answer would be an
+      // English word sitting in a French form.
+      placeholder: picks ? null : item.placeholder?.trim() || null,
+    });
+  }
+
+  return { card: "questionnaire", intro: intro?.trim() || null, questions };
+}
+
+/**
+ * A proposed week's sessions as 0 = Monday … 6 = Sunday, sorted, whichever way
+ * the model numbered them.
+ *
+ * Every other place a planned day appears — `PlannedSessionSchema`, the accept
+ * route, the weekday stamps the card indexes by — counts from 0, and a model
+ * asked for "seven days, Monday first" writes 1…7 often enough that rejecting
+ * it costs the athlete the whole turn: the input never validates, so the tool
+ * never runs and `streamText` fails mid-answer.
+ *
+ * A week that reaches 7 without a 0 is that week, off by one, and shifting the
+ * whole of it is unambiguous. A week holding both a 0 and a 7 is a model that
+ * lost count, and shifting there would move six right days to fix one wrong
+ * one — so only the 7 moves, to the Sunday it means under either numbering.
+ * Either way nothing leaves 0…6, which is what the accept route validates
+ * against and what the card's weekday stamps are indexed by.
+ */
+export function mondayFirst<T extends { day: number }>(sessions: T[]): T[] {
+  const days = sessions.map((session) => session.day);
+  const shift = days.includes(7) && !days.includes(0);
+
+  return sessions
+    .map((session) => ({
+      ...session,
+      day: shift ? session.day - 1 : Math.min(session.day, 6),
+    }))
+    .sort((a, b) => a.day - b.day);
+}
+
 /** The context to bind a set of tools to one athlete and one turn. */
 export interface CoachToolContext {
   accessToken: string;
@@ -545,6 +728,78 @@ export function createCoachTools(ctx: CoachToolContext): ToolSet {
         const context = await saveContext(userId, patch);
         return { saved: true, context, summary: describeGoal(context, today) };
       },
+    }),
+
+    askAthlete: tool({
+      description:
+        "Ask the athlete something the tools cannot tell you — which race, " +
+        "what hurts, which days they can run, how a session felt. Draws the " +
+        "questions as a form they tap through one at a time instead of typing " +
+        "prose, and their answers come back as their next message. Use it " +
+        "rather than writing the questions into your reply. One form per turn, " +
+        "up to five questions, and never for anything a tool can look up.",
+      inputSchema: z.object({
+        intro: z
+          .string()
+          .max(160)
+          .optional()
+          .describe(
+            "One line saying why you are asking. Omit it when the questions " +
+              "speak for themselves.",
+          ),
+        questions: z
+          .array(
+            z.object({
+              question: z
+                .string()
+                .max(140)
+                .describe("The question itself, one sentence."),
+              hint: z
+                .string()
+                .max(160)
+                .optional()
+                .describe("A clarifying line under the question."),
+              kind: z
+                .enum(["single", "multi", "text", "number"])
+                .describe(
+                  "single = pick one choice, multi = pick any number of " +
+                    "them, text = type a short answer, number = type a " +
+                    "number. Prefer choices: a tap beats a sentence.",
+                ),
+              choices: z
+                .array(
+                  z.object({
+                    label: z.string().max(60),
+                    hint: z.string().max(80).optional(),
+                  }),
+                )
+                .max(MAX_CHOICES)
+                .optional()
+                .describe(
+                  "Two to six options, for single and multi only. Every " +
+                    "choice question is also drawn with a free-text box for " +
+                    "an answer you did not list, so never add 'Other', " +
+                    "'Something else' or 'None of these' yourself — list only " +
+                    "the answers you actually expect.",
+                ),
+              unit: z
+                .string()
+                .max(20)
+                .optional()
+                .describe("What a number is in: 'km', 'days a week', 'kg'."),
+              placeholder: z
+                .string()
+                .max(60)
+                .optional()
+                .describe("An example answer, for text and number."),
+            }),
+          )
+          .min(1)
+          .max(MAX_QUESTIONS)
+          .describe("The questions, in the order they should be asked."),
+      }),
+      execute: async ({ intro, questions }) =>
+        buildQuestionnaire(intro, questions),
     }),
 
     listRuns: tool({
@@ -796,7 +1051,10 @@ export function createCoachTools(ctx: CoachToolContext): ToolSet {
           .string()
           .regex(/^\d{4}-\d{2}-\d{2}$/)
           .optional()
-          .describe("The Monday the week starts on. Defaults to this week."),
+          .describe(
+            "A date in the week being written. Defaults to this week; it is " +
+              "snapped to that week's Monday.",
+          ),
         label: z
           .string()
           .max(60)
@@ -805,7 +1063,14 @@ export function createCoachTools(ctx: CoachToolContext): ToolSet {
         sessions: z
           .array(
             z.object({
-              day: z.number().int().min(0).max(6).describe("0 = Monday."),
+              // 7 is accepted, not asked for: a model that numbers the week
+              // 1…7 is normalised by `mondayFirst` rather than rejected.
+              day: z
+                .number()
+                .int()
+                .min(0)
+                .max(7)
+                .describe("0 = Monday … 6 = Sunday."),
               type: z
                 .string()
                 .max(40)
@@ -830,16 +1095,21 @@ export function createCoachTools(ctx: CoachToolContext): ToolSet {
           .describe("Seven days, Monday first."),
       }),
       execute: async ({ week_starting, label, sessions }) => {
-        const week = week_starting ?? weekStart(today);
+        // Snapped, not trusted: a week is keyed on its Monday everywhere it is
+        // read back — `getPlan` here, the accept route, the briefing's
+        // `weekStart(today)` — so a mid-week date the model wrote would store a
+        // plan nothing ever looks for again.
+        const week = weekStart(week_starting ?? today);
         const accepted = await getPlan(userId, week);
-        const total = sessions.reduce((sum, session) => sum + session.km, 0);
+        const planned = mondayFirst(sessions);
+        const total = planned.reduce((sum, session) => sum + session.km, 0);
         return {
           card: "week-plan" as const,
           week_starting: week,
           label: label ?? null,
-          sessions: [...sessions].sort((a, b) => a.day - b.day),
+          sessions: planned,
           total_km: Number(total.toFixed(1)),
-          quality: sessions.filter((session) => session.key).length,
+          quality: planned.filter((session) => session.key).length,
           /** True when this exact week has already been accepted. */
           accepted: accepted !== null,
         };

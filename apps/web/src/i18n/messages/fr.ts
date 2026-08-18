@@ -287,6 +287,8 @@ export const fr: Translated<Messages> = {
     feedbackSend: "Envoyer",
     feedbackThanks: "Merci — c’est noté.",
     sources: "D’après",
+    steps_one: "{{count}} étape",
+    steps_other: "{{count}} étapes",
     toolFailed: "{{title}} a échoué",
     workingReading: "Lecture de votre historique Strava",
     workingWriting: "Rédaction",
@@ -321,6 +323,7 @@ export const fr: Translated<Messages> = {
       getTrainingSignals: "Mesure de votre entraînement",
       predictRaces: "Lecture de vos meilleurs efforts",
       proposeWeek: "Rédaction de votre semaine",
+      askAthlete: "Une question pour vous",
     },
   },
 
@@ -416,6 +419,19 @@ export const fr: Translated<Messages> = {
     askSwapDay: "Remplace {{day}} par autre chose",
     longRunTo: "Sortie longue → {{day}}",
     askMoveLongRun: "Déplace la sortie longue au {{day}}",
+
+    questionnaire: "Questions",
+    questionnaireStep: "{{current}} sur {{total}}",
+    questionnairePrevious: "Retour",
+    questionnaireSkip: "Passer",
+    questionnaireNext: "Suivant",
+    questionnaireSend: "Envoyer",
+    questionnaireOther: "Autre chose…",
+    questionnaireAnswerOrSkip: "Répondez à celle-ci, ou passez-la.",
+    questionnaireAwaiting: "En attente de votre réponse",
+    questionnaireAnswered: "Répondu",
+    questionnaireAnswers: "Voici mes réponses :",
+    questionnaireSkipped: "passée",
   },
 
   rail: {
