@@ -15,14 +15,21 @@
 //   GET  /api/v3/athlete/activities
 //   GET  /api/v3/activities/:id
 //   GET  /api/v3/activities/:id/streams
+//   GET  /avatars/:key.svg        a profile picture, so the avatar option draws
 //
 // Which athlete you are is carried in the authorization code and then in the
 // access token, so two browser contexts can be two different people against one
 // server.
 import { createServer } from "node:http";
 import { ATHLETES, athleteForToken, tokenFor } from "./athletes.js";
+import { recordRun, toStreamSet } from "./streams.js";
 
 const PORT = Number(process.env.FAKE_STRAVA_PORT ?? 4100);
+
+/** Where this server is, as the API and the browser both have to reach it —
+ *  `profile` below is an absolute URL, because that is what Strava serves and
+ *  what `avatarSource` in @repo/video insists on before it draws a picture. */
+const SELF = `http://127.0.0.1:${PORT}`;
 
 function json(
   res: import("node:http").ServerResponse,
@@ -48,7 +55,7 @@ function toActivity(
     distance: run.distance,
     moving_time: run.moving_time,
     elapsed_time: run.moving_time + 60,
-    total_elevation_gain: 42,
+    total_elevation_gain: run.elevationGain,
     type: "Run",
     sport_type: "Run",
     start_date: run.start_date_local,
@@ -56,8 +63,8 @@ function toActivity(
     timezone: "(GMT+01:00) Africa/Casablanca",
     average_speed: run.distance / run.moving_time,
     max_speed: run.distance / run.moving_time + 1,
-    average_heartrate: 152,
-    max_heartrate: 176,
+    average_heartrate: run.averageHeartrate,
+    max_heartrate: run.averageHeartrate + 22,
     workout_type: 2,
     athlete: { id: athlete.id },
     trainer: false,
@@ -66,38 +73,31 @@ function toActivity(
   };
 }
 
-/** A short, valid-looking route so the studio has something to draw. */
-function streamsFor(run: { moving_time: number; distance: number }) {
-  const points = 20;
-  const latlng: number[][] = [];
-  const time: number[] = [];
-  const distance: number[] = [];
-  for (let i = 0; i < points; i += 1) {
-    const t = i / (points - 1);
-    latlng.push([33.5731 + t * 0.01, -7.5898 + t * 0.008]);
-    time.push(Math.round(t * run.moving_time));
-    distance.push(Math.round(t * run.distance));
-  }
-  return {
-    latlng: {
-      data: latlng,
-      series_type: "distance",
-      original_size: points,
-      resolution: "high",
-    },
-    time: {
-      data: time,
-      series_type: "distance",
-      original_size: points,
-      resolution: "high",
-    },
-    distance: {
-      data: distance,
-      series_type: "distance",
-      original_size: points,
-      resolution: "high",
-    },
-  };
+/**
+ * A profile picture, drawn rather than fetched.
+ *
+ * The avatar option is the one thing in the studio that needs an image from
+ * somewhere, and a fixture that reaches out to a CDN is a fixture that fails on
+ * a train. SVG because the composition only ever puts it in an `<img>`, and
+ * because a hand-rolled PNG encoder is not what this file is for.
+ *
+ * Deliberately not cobalt or teal: those are the *template's* colours for who is
+ * who, and a picture that happened to match one of them would make a wrong ring
+ * impossible to spot.
+ */
+const AVATAR_INK: Record<string, string> = {
+  ayoub: "#b4652a",
+  sam: "#6b3b78",
+};
+
+function avatarSvg(key: string, initial: string): string {
+  const ink = AVATAR_INK[key] ?? "#3a3f45";
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" width="160" height="160">
+  <rect width="160" height="160" fill="${ink}"/>
+  <text x="80" y="80" fill="#ffffff" font-family="Helvetica, Arial, sans-serif"
+        font-size="86" font-weight="600" text-anchor="middle"
+        dominant-baseline="central">${initial}</text>
+</svg>`;
 }
 
 /** The athlete behind an `Authorization: Bearer …` header, if any. */
@@ -110,6 +110,24 @@ function caller(req: import("node:http").IncomingMessage) {
 const server = createServer((req, res) => {
   const url = new URL(req.url ?? "/", `http://localhost:${PORT}`);
   const path = url.pathname;
+
+  const avatar = /^\/avatars\/([a-z]+)\.svg$/.exec(path);
+  if (avatar) {
+    const owner = ATHLETES[avatar[1] as keyof typeof ATHLETES];
+    if (!owner) {
+      json(res, 404, { message: "Record Not Found", errors: [] });
+      return;
+    }
+    const body = avatarSvg(owner.key, owner.firstname.slice(0, 1));
+    res.writeHead(200, {
+      "content-type": "image/svg+xml; charset=utf-8",
+      "content-length": Buffer.byteLength(body),
+      // The studio re-reads this on every option toggle and every render.
+      "cache-control": "public, max-age=3600",
+    });
+    res.end(body);
+    return;
+  }
 
   // What Playwright waits on before starting the other servers.
   if (path === "/health") {
@@ -202,8 +220,8 @@ const server = createServer((req, res) => {
       updated_at: "2026-08-15T00:00:00Z",
       badge_type_id: 0,
       weight: 70,
-      profile_medium: "",
-      profile: "",
+      profile_medium: `${SELF}/avatars/${athlete.key}.svg`,
+      profile: `${SELF}/avatars/${athlete.key}.svg`,
     });
     return;
   }
@@ -228,7 +246,7 @@ const server = createServer((req, res) => {
       json(res, 404, { message: "Record Not Found", errors: [] });
       return;
     }
-    json(res, 200, streamsFor(run));
+    json(res, 200, toStreamSet(recordRun(run)));
     return;
   }
 

@@ -1,4 +1,4 @@
-# apps/e2e — the end-to-end suite
+# apps/e2e — the end-to-end suite, and the stack you can click through
 
 Playwright, driving a browser at the real Vite app, which proxies to the real
 Hono API, which reads and writes a real Postgres.
@@ -10,6 +10,52 @@ pnpm e2e        # from the repo root
 
 `pnpm --filter @repo/e2e e2e:ui` opens Playwright's UI mode, and
 `e2e:report` opens the HTML report of the last run.
+
+## `pnpm dev:fake` — the same stack, with nobody driving it
+
+```bash
+pnpm dev:fake:db   # docker compose --profile dev-fake up -d db-dev-fake
+pnpm dev:fake      # from the repo root
+```
+
+Three servers around the same fake Strava, left running so you can sign in as
+one athlete in a window and the other in a private one, and click through a
+feature that needs both of them.
+
+That is the only way to try some of them by hand. This repository's Strava app is
+in Single Player Mode, so a second real account cannot authorise it at all — and
+even with an access increase from Strava, checking a two-runner layout would mean
+finding a friend and going for a run first.
+
+It is a *development* stack, not the suite: its database is a volume rather than
+`tmpfs` and nothing truncates it, so the invitation you accepted this morning is
+still accepted this afternoon. It runs the API and Vite in watch mode, so it is
+something to keep open while changing the code it is running.
+
+Ports sit a hundred above the suite's — app **5373**, API **3200**, fake Strava
+**4200**, database **5534** — so both can be up at once, and
+`DEV_FAKE_PORT_OFFSET` shifts the set the same way `E2E_PORT_OFFSET` does.
+
+### The map will be black unless Mapbox knows this origin
+
+Mapbox tokens are restricted by URL, and the one in `apps/web/.env` is almost
+certainly scoped to the development origin — which this is not. The style still
+loads, so the map mounts and stamps its logo on the plate; then every *tile* 403s
+and the map often never reaches `load`, so the route layers are never added
+either. What you get is a film whose type, numbers and bars are all correct over a
+black rectangle, which reads as a broken template rather than as a token.
+
+`dev.ts` makes one request at startup and says so if that is what is happening.
+Add `http://127.0.0.1:5373` to the token, or unset `VITE_MAPBOX_TOKEN` to get the
+bare canvas plate deliberately — the compositions draw the route on it either way.
+
+### What it still cannot do for you
+
+A Lambda render, unless `REMOTION_FUNCTION_NAME` and `REMOTION_SERVE_URL` are
+set — those are passed through from your shell and `.env`, along with
+`MAPBOX_TOKEN` and the AWS credentials. Note that Lambda cannot reach a fixture
+avatar served from `127.0.0.1`, so a render started here draws the plain dot
+rather than the face; the browser's own player shows the avatar correctly.
 
 ## Only Strava is fake
 
@@ -29,9 +75,10 @@ exfiltration vector, not a configuration option.
 
 `fake-strava.ts` implements only what the flow touches — the authorize screen
 (as two links, one per fixture athlete), the token exchange, `/athlete`,
-`/athlete/activities`, `/activities/:id` and its streams. Which athlete you are
-rides in the authorization code and then in the access token, so two browser
-contexts are two different people against one server.
+`/athlete/activities`, `/activities/:id` and its streams, and a drawn SVG
+profile picture so the avatar option has something to put on the map. Which
+athlete you are rides in the authorization code and then in the access token, so
+two browser contexts are two different people against one server.
 
 It also serves a 404 for an activity belonging to somebody else, which is
 load-bearing: the API's ownership check *is* Strava refusing to serve an
@@ -44,8 +91,18 @@ gives Sam a decoy that evening. The decoy is the point — if the matcher's time
 window ever stops working, the suite says so rather than passing with a longer
 list.
 
-Nothing is randomised. A ranked list that reshuffles between runs is a flaky
-test.
+`streams.ts` records those runs the way a watch would, at Strava's own 1 Hz: a
+loop with a lane on it, a pace shape, a heart rate and a climb. Two things there
+are load-bearing rather than decorative. The **lane** is what makes two people
+who ran together two visible traces instead of one — the fixture used to hand
+every run the identical twenty-point diagonal, which is a film of one line with
+another hidden exactly underneath it. The **pace shape** is what makes the live
+numbers move; a flat multiplier gives every frame the same pace and hides
+anything that reads them wrongly.
+
+Nothing is randomised — the receiver noise is seeded on the run's id. A ranked
+list that reshuffles between runs is a flaky test, and a route that wanders
+between runs is a screenshot you cannot compare.
 
 ## Ports and state
 

@@ -46,6 +46,39 @@ services:
       timeout: 3s
       retries: 15
 
+  # The database behind `pnpm dev:fake` — the same fake-Strava stack the suite
+  # runs, with nobody driving it, so a two-athlete feature can be clicked
+  # through by hand.
+  #
+  # Its own container for the same reason `db-e2e` is not `db`, one step further
+  # along: the suite truncates, so a manual session sharing its database would be
+  # signed out by any `pnpm e2e` — and sharing `db` would let a fixture athlete's
+  # id collide with your real Strava id and quietly relink the account you
+  # actually sign in with. A volume rather than `tmpfs`, because a stack you sign
+  # into by hand should still know who you are tomorrow.
+  db-dev-fake:
+    profiles: ["dev-fake"]
+    image: postgres:18-alpine@sha256:a1d02e4bd40c94d3bf2bdd3678c137388e76d9efcd23c285e9429d336a834b44
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+      POSTGRES_DB: app
+    ports:
+      # A hundred above the suite's, and shiftable the same way. Keep in step
+      # with `DEV` in apps/e2e/env.ts — `pnpm dev:fake:db` passes it through.
+      - "127.0.0.1:${DEV_FAKE_DB_PORT:-5534}:5432"
+    # Mounted at /var/lib/postgresql rather than its `data` subdirectory, for
+    # the same reason `db-e2e` is: the postgres:18 image puts the cluster one
+    # level down and refuses to initialise when the mount point lands on the
+    # boundary between the two.
+    volumes:
+      - db-dev-fake-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d app"]
+      interval: 3s
+      timeout: 3s
+      retries: 15
+
   # Log storage. Started by both profiles, because the API pushes to it
   # directly — there is no agent scraping container stdout.
   loki:
@@ -159,5 +192,6 @@ services:
 
 volumes:
   db-data:
+  db-dev-fake-data:
   loki-data:
   grafana-data:
