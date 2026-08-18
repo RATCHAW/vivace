@@ -709,7 +709,7 @@ describe("coachSystemPrompt", () => {
   });
 
   it("asks for the form in French, and for the prose in English", () => {
-    const prompt = coachSystemPrompt("2026-08-18", 6, undefined, "fr");
+    const prompt = coachSystemPrompt("2026-08-18", 6, { language: "fr" });
     expect(prompt).toContain("reading the app in French");
     expect(prompt).toContain("Everything you write yourself stays in English");
   });

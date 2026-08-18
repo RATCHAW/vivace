@@ -28,6 +28,7 @@ import {
   type BestEffort,
 } from "./strava.js";
 import { getContext, getPlan, saveContext } from "./coach-store.js";
+import { getFeatureVariantFor } from "./posthog.js";
 import {
   describeGoal,
   readTraining,
@@ -79,12 +80,17 @@ export interface CoachConfig {
  * Null until an API key is configured — the chat route turns that into a 503
  * with a `not_configured` reason rather than a crash, the same way the render
  * routes treat a missing Remotion Lambda deployment.
+ *
+ * `override` is the model a feature flag's variant named, and it wins over the
+ * env var: a variant exists precisely so a model can be changed without a
+ * deploy. Null still means "no API key" and nothing else — a variant can only
+ * ever change *which* model is asked for, never whether one can be.
  */
-export function getCoachConfig(): CoachConfig | null {
+export function getCoachConfig(override?: string): CoachConfig | null {
   const apiKey = process.env.LLM_GATEWAY_API_KEY;
   if (!apiKey) return null;
   // `||`, not `??`: docker-compose passes an unset variable through as "".
-  const modelId = process.env.COACH_MODEL || DEFAULT_MODEL;
+  const modelId = override || process.env.COACH_MODEL || DEFAULT_MODEL;
   const gateway = createGateway({
     apiKey,
     baseURL: process.env.LLM_GATEWAY_URL || DEFAULT_GATEWAY_URL,
@@ -248,6 +254,65 @@ const LANGUAGE_NAMES: Record<CoachLanguage, string> = {
 };
 
 /**
+ * `v2-terse`: the same coach, told to spend fewer words.
+ *
+ * Written as an addendum rather than a second copy of the whole prompt. A
+ * variant *may* be a whole prompt — the catalogue below holds strings, not
+ * patches — but this one changes the output rules and nothing else, and forty
+ * duplicated lines would drift the first time the base prompt learned a tool.
+ */
+const TERSE_ADDENDUM = `
+Above anything said about length so far: two sentences, three at the very most.
+Lead with the instruction and leave the reasoning out unless it changes what
+they should do — the athlete is reading this on a phone, between other things.
+No greeting, no restating the question, and no closing offer to help further.
+`.trim();
+
+/**
+ * The prompts that can answer a turn, by version.
+ *
+ * A version key, not the prompt text itself, is what a flag's payload names.
+ * The payload *could* carry the whole prompt and be edited in PostHog with no
+ * deploy at all — but the prompt names the tools the code must actually have,
+ * and in a flag textarea it loses review, diff and this file's tests. The
+ * catalogue is the trade: the pairing is switchable without a deploy, the words
+ * still go through a pull request.
+ */
+const SYSTEM_PROMPTS = {
+  v1: BASE_SYSTEM_PROMPT,
+  "v2-terse": `${BASE_SYSTEM_PROMPT}\n\n${TERSE_ADDENDUM}`,
+} as const;
+
+export type CoachPromptVersion = keyof typeof SYSTEM_PROMPTS;
+
+/**
+ * Every prompt a variant may name — derived from the catalogue rather than
+ * written beside it, so a prompt added above is one the payload schema below
+ * accepts without a second edit anyone could forget.
+ */
+export const PROMPT_VERSIONS = Object.keys(SYSTEM_PROMPTS) as [
+  CoachPromptVersion,
+  ...CoachPromptVersion[],
+];
+
+/** What the coach shipped with, and what every fallback lands on. */
+export const DEFAULT_PROMPT_VERSION: CoachPromptVersion = "v1";
+
+function isPromptVersion(value: string): value is CoachPromptVersion {
+  return value in SYSTEM_PROMPTS;
+}
+
+/** What the athlete's message is folded into, when no variant says otherwise. */
+export interface CoachPromptOptions {
+  /** The run the composer's `@` picker put on the message. */
+  attached?: AttachedRun;
+  /** Which prompt in the catalogue answers this turn. */
+  prompt?: CoachPromptVersion;
+  /** The language the athlete is reading the app in. Defaults to English. */
+  language?: CoachLanguage;
+}
+
+/**
  * The system prompt with today's date and the window the athlete has selected
  * in the thread header folded in.
  *
@@ -257,11 +322,10 @@ const LANGUAGE_NAMES: Record<CoachLanguage, string> = {
 export function coachSystemPrompt(
   today: string,
   rangeWeeks: number,
-  attached?: AttachedRun,
-  language: CoachLanguage = "en",
+  { attached, prompt, language = "en" }: CoachPromptOptions = {},
 ): string {
   const lines = [
-    BASE_SYSTEM_PROMPT,
+    SYSTEM_PROMPTS[prompt ?? DEFAULT_PROMPT_VERSION],
     `Today is ${today}. The athlete is looking at the last ${rangeWeeks} weeks of training; prefer that window unless they ask for another.`,
   ];
   if (attached) {
@@ -279,6 +343,120 @@ export function coachSystemPrompt(
     );
   }
   return lines.join("\n\n");
+}
+
+/**
+ * The multivariate flag that carries the model **and** the prompt.
+ *
+ * One flag, not two. The unit that varies is the *pair* — a prompt tuned for
+ * one model is not the prompt for another — and a flag per axis would let a
+ * turn land on a combination nobody meant to ship. Each variant's JSON payload
+ * is the config:
+ *
+ * ```json
+ * { "model": "anthropic/claude-sonnet-5", "prompt": "v2-terse" }
+ * ```
+ *
+ * A PostHog experiment is this same flag with statistics attached, so the flag
+ * can go in on its own and be promoted to an experiment later without a line
+ * here changing.
+ */
+export const COACH_VARIANT_FLAG = "coach-model";
+
+/**
+ * A variant's payload, as it survives being typed into a textarea.
+ *
+ * Every field is optional and every field is checked. A model id that isn't
+ * `vendor/model` hands the choice of vendor back to the gateway — the thing
+ * `DEFAULT_MODEL`'s comment above exists to prevent — and a prompt version
+ * naming nothing in the catalogue would leave the coach with no instructions at
+ * all. Either one falls back to the shipped pairing rather than shipping a
+ * broken one to whoever the flag rolled it out to.
+ */
+const variantPayloadSchema = z.object({
+  model: z
+    .string()
+    .regex(/^[\w.-]+\/[\w.:-]+$/)
+    .optional(),
+  prompt: z.enum(PROMPT_VERSIONS).optional(),
+});
+
+/** Which model and which prompt answer one athlete's turn, and under what name. */
+export interface CoachVariant {
+  /**
+   * What the flag evaluated to, for `$feature/…` attribution on the trace.
+   * Unset in the ordinary case: no flag, no PostHog, or this athlete outside
+   * the rollout — all of which are the shipped pairing.
+   */
+  variant?: string;
+  /** The model the variant named, or undefined for the env var's. */
+  modelId?: string;
+  /** The prompt that goes with it. */
+  prompt: CoachPromptVersion;
+}
+
+/**
+ * `COACH_PROMPT` picks a prompt the way `COACH_MODEL` picks a model: for a
+ * deploy, for a fresh clone that has never heard of PostHog, and for reading
+ * one variant's answers locally without creating a flag to do it.
+ */
+function envPromptVersion(
+  onInvalid: (source: "flag" | "env", value: unknown) => void,
+): CoachPromptVersion {
+  // `||`, not `??`: docker-compose passes an unset variable through as "".
+  const named = process.env.COACH_PROMPT || "";
+  if (!named) return DEFAULT_PROMPT_VERSION;
+  if (isPromptVersion(named)) return named;
+  onInvalid("env", named);
+  return DEFAULT_PROMPT_VERSION;
+}
+
+/**
+ * The model and prompt this athlete's turn runs on.
+ *
+ * Call it once, at the point the turn is actually going to happen: reading the
+ * flag is what sends `$feature_flag_called`, and an athlete whose request was
+ * about to 404 was never exposed to anything.
+ *
+ * `onInvalid` rather than a logger, for the same reason
+ * `dropUnannouncedToolInput` takes one — this is called from a handler, where
+ * the request's own child logger is what makes a line traceable. Nothing here
+ * is swallowed: a payload we refuse is a flag someone typed wrong, and it is
+ * invisible until it is said out loud.
+ */
+export async function resolveCoachVariant(
+  distinctId: string,
+  onInvalid: (source: "flag" | "env", value: unknown) => void,
+): Promise<CoachVariant> {
+  const evaluated = await getFeatureVariantFor(COACH_VARIANT_FLAG, distinctId);
+
+  // The arm an experiment splits on. A `true` value is a payload-only flag,
+  // which is one config for everyone rather than an arm — nothing to attribute.
+  let variant: string | undefined;
+  /** What the flag decided, once it has been believed. */
+  let chosen: z.infer<typeof variantPayloadSchema> = {};
+
+  if (evaluated) {
+    variant = typeof evaluated.value === "string" ? evaluated.value : undefined;
+
+    // A flag that is on and carries nothing is one someone created and hasn't
+    // filled in yet. That is the shipped pairing, not a broken payload.
+    if (evaluated.payload !== undefined && evaluated.payload !== null) {
+      const parsed = variantPayloadSchema.safeParse(evaluated.payload);
+      // Refused whole, never half: the pair is the unit that varies, so taking
+      // the good half of a bad payload would build a pairing nobody chose.
+      if (parsed.success) chosen = parsed.data;
+      else onInvalid("flag", evaluated.payload);
+    }
+  }
+
+  return {
+    variant,
+    modelId: chosen.model,
+    // Read last, and only when the flag left the question open — otherwise a
+    // typo in COACH_PROMPT would be reported on every turn that ignored it.
+    prompt: chosen.prompt ?? envPromptVersion(onInvalid),
+  };
 }
 
 /** The run the composer's `@` picker put on a message. */

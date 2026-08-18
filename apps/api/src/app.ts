@@ -67,12 +67,14 @@ import {
 import {
   attachedRun,
   COACH_NOT_CONFIGURED,
+  COACH_VARIANT_FLAG,
   coachFailure,
   coachMessageMetadataSchema,
   coachSystemPrompt,
   createCoachTools,
   dropUnannouncedToolInput,
   getCoachConfig,
+  resolveCoachVariant,
   type CoachFailure,
 } from "./coach.js";
 import { buildBriefing, todayLocal } from "./briefing.js";
@@ -1265,8 +1267,11 @@ app.openapi(coachChatRoute, async (c) => {
   if (!session) return c.json({ error: "Not signed in" }, 401);
 
   const log = c.get("log");
-  const config = getCoachConfig();
-  if (!config) {
+  // The pairing the coach shipped with, and the one check worth doing before
+  // any work: whether a model can be reached at all. A variant may replace the
+  // model further down; it can never supply the API key.
+  const defaultConfig = getCoachConfig();
+  if (!defaultConfig) {
     // The instructions are for whoever runs the server, so they go to the log.
     // The athlete gets the reason and apps/web writes the sentence.
     log.warn({ event: "coach.not_configured" }, COACH_NOT_CONFIGURED);
@@ -1313,6 +1318,32 @@ app.openapi(coachChatRoute, async (c) => {
 
   const messages: UIMessage[] = await getMessages(thread.id);
 
+  // Which model answers, and which prompt it answers with. Read here rather
+  // than beside the config above, because evaluating the flag is what sends
+  // `$feature_flag_called` — the exposure an experiment computes its statistics
+  // from — and an athlete whose request was about to 404 was never exposed to
+  // anything. By this line the turn is certain to happen.
+  const variant = await resolveCoachVariant(
+    session.user.id,
+    (source, value) => {
+      log.warn(
+        {
+          event: "coach.variant_invalid",
+          flag: COACH_VARIANT_FLAG,
+          source,
+          value,
+        },
+        "Ignored an unusable coach variant and kept the shipped pairing",
+      );
+    },
+  );
+  // The pairing this turn actually runs on. `?? defaultConfig` can't fire — the
+  // API key the guard above proved is there is the only thing that returns null
+  // — but it keeps the override honest without an assertion.
+  const config = variant.modelId
+    ? (getCoachConfig(variant.modelId) ?? defaultConfig)
+    : defaultConfig;
+
   // The interesting part of a coach turn isn't in the URL: which thread, and
   // whether the athlete asked something new, rewrote the question, or re-rolled
   // the last answer.
@@ -1324,6 +1355,8 @@ app.openapi(coachChatRoute, async (c) => {
       trigger: body.trigger,
       edited: editedMessageId !== undefined,
       messages: messages.length,
+      variant: variant.variant,
+      prompt: variant.prompt,
     },
     "Answering a coach turn",
   );
@@ -1345,17 +1378,25 @@ app.openapi(coachChatRoute, async (c) => {
       trigger: body.trigger,
       range_weeks: body.range_weeks,
       language: body.language,
+      // `contextProperties` in posthog.ts spreads these onto the `$ai_trace`,
+      // every `$ai_generation` under it *and* every `$ai_span` — so cost,
+      // latency, stop reason and tool-call count all become filterable by
+      // variant for one line here. `$feature/<key>` is the property name
+      // PostHog's own experiment analysis reads, not one of ours.
+      ...(variant.variant
+        ? { [`$feature/${COACH_VARIANT_FLAG}`]: variant.variant }
+        : {}),
+      coach_prompt: variant.prompt,
     },
   });
 
   const result = streamText({
     model: config.model,
-    system: coachSystemPrompt(
-      today,
-      body.range_weeks,
-      attachedRun(messages),
-      body.language,
-    ),
+    system: coachSystemPrompt(today, body.range_weeks, {
+      attached: attachedRun(messages),
+      prompt: variant.prompt,
+      language: body.language,
+    }),
     messages: await convertToModelMessages(messages),
     tools: createCoachTools({
       accessToken,
