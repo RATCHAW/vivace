@@ -4,5 +4,6 @@
 // here does not exist as far as migrations are concerned.
 export * from "./auth.js";
 export * from "./coach.js";
+export * from "./invite.js";
 export * from "./render.js";
 export * from "./webhook.js";

@@ -63,6 +63,17 @@ export type NumberStream = {
     data: Array<number>;
 };
 
+export type RunPartnerState = {
+    partner: RunPartner;
+};
+
+export type RunPartner = {
+    name: string;
+    avatar_url: string;
+    activity: Run;
+    streams: RunStreams;
+} | null;
+
 export type RunRenderState = {
     render: RunRender;
 };
@@ -81,7 +92,7 @@ export type RunRender = {
     updated_at: string;
 } | null;
 
-export type VideoTemplate = 'run-video' | 'split-rush' | 'living-poster' | 'minimal-numbers';
+export type VideoTemplate = 'run-video' | 'duo-replay' | 'split-rush' | 'living-poster' | 'minimal-numbers';
 
 export type VideoTheme = 'charcoal' | 'cream' | 'accent';
 
@@ -90,6 +101,42 @@ export type RunRenderOptions = {
     show_avatar?: boolean;
     theme?: VideoTheme;
     greenscreen?: boolean;
+};
+
+export type RunInvite = {
+    token: string;
+    activity_id: number;
+    status: RunInviteStatus;
+    invitee_name: string | null;
+    invitee_activity_id: number | null;
+    expires_at: string;
+    responded_at: string | null;
+    created_at: string;
+};
+
+export type RunInviteStatus = 'pending' | 'accepted' | 'declined' | 'revoked' | 'expired';
+
+export type RunInviteList = {
+    invites: Array<RunInvite>;
+};
+
+export type RunInvitePreview = {
+    status: RunInviteStatus;
+    inviter_name: string;
+    run_name: string;
+    run_date: string;
+    run_distance: number;
+    run_moving_time: number;
+    expires_at: string;
+};
+
+export type RunInviteCandidates = {
+    candidates: Array<Run>;
+};
+
+export type AcceptRunInvite = {
+    activity_id: number;
+    consent_text: string;
 };
 
 export type CoachThread = {
@@ -354,6 +401,37 @@ export type GetRunStreamsResponses = {
 
 export type GetRunStreamsResponse = GetRunStreamsResponses[keyof GetRunStreamsResponses];
 
+export type GetRunPartnerData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/runs/{id}/partner';
+};
+
+export type GetRunPartnerErrors = {
+    /**
+     * No valid session.
+     */
+    401: ApiError;
+    /**
+     * Strava rejected or failed the upstream request.
+     */
+    502: ApiError;
+};
+
+export type GetRunPartnerError = GetRunPartnerErrors[keyof GetRunPartnerErrors];
+
+export type GetRunPartnerResponses = {
+    /**
+     * The other runner, or null if there isn't one.
+     */
+    200: RunPartnerState;
+};
+
+export type GetRunPartnerResponse = GetRunPartnerResponses[keyof GetRunPartnerResponses];
+
 export type GetRunRenderData = {
     body?: never;
     path: {
@@ -401,6 +479,10 @@ export type StartRunRenderErrors = {
      * The stored Strava token lacks the activity:read scope; sign out and back in.
      */
     403: ApiError;
+    /**
+     * This template needs a second runner, and nobody has accepted an invitation to this run — or the athlete who did has since disconnected Strava.
+     */
+    409: ApiError;
     /**
      * Strava or Lambda failed the upstream request.
      */
@@ -454,6 +536,259 @@ export type StreamRunRenderProgressResponses = {
 };
 
 export type StreamRunRenderProgressResponse = StreamRunRenderProgressResponses[keyof StreamRunRenderProgressResponses];
+
+export type CreateRunInviteData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/runs/{id}/invite';
+};
+
+export type CreateRunInviteErrors = {
+    /**
+     * No valid session.
+     */
+    401: ApiError;
+    /**
+     * The stored Strava token lacks the activity:read scope; sign out and back in.
+     */
+    403: ApiError;
+    /**
+     * No such run on the signed-in athlete's account.
+     */
+    404: ApiError;
+    /**
+     * Strava rejected or failed the upstream request.
+     */
+    502: ApiError;
+};
+
+export type CreateRunInviteError = CreateRunInviteErrors[keyof CreateRunInviteErrors];
+
+export type CreateRunInviteResponses = {
+    /**
+     * The invitation. `token` goes in the link the athlete sends.
+     */
+    200: RunInvite;
+};
+
+export type CreateRunInviteResponse = CreateRunInviteResponses[keyof CreateRunInviteResponses];
+
+export type ListRunInvitesData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/runs/{id}/invites';
+};
+
+export type ListRunInvitesErrors = {
+    /**
+     * No valid session.
+     */
+    401: ApiError;
+};
+
+export type ListRunInvitesError = ListRunInvitesErrors[keyof ListRunInvitesErrors];
+
+export type ListRunInvitesResponses = {
+    /**
+     * The run's invitations.
+     */
+    200: RunInviteList;
+};
+
+export type ListRunInvitesResponse = ListRunInvitesResponses[keyof ListRunInvitesResponses];
+
+export type RevokeRunInviteData = {
+    body?: never;
+    path: {
+        token: string;
+    };
+    query?: never;
+    url: '/api/invites/{token}';
+};
+
+export type RevokeRunInviteErrors = {
+    /**
+     * No valid session.
+     */
+    401: ApiError;
+    /**
+     * No invitation with that token sent by this athlete.
+     */
+    404: ApiError;
+    /**
+     * It was declined or has already been withdrawn.
+     */
+    409: ApiError;
+};
+
+export type RevokeRunInviteError = RevokeRunInviteErrors[keyof RevokeRunInviteErrors];
+
+export type RevokeRunInviteResponses = {
+    /**
+     * The withdrawn invitation.
+     */
+    200: RunInvite;
+};
+
+export type RevokeRunInviteResponse = RevokeRunInviteResponses[keyof RevokeRunInviteResponses];
+
+export type GetRunInviteData = {
+    body?: never;
+    path: {
+        token: string;
+    };
+    query?: never;
+    url: '/api/invites/{token}';
+};
+
+export type GetRunInviteErrors = {
+    /**
+     * No invitation with that token.
+     */
+    404: ApiError;
+    /**
+     * Strava rejected or failed the upstream request.
+     */
+    502: ApiError;
+};
+
+export type GetRunInviteError = GetRunInviteErrors[keyof GetRunInviteErrors];
+
+export type GetRunInviteResponses = {
+    /**
+     * The invitation, as much of it as an outsider may see.
+     */
+    200: RunInvitePreview;
+};
+
+export type GetRunInviteResponse = GetRunInviteResponses[keyof GetRunInviteResponses];
+
+export type GetRunInviteCandidatesData = {
+    body?: never;
+    path: {
+        token: string;
+    };
+    query?: never;
+    url: '/api/invites/{token}/candidates';
+};
+
+export type GetRunInviteCandidatesErrors = {
+    /**
+     * No valid session.
+     */
+    401: ApiError;
+    /**
+     * The stored Strava token lacks the activity:read scope; sign out and back in.
+     */
+    403: ApiError;
+    /**
+     * No invitation with that token.
+     */
+    404: ApiError;
+    /**
+     * The invitation is answered, withdrawn, or expired.
+     */
+    409: ApiError;
+    /**
+     * Strava rejected or failed the upstream request.
+     */
+    502: ApiError;
+};
+
+export type GetRunInviteCandidatesError = GetRunInviteCandidatesErrors[keyof GetRunInviteCandidatesErrors];
+
+export type GetRunInviteCandidatesResponses = {
+    /**
+     * Candidate runs, best match first.
+     */
+    200: RunInviteCandidates;
+};
+
+export type GetRunInviteCandidatesResponse = GetRunInviteCandidatesResponses[keyof GetRunInviteCandidatesResponses];
+
+export type AcceptRunInviteData = {
+    body: AcceptRunInvite;
+    path: {
+        token: string;
+    };
+    query?: never;
+    url: '/api/invites/{token}/accept';
+};
+
+export type AcceptRunInviteErrors = {
+    /**
+     * No valid session.
+     */
+    401: ApiError;
+    /**
+     * The stored Strava token lacks the activity:read scope; sign out and back in.
+     */
+    403: ApiError;
+    /**
+     * No invitation with that token, or no such run on my account.
+     */
+    404: ApiError;
+    /**
+     * The invitation is already answered, withdrawn or expired — or it is the caller's own.
+     */
+    409: ApiError;
+    /**
+     * Strava rejected or failed the upstream request.
+     */
+    502: ApiError;
+};
+
+export type AcceptRunInviteError = AcceptRunInviteErrors[keyof AcceptRunInviteErrors];
+
+export type AcceptRunInviteResponses = {
+    /**
+     * The accepted invitation.
+     */
+    200: RunInvite;
+};
+
+export type AcceptRunInviteResponse = AcceptRunInviteResponses[keyof AcceptRunInviteResponses];
+
+export type DeclineRunInviteData = {
+    body?: never;
+    path: {
+        token: string;
+    };
+    query?: never;
+    url: '/api/invites/{token}/decline';
+};
+
+export type DeclineRunInviteErrors = {
+    /**
+     * No valid session.
+     */
+    401: ApiError;
+    /**
+     * No invitation with that token.
+     */
+    404: ApiError;
+    /**
+     * The invitation is already answered, withdrawn or expired.
+     */
+    409: ApiError;
+};
+
+export type DeclineRunInviteError = DeclineRunInviteErrors[keyof DeclineRunInviteErrors];
+
+export type DeclineRunInviteResponses = {
+    /**
+     * The declined invitation.
+     */
+    200: RunInvite;
+};
+
+export type DeclineRunInviteResponse = DeclineRunInviteResponses[keyof DeclineRunInviteResponses];
 
 export type ListCoachThreadsData = {
     body?: never;

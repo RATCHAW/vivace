@@ -25,6 +25,10 @@
       "description": "The signed-in athlete's runs and their streams"
     },
     {
+      "name": "Invites",
+      "description": "Inviting another athlete who ran the same run to appear in its video"
+    },
+    {
       "name": "Coach",
       "description": "Conversations with the AI running coach"
     },
@@ -304,6 +308,44 @@
           "data"
         ]
       },
+      "RunPartnerState": {
+        "type": "object",
+        "properties": {
+          "partner": {
+            "$ref": "#/components/schemas/RunPartner"
+          }
+        },
+        "required": [
+          "partner"
+        ]
+      },
+      "RunPartner": {
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "Marianne"
+          },
+          "avatar_url": {
+            "type": "string"
+          },
+          "activity": {
+            "$ref": "#/components/schemas/Run"
+          },
+          "streams": {
+            "$ref": "#/components/schemas/RunStreams"
+          }
+        },
+        "required": [
+          "name",
+          "avatar_url",
+          "activity",
+          "streams"
+        ]
+      },
       "RunRenderState": {
         "type": "object",
         "properties": {
@@ -392,6 +434,7 @@
         "type": "string",
         "enum": [
           "run-video",
+          "duo-replay",
           "split-rush",
           "living-poster",
           "minimal-numbers"
@@ -427,6 +470,158 @@
             "example": true
           }
         }
+      },
+      "RunInvite": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "example": "u4Hs1Zx…"
+          },
+          "activity_id": {
+            "type": "integer",
+            "example": 987654321
+          },
+          "status": {
+            "$ref": "#/components/schemas/RunInviteStatus"
+          },
+          "invitee_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "Marianne"
+          },
+          "invitee_activity_id": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "responded_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "token",
+          "activity_id",
+          "status",
+          "invitee_name",
+          "invitee_activity_id",
+          "expires_at",
+          "responded_at",
+          "created_at"
+        ]
+      },
+      "RunInviteStatus": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "accepted",
+          "declined",
+          "revoked",
+          "expired"
+        ],
+        "example": "pending"
+      },
+      "RunInviteList": {
+        "type": "object",
+        "properties": {
+          "invites": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RunInvite"
+            }
+          }
+        },
+        "required": [
+          "invites"
+        ]
+      },
+      "RunInvitePreview": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/RunInviteStatus"
+          },
+          "inviter_name": {
+            "type": "string",
+            "example": "Ayoub"
+          },
+          "run_name": {
+            "type": "string",
+            "example": "Saturday long run"
+          },
+          "run_date": {
+            "type": "string",
+            "example": "2026-08-15"
+          },
+          "run_distance": {
+            "type": "number",
+            "example": 10240.5
+          },
+          "run_moving_time": {
+            "type": "integer",
+            "example": 3120
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "status",
+          "inviter_name",
+          "run_name",
+          "run_date",
+          "run_distance",
+          "run_moving_time",
+          "expires_at"
+        ]
+      },
+      "RunInviteCandidates": {
+        "type": "object",
+        "properties": {
+          "candidates": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Run"
+            }
+          }
+        },
+        "required": [
+          "candidates"
+        ]
+      },
+      "AcceptRunInvite": {
+        "type": "object",
+        "properties": {
+          "activity_id": {
+            "type": "integer",
+            "example": 123456789
+          },
+          "consent_text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "activity_id",
+          "consent_text"
+        ]
       },
       "CoachThread": {
         "type": "object",
@@ -1296,6 +1491,65 @@
         }
       }
     },
+    "/api/runs/{id}/partner": {
+      "get": {
+        "operationId": "getRunPartner",
+        "tags": [
+          "Runs"
+        ],
+        "summary": "Get the other runner on this run, if somebody accepted",
+        "description": "The run and streams of whoever accepted an invitation to appear in this run's video, read with their own Strava token. `partner` is null when nobody has accepted, or when the athlete who did has since disconnected Strava — the browser reads it to decide whether the two-runner templates can be offered, and to play them without going back to Strava itself.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$",
+              "example": "987654321"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The other runner, or null if there isn't one.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunPartnerState"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Strava rejected or failed the upstream request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/runs/{id}/render": {
       "get": {
         "operationId": "getRunRender",
@@ -1303,7 +1557,7 @@
           "Runs"
         ],
         "summary": "Get one run's stored render",
-        "description": "Reads the persisted render state for this run, athlete and template. `render` is null when this run has never been rendered with this template. While a render is in flight, live progress comes from the SSE endpoint, which also keeps this state up to date.",
+        "description": "Reads the persisted render state for this run, athlete and template. `render` is null when this run has never been rendered with this template, and equally when the render it has was made with a second runner who is no longer on this run — that file is a film of two other people. While a render is in flight, live progress comes from the SSE endpoint, which also keeps this state up to date.",
         "security": [
           {
             "sessionCookie": []
@@ -1358,7 +1612,7 @@
           "Runs"
         ],
         "summary": "Render this run's video on Remotion Lambda",
-        "description": "Fetches the run and its streams from Strava, starts a Remotion Lambda render of the chosen template, and persists the render state. The MP4 lands in the Remotion S3 bucket. Idempotent while a render is in flight or already done with the same options — those return the existing state; a failed render, or one whose options no longer match, is rendered again. Each template gets its own render, so switching template does not replace the video already made with the last one. The body is optional and defaults to the plain replay.",
+        "description": "Fetches the run and its streams from Strava, starts a Remotion Lambda render of the chosen template, and persists the render state. The MP4 lands in the Remotion S3 bucket. Idempotent while a render is in flight or already done with the same options — those return the existing state; a failed render, or one whose options no longer match, is rendered again. Each template gets its own render, so switching template does not replace the video already made with the last one. A template that draws two runners also reads the run's accepted invitation and the partner's own Strava data, and is refused with 409 when there is none. The body is optional and defaults to the plain replay.",
         "security": [
           {
             "sessionCookie": []
@@ -1408,6 +1662,16 @@
           },
           "403": {
             "description": "The stored Strava token lacks the activity:read scope; sign out and back in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "This template needs a second runner, and nobody has accepted an invitation to this run — or the athlete who did has since disconnected Strava.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1495,6 +1759,522 @@
           },
           "503": {
             "description": "Remotion Lambda is not configured on this server.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/runs/{id}/invite": {
+      "post": {
+        "operationId": "createRunInvite",
+        "tags": [
+          "Invites"
+        ],
+        "summary": "Invite someone who ran this run to appear in its video",
+        "description": "Mints a link the athlete sends themselves, through whatever they already message people with. This API never contacts the invitee: Strava's API terms forbid using its materials to initiate contact with a Strava user, and there is no address to send to anyway. A run that already has a live unanswered link returns that one rather than a second — every extra token would be another standing permission to view the run.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$",
+              "example": "987654321"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The invitation. `token` goes in the link the athlete sends.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunInvite"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The stored Strava token lacks the activity:read scope; sign out and back in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such run on the signed-in athlete's account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Strava rejected or failed the upstream request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/runs/{id}/invites": {
+      "get": {
+        "operationId": "listRunInvites",
+        "tags": [
+          "Invites"
+        ],
+        "summary": "List the invitations sent for this run",
+        "description": "Every invitation the signed-in athlete has sent for this run, newest first — which is what lets the studio say whether anyone has answered. A link nobody answered before it lapsed reads `expired`.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$",
+              "example": "987654321"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The run's invitations.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunInviteList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/invites/{token}": {
+      "get": {
+        "operationId": "getRunInvite",
+        "tags": [
+          "Invites"
+        ],
+        "summary": "Preview an invitation (no session required)",
+        "description": "What the holder of a link is shown before they sign in — who is asking and which run, and nothing else. Deliberately unauthenticated: the whole point of the link is that it reaches somebody who does not have an account yet, and requiring one first would ask them to authorise us before telling them what for. The token is the credential.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 20,
+              "maxLength": 100,
+              "pattern": "^[A-Za-z0-9_-]+$",
+              "example": "u4Hs1ZxK9pQ2mR7vT0nB3cJ6yL8wF5dG1aE4hS7kX0M"
+            },
+            "required": true,
+            "name": "token",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The invitation, as much of it as an outsider may see.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunInvitePreview"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No invitation with that token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Strava rejected or failed the upstream request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "revokeRunInvite",
+        "tags": [
+          "Invites"
+        ],
+        "summary": "Withdraw an invitation I sent, or take the runner it brought back out",
+        "description": "Kills the link, and with it the second runner if somebody had already accepted — the film belongs to the athlete making it, so a run that ended up with the wrong person on it can be given to somebody else instead. Only the athlete who sent it may, and only while it is still live: a declined or already-withdrawn invitation is settled. What this does not do is erase the record of who consented to what, and it is not the invitee's way out — that is disconnecting Strava, which withdraws every grant they have given in either direction.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 20,
+              "maxLength": 100,
+              "pattern": "^[A-Za-z0-9_-]+$",
+              "example": "u4Hs1ZxK9pQ2mR7vT0nB3cJ6yL8wF5dG1aE4hS7kX0M"
+            },
+            "required": true,
+            "name": "token",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The withdrawn invitation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunInvite"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No invitation with that token sent by this athlete.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "It was declined or has already been withdrawn.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/invites/{token}/candidates": {
+      "get": {
+        "operationId": "getRunInviteCandidates",
+        "tags": [
+          "Invites"
+        ],
+        "summary": "My runs that could be the other half of this one",
+        "description": "The signed-in athlete's own runs, ranked by how much they overlap the invited run, best first. Ranking only orders the list — the athlete confirms which run was theirs, because they are the only one who knows. An empty list is a normal answer: they may have recorded nothing that day, or hidden their start times, and the client should let them say so.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 20,
+              "maxLength": 100,
+              "pattern": "^[A-Za-z0-9_-]+$",
+              "example": "u4Hs1ZxK9pQ2mR7vT0nB3cJ6yL8wF5dG1aE4hS7kX0M"
+            },
+            "required": true,
+            "name": "token",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Candidate runs, best match first.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunInviteCandidates"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The stored Strava token lacks the activity:read scope; sign out and back in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No invitation with that token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The invitation is answered, withdrawn, or expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Strava rejected or failed the upstream request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/invites/{token}/accept": {
+      "post": {
+        "operationId": "acceptRunInvite",
+        "tags": [
+          "Invites"
+        ],
+        "summary": "Accept an invitation, naming which run was mine",
+        "description": "Records the consent that lets this athlete's run appear in the inviter's video, against the run they say was theirs. The sentence they were shown is stored verbatim with the row: consent has to be evidenced as it was worded at the time, and the catalogue will be reworded. Accepting twice is not an error — the second attempt reports the invitation as already answered.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 20,
+              "maxLength": 100,
+              "pattern": "^[A-Za-z0-9_-]+$",
+              "example": "u4Hs1ZxK9pQ2mR7vT0nB3cJ6yL8wF5dG1aE4hS7kX0M"
+            },
+            "required": true,
+            "name": "token",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcceptRunInvite"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The accepted invitation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunInvite"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The stored Strava token lacks the activity:read scope; sign out and back in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No invitation with that token, or no such run on my account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The invitation is already answered, withdrawn or expired — or it is the caller's own.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Strava rejected or failed the upstream request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/invites/{token}/decline": {
+      "post": {
+        "operationId": "declineRunInvite",
+        "tags": [
+          "Invites"
+        ],
+        "summary": "Decline an invitation",
+        "description": "Closes the invitation without pairing anything. Recorded rather than left to lapse, so the inviter can tell a no from a link nobody opened.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 20,
+              "maxLength": 100,
+              "pattern": "^[A-Za-z0-9_-]+$",
+              "example": "u4Hs1ZxK9pQ2mR7vT0nB3cJ6yL8wF5dG1aE4hS7kX0M"
+            },
+            "required": true,
+            "name": "token",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The declined invitation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunInvite"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No invitation with that token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The invitation is already answered, withdrawn or expired.",
             "content": {
               "application/json": {
                 "schema": {

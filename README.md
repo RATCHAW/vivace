@@ -86,6 +86,7 @@ only the downloadable MP4 render is unavailable.
 | `apps/api` | Hono API, better-auth, coach, Strava proxy, persistence and telemetry |
 | `apps/web` | Authenticated Vite/React product |
 | `apps/landing` | Public Next.js marketing site |
+| `apps/e2e` | Playwright suite: a browser against the real app, API and Postgres |
 | `packages/strava-api` | Generated SDK for Strava's API |
 | `packages/video` | Shared Remotion template catalogue, Player code and Lambda entry |
 
@@ -727,6 +728,8 @@ pnpm lint       # eslint across every workspace (pnpm lint:fix to autofix)
 pnpm format     # prettier --write (pnpm format:check to only report)
 pnpm generate   # regenerate the OpenAPI document and both generated clients
 pnpm spec:pull  # re-download and bundle Strava's Swagger spec
+pnpm e2e:db     # start the end-to-end Postgres (:5434, tmpfs, its own volume)
+pnpm e2e        # Playwright: browser -> web -> api -> postgres (see apps/e2e)
 pnpm db:up      # start Postgres only (docker compose)
 pnpm db:reset   # throw the local Postgres volume away and start it empty
 pnpm logs:up    # start Postgres + Loki + Grafana (Grafana on :3002)
@@ -746,7 +749,26 @@ pnpm --filter @repo/landing dev   # landing page only, on :3001
 ## Checks
 
 `pnpm lint && pnpm format:check && pnpm typecheck && pnpm test && pnpm build` is
-what "done" means, and what CI runs. Husky hooks catch a subset earlier:
+what "done" means, and what CI runs.
+
+`pnpm test` is deliberately database-free and stays that way — it is the fast
+gate. The end-to-end suite is the slow one and runs as its own CI job:
+
+```sh
+pnpm e2e:db && pnpm e2e
+
+# Another checkout already running its suite? Shift all four ports at once.
+E2E_PORT_OFFSET=10 pnpm e2e:db && E2E_PORT_OFFSET=10 pnpm e2e
+```
+
+It drives a browser at the real Vite app, which proxies to the real Hono API,
+which reads and writes a real Postgres. Only Strava is replaced, by a server the
+suite owns — so better-auth's OAuth, the generated SDK, the routes and the
+migrations under test are the ones that ship. See
+[apps/e2e/README.md](./apps/e2e/README.md), including why the two environment
+variables that move Strava's address are inert in production.
+
+Husky hooks catch a subset earlier:
 `pre-commit` formats, lints and typechecks the staged files, and `commit-msg`
 requires a [Conventional Commit](https://www.conventionalcommits.org).
 

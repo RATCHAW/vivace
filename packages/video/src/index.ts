@@ -7,7 +7,7 @@
  * never runs. The compositions themselves are `@repo/video/compositions`.
  */
 export * from "./registry";
-export type { VideoActivity, VideoStreams } from "./types";
+export type { VideoActivity, VideoPartner, VideoStreams } from "./types";
 
 // Which templates a given run can be cut with, and how long each one's film is.
 // The picker reads the first, the browser's <Player> reads the second, and

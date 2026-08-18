@@ -217,6 +217,122 @@ export const RunRenderStateSchema = z
 
 export type RunRenderState = z.infer<typeof RunRenderStateSchema>;
 
+/**
+ * The other runner on a run, for the templates that draw two.
+ *
+ * Everything here was read with the *invitee's* own Strava token — their pace is
+ * not readable any other way — so the existence of this object is itself the
+ * evidence that an invitation was accepted and not withdrawn. It carries a whole
+ * run because the film draws one: the browser plays the same props Lambda
+ * renders, and neither can go back to Strava for the rest of it.
+ */
+export const RunPartnerSchema = z
+  .object({
+    /** Their first name, as Strava spells it. A label on a bar, not a profile. */
+    name: z.string().openapi({ example: "Marianne" }),
+    /** Their Strava picture, or "" when they never set one. */
+    avatar_url: z.string(),
+    /** Which of their runs they said was the same run. */
+    activity: RunSchema,
+    streams: RunStreamsSchema,
+  })
+  .openapi("RunPartner");
+
+export type RunPartner = z.infer<typeof RunPartnerSchema>;
+
+/** Wrapper so "nobody has accepted" is an ordinary 200 with `partner: null`. */
+export const RunPartnerStateSchema = z
+  .object({ partner: RunPartnerSchema.nullable() })
+  .openapi("RunPartnerState");
+
+/** Where an invitation to appear in someone's run video has got to. */
+export const RunInviteStatusSchema = z
+  .enum(["pending", "accepted", "declined", "revoked", "expired"])
+  .openapi("RunInviteStatus", { example: "pending" });
+
+/**
+ * One invitation, as the athlete who sent it sees it.
+ *
+ * `expired` is served but never stored — a link nobody answered before its
+ * `expires_at` is reported expired rather than pending, because nothing runs to
+ * write that transition and a row can't be trusted to age itself.
+ */
+export const RunInviteSchema = z
+  .object({
+    /** The bearer token in the link. Returned to the inviter alone: whoever
+     *  holds it can see the invitation, which is the point of sending it. */
+    token: z.string().openapi({ example: "u4Hs1Zx…" }),
+    activity_id: z.number().int().openapi({ example: 987654321 }),
+    status: RunInviteStatusSchema,
+    /** The athlete who answered, once one has. First name only — it is a label
+     *  on the inviter's screen, not a profile. */
+    invitee_name: z.string().nullable().openapi({ example: "Marianne" }),
+    /** Which of their runs they said was the same run. */
+    invitee_activity_id: z.number().int().nullable(),
+    expires_at: z.iso.datetime(),
+    responded_at: z.iso.datetime().nullable(),
+    created_at: z.iso.datetime(),
+  })
+  .openapi("RunInvite");
+
+export type RunInvite = z.infer<typeof RunInviteSchema>;
+
+/** Wrapper so "this run has no invitations" is an ordinary 200. */
+export const RunInviteListSchema = z
+  .object({ invites: z.array(RunInviteSchema) })
+  .openapi("RunInviteList");
+
+/**
+ * What the holder of a link is shown, before they have signed in.
+ *
+ * Deliberately the smallest thing that makes the question answerable: who is
+ * asking, and which run. No ids, no route, no pace — an unauthenticated caller
+ * gets enough to recognise a run they were on and nothing that would be worth
+ * harvesting if the token leaked.
+ */
+export const RunInvitePreviewSchema = z
+  .object({
+    status: RunInviteStatusSchema,
+    /** The inviter's first name, as Strava spells it. */
+    inviter_name: z.string().openapi({ example: "Ayoub" }),
+    /** What they called the run. */
+    run_name: z.string().openapi({ example: "Saturday long run" }),
+    /** The run's own local day, `YYYY-MM-DD`. */
+    run_date: z.string().openapi({ example: "2026-08-15" }),
+    /** Metres. */
+    run_distance: z.number().openapi({ example: 10240.5 }),
+    /** Seconds. */
+    run_moving_time: z.number().int().openapi({ example: 3120 }),
+    expires_at: z.iso.datetime(),
+  })
+  .openapi("RunInvitePreview");
+
+export type RunInvitePreview = z.infer<typeof RunInvitePreviewSchema>;
+
+/**
+ * The invitee's own runs that could be the other half of this one, best first.
+ *
+ * Ranked rather than resolved: the athlete picks, because they are the only one
+ * who actually knows. An empty list is normal and not an error — they may have
+ * recorded nothing that day, or hidden their start times.
+ */
+export const RunInviteCandidatesSchema = z
+  .object({ candidates: z.array(RunSchema) })
+  .openapi("RunInviteCandidates");
+
+/** Accepting: which of my runs it was, and that I agree to it being used. */
+export const AcceptRunInviteSchema = z
+  .object({
+    activity_id: z.number().int().openapi({ example: 123456789 }),
+    /** The sentence the athlete was actually shown when they agreed, stored
+     *  verbatim with the row. Consent has to be evidenced as it was worded at
+     *  the time — the catalogue will be reworded, and this must not follow it. */
+    consent_text: z.string().min(1).max(500),
+  })
+  .openapi("AcceptRunInvite");
+
+export type AcceptRunInvite = z.infer<typeof AcceptRunInviteSchema>;
+
 /** One coach conversation. `title` is null until the first message names it. */
 export const CoachThreadSchema = z
   .object({

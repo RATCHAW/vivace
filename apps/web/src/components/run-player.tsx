@@ -16,6 +16,7 @@ import {
   getTemplate,
   type TemplateId,
   type ThemeName,
+  type VideoPartner,
 } from "@repo/video";
 import { VIDEO_COMPONENTS } from "@repo/video/compositions";
 import type { Run, RunStreams } from "@/api";
@@ -76,6 +77,8 @@ export function RunPlayer({
   streams,
   mapboxToken,
   avatarUrl,
+  athleteName,
+  partner = null,
   theme,
   greenscreen,
   fit = "width",
@@ -93,6 +96,11 @@ export function RunPlayer({
   /** The athlete's picture when the avatar option is on, else "" — see
    *  `<VideoOptions>`. A change re-renders the film, not the player. */
   avatarUrl: string;
+  /** What to call them on their own bar in a two-runner film. */
+  athleteName: string;
+  /** Whoever accepted an invitation to this run, with their own run attached.
+   *  Null on a solo run, and ignored by every template but the duo cut. */
+  partner?: VideoPartner | null;
   /** Which of the three looks to cut it in. */
   theme: ThemeName;
   /** Cut the canvas as a chroma key plate. Every template honours it, and the
@@ -177,6 +185,8 @@ export function RunPlayer({
           mapboxToken,
           avatarUrl,
           theme,
+          athleteName,
+          partner,
           greenscreen,
         }}
         durationInFrames={durationInFrames}

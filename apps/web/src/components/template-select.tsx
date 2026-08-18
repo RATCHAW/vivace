@@ -7,6 +7,7 @@ import {
 } from "@repo/video";
 import { useVideoLabels } from "@/i18n/video";
 import { cn } from "@/lib/utils";
+import { NewBadge } from "@/components/mono";
 import {
   Select,
   SelectContent,
@@ -14,6 +15,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+
+/**
+ * The cuts still worth pointing at, and a list with a shelf life.
+ *
+ * Deliberately not a field on the catalogue: `@repo/video` is the source of
+ * truth for what can be rendered, and it is also what Lambda and apps/api load,
+ * neither of which has an opinion about what an athlete has already seen. How
+ * long a template is news is this screen's business — so retiring the badge is
+ * deleting an id from here, not a change to the contract three packages read.
+ *
+ * Keep it to one. The cobalt is a stamp; two of them is a colour scheme.
+ */
+const NEW_TEMPLATES: readonly TemplateId[] = ["duo-replay"];
 
 /**
  * Which cut of the run is playing — above the film, because it is the film's
@@ -24,9 +38,21 @@ import {
  * route replay exists and understand in four words why this run can't have one.
  * A catalogue that changes length as you click down the list reads as a bug.
  *
+ * One reason is not like the others. `needs-partner` says the run is fine and
+ * nobody has accepted yet — the athlete can fix that from this screen, and
+ * choosing the cut is how they get to the invitation, which the studio only
+ * offers on a template with a second lane in it. So that row stays selectable
+ * and keeps its second line; every other reason is a fact about the run that no
+ * click from here can change, and those rows stay dead.
+ *
  * That reason is the *only* second line here. The templates describe themselves
  * well enough by name, and a sentence under each of four rows turns a choice
  * into a page to read.
+ *
+ * The "New" stamp is on the rows and not on the trigger. The trigger says which
+ * cut is *playing*, and by the time a new one is playing the athlete has found
+ * it — a badge there is the app congratulating itself. The list is where the
+ * finding happens, so that is where the stamp goes.
  */
 export function TemplateSelect({
   template,
@@ -50,6 +76,7 @@ export function TemplateSelect({
         id: entry.id,
         eligible: true,
         reason: undefined,
+        reasonKey: undefined,
       }));
 
   return (
@@ -79,12 +106,18 @@ export function TemplateSelect({
             <SelectItem
               key={entry.id}
               value={entry.id}
-              disabled={!entry.eligible}
+              disabled={!entry.eligible && entry.reasonKey !== "needs-partner"}
               className={cn(reason && "items-start py-2.5")}
             >
               <span className="flex flex-col gap-1">
-                <span className="font-semibold">
-                  {labels.templateLabel(entry.id)}
+                {/* The badge sits on the name's line, never above the reason:
+                    the row can carry both, and a stamp that drifts to its own
+                    line stops belonging to the word it marks. */}
+                <span className="flex items-center gap-2">
+                  <span className="font-semibold">
+                    {labels.templateLabel(entry.id)}
+                  </span>
+                  {NEW_TEMPLATES.includes(entry.id) && <NewBadge />}
                 </span>
                 {reason && (
                   <span className="text-caption text-muted-foreground text-wrap">

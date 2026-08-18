@@ -28,6 +28,24 @@ export interface VideoActivity {
   workout_type: string;
 }
 
+/**
+ * The other runner, when a film has one.
+ *
+ * There is no social graph behind this and no second athlete on the props: one
+ * invitation, answered, is what puts a partner here — see `run_invite` in
+ * apps/api. Their run travels with them because it has to: a second runner's
+ * pace is only readable with that runner's own Strava token, so by the time a
+ * composition is handed this, consent has already been given and spent.
+ */
+export interface VideoPartner {
+  /** First name, as Strava spells it. A label on a bar, not a profile. */
+  name: string;
+  activity: VideoActivity;
+  streams: VideoStreams;
+  /** Their Strava picture when the avatar option is on, else "" for the dot. */
+  avatarUrl: string;
+}
+
 interface NumberStream {
   data: number[];
 }

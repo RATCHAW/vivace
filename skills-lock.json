@@ -49,6 +49,12 @@
       "skillPath": "skills/remotion-docs/SKILL.md",
       "computedHash": "a5824cb686701e7272f609f79c56209feae7d81c4e2788f4ae984321b46fdf49"
     },
+    "research": {
+      "source": "mattpocock/skills",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/research/SKILL.md",
+      "computedHash": "bd3e2c6826671d82c86ed0da3dac3370ebcf63b0fe847f91bb444e1fb7dac21b"
+    },
     "seo-audit": {
       "source": "coreyhaines31/marketingskills",
       "sourceType": "github",

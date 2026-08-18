@@ -8,12 +8,17 @@
  */
 import type { ComponentType } from "react";
 import type { TemplateId } from "./registry";
+import { DuoReplay } from "./templates/duo-replay/DuoReplay";
 import { LivingPoster } from "./templates/living-poster/LivingPoster";
 import { MinimalNumbers } from "./templates/minimal-numbers/MinimalNumbers";
 import { RunVideo } from "./templates/run-video/RunVideo";
 import { SplitRush } from "./templates/split-rush/SplitRush";
 
 export { RunVideo, type RunVideoProps } from "./templates/run-video/RunVideo";
+export {
+  DuoReplay,
+  type DuoReplayProps,
+} from "./templates/duo-replay/DuoReplay";
 export {
   SplitRush,
   type SplitRushProps,
@@ -46,6 +51,11 @@ export interface VideoProps extends Record<string, unknown> {
   avatarUrl: string;
   /** One of `THEME_NAMES`. A template that doesn't support themes ignores it. */
   theme: string;
+  /** The other runner, on a run somebody accepted an invitation to. Null on
+   *  every template but the duo cut, which is the only one that reads it. */
+  partner: unknown;
+  /** What to call the athlete on their own bar in a two-runner film. */
+  athleteName: string;
   /** Cut the canvas as a chroma key plate. Every template honours this one —
    *  see `core/greenscreen.ts`. */
   greenscreen: boolean;
@@ -56,6 +66,7 @@ export const VIDEO_COMPONENTS: Record<TemplateId, ComponentType<VideoProps>> = {
   // actually reads; React components are contravariant in props, so the
   // catalogue's common type costs one cast per entry.
   "run-video": RunVideo as ComponentType<VideoProps>,
+  "duo-replay": DuoReplay as ComponentType<VideoProps>,
   "split-rush": SplitRush as ComponentType<VideoProps>,
   "living-poster": LivingPoster as ComponentType<VideoProps>,
   "minimal-numbers": MinimalNumbers as ComponentType<VideoProps>,
