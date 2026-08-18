@@ -499,6 +499,57 @@ The key is the *project* key, which is public by design — it can only write
 events. Add `POSTHOG_HOST=https://eu.i.posthog.com` (and the matching
 `VITE_`/`NEXT_PUBLIC_` variants) for an EU or self-hosted project.
 
+### Development data, and keeping it out of production's numbers
+
+A PostHog project is one silo of data. Point a laptop at the production key and
+the athlete you are testing with is a person in the same Persons list as the
+people actually using the app — there is no built-in separation, and nothing in
+an event says where it came from unless it is put there.
+
+Both halves of the answer are set up here.
+
+**Every event carries `environment`**, and so does the person behind it:
+`production`, `staging`, or the `development` a laptop reports. It comes from
+`APP_ENV` in the API (the same value that labels the logs in Loki), from
+`VITE_APP_ENV` or Vite's mode in the browser, and from `NEXT_PUBLIC_APP_ENV` or
+`NODE_ENV` on the landing page. Nothing needs setting for `pnpm dev` or for
+production — the fallback is right for both.
+
+It is only wrong where a *production build* isn't production, which is two
+places, and both are already handled or one variable away:
+
+- `docker compose --profile app up` passes `APP_ENV` (default `docker`) to all
+  three services, so the local stack doesn't file its events under production.
+- A **Vercel preview deployment** builds exactly as production does. Set
+  `VITE_APP_ENV` / `NEXT_PUBLIC_APP_ENV` to `preview` on Vercel's Preview
+  environment if you want those told apart too.
+
+Two things read it:
+
+- **The Persons list.** Filter on the person property `environment = production`
+  to see only real athletes. Save it as a cohort and it is one click after that.
+- **Project settings → Product analytics → "Filter out internal and test
+  users".** Add `environment ∌ production` (or `= development`) and turn on
+  "apply to all new insights". Every dashboard is then production-only by
+  default. Note this filters *analysis*, not ingestion — the events are still
+  captured, and still visible in the Activity tab.
+
+Both need events that carry the property, so a filter written the day it ships
+also drops everything recorded before it. Either accept the gap or write the
+filter as "not development", which leaves the older, unlabelled events in.
+
+**A second project is stronger**, and it is [what PostHog
+recommends](https://posthog.com/docs/settings/projects#how-to-organize-projects):
+create a `development` project, put *its* key in your local `.env` files, and
+production's data is never touched at all. The cost is that flags, surveys and
+the `VITE_POSTHOG_COACH_SURVEY_ID` survey have to be recreated there before you
+can test them — which is why the `environment` property exists as well, rather
+than instead.
+
+**Or send nothing.** Leaving the PostHog keys unset locally is the default state
+of a fresh clone and of every test run; the app behaves identically without
+them.
+
 ### The `video-render` flag
 
 A Lambda render is the one click here that costs real money, so it has a kill

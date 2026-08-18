@@ -12,7 +12,7 @@
 import "dotenv/config";
 import { captureAiGeneration } from "@posthog/ai";
 import { PostHog } from "posthog-node";
-import { logger } from "./logger.js";
+import { appEnv, logger } from "./logger.js";
 
 /** Tests must not open a batching HTTP client or talk to a real project. */
 const isTest = process.env.NODE_ENV === "test" || Boolean(process.env.VITEST);
@@ -51,6 +51,34 @@ const client = createClient();
 /** Whether anything below will actually leave the process. */
 export const posthogEnabled = client !== null;
 
+/**
+ * `environment` on every event, and on the person behind it.
+ *
+ * A PostHog project is one silo of data, so a laptop pointed at a real key
+ * writes its test athletes into the same Persons list as production's. Nothing
+ * in an event says where it came from unless we put it there — this is that
+ * property, and it is what "Filter out internal and test users" and a
+ * `environment = production` filter on the Persons list both read.
+ *
+ * `$set` rather than `$set_once`: an athlete's environment is wherever they
+ * were last seen, so a real person who is also the one testing locally is not
+ * stuck as `development` forever.
+ *
+ * A separate PostHog project for development is stronger than a property — the
+ * data never arrives at all — and this doesn't replace it. It is what keeps the
+ * project honest for everyone who hasn't set one up. See the README.
+ */
+function withEnvironment(
+  properties: Record<string, unknown> | undefined,
+  { person = false }: { person?: boolean } = {},
+): Record<string, unknown> {
+  return {
+    ...properties,
+    environment: appEnv,
+    ...(person ? { $set: { environment: appEnv } } : {}),
+  };
+}
+
 interface UserEvent {
   /** The better-auth user id — the same value `userId` carries in the logs. */
   distinctId: string;
@@ -67,7 +95,13 @@ export function captureUserEvent({
   event,
   properties,
 }: UserEvent): void {
-  client?.capture({ distinctId, event, properties });
+  client?.capture({
+    distinctId,
+    event,
+    // An athlete doing something is the one place a person definitely exists,
+    // so it is where the person's own `environment` is written.
+    properties: withEnvironment(properties, { person: true }),
+  });
 }
 
 /**
@@ -82,11 +116,15 @@ export function captureServerException(
   distinctId: string | undefined,
   properties?: Record<string, unknown>,
 ): void {
-  client?.captureException(error, distinctId ?? "server", {
-    ...properties,
-    // Separates API faults from the browser's in the same project.
-    source: "api",
-  });
+  client?.captureException(
+    error,
+    distinctId ?? "server",
+    withEnvironment({
+      ...properties,
+      // Separates API faults from the browser's in the same project.
+      source: "api",
+    }),
+  );
 }
 
 /**
@@ -210,7 +248,7 @@ interface LlmEventContext {
 
 /** The `$ai_*` properties every event in a trace carries. */
 function contextProperties(context: LlmEventContext): Record<string, unknown> {
-  return {
+  return withEnvironment({
     $ai_trace_id: context.traceId,
     ...(context.spanId ? { $ai_span_id: context.spanId } : {}),
     ...(context.parentId ? { $ai_parent_id: context.parentId } : {}),
@@ -224,7 +262,7 @@ function contextProperties(context: LlmEventContext): Record<string, unknown> {
       ? { $session_id: context.replaySessionId }
       : {}),
     ...context.properties,
-  };
+  });
 }
 
 /** `$ai_is_error` / `$ai_error`, in the shape `@posthog/ai` writes them. */

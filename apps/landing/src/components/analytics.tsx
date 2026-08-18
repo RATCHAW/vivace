@@ -15,6 +15,19 @@ import { useEffect } from "react";
 const key = process.env.NEXT_PUBLIC_POSTHOG_KEY;
 const host = process.env.NEXT_PUBLIC_POSTHOG_HOST || "https://us.i.posthog.com";
 
+// Which deploy these events came from, so `next dev` on a laptop can be told
+// apart from the live page in the one project both write to — the same
+// `environment` property apps/web and apps/api send. NEXT_PUBLIC_APP_ENV
+// overrides it because a staging deploy is a production *build*.
+const environment =
+  process.env.NEXT_PUBLIC_APP_ENV ||
+  // Next sets NODE_ENV from the command — `next dev` or `next build` — rather
+  // than reading it from the environment, so turbo's `env` list has nothing to
+  // govern here.
+  // eslint-disable-next-line turbo/no-undeclared-env-vars
+  process.env.NODE_ENV ||
+  "development";
+
 export function Analytics() {
   useEffect(() => {
     if (!key) return;
@@ -35,6 +48,10 @@ export function Analytics() {
         // by default — a replay shows the scroll, not the address.
         session_recording: { maskAllInputs: true },
       });
+
+      // A super property: on every event from this page, anonymous ones
+      // included — which here is all of them.
+      posthog.register({ environment });
     });
 
     return () => {
