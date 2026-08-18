@@ -205,6 +205,7 @@ export type CoachChatRequest = {
     message?: CoachMessage;
     message_id?: string;
     range_weeks?: number;
+    language?: 'en' | 'fr';
 };
 
 export type StravaEvent = {

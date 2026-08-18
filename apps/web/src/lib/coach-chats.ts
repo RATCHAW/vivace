@@ -7,8 +7,18 @@
 // leaves its stream running, and coming back finds the transcript exactly
 // where it got to, still arriving if the coach is mid-answer.
 import { Chat } from "@ai-sdk/react";
-import { DefaultChatTransport, type UIMessage } from "ai";
-import { COACH_CHAT_PATH, listCoachThreadsQueryKey } from "@/api";
+import {
+  DefaultChatTransport,
+  getToolName,
+  isToolUIPart,
+  type UIMessage,
+} from "ai";
+import {
+  COACH_CHAT_PATH,
+  getCoachBriefingQueryKey,
+  listCoachThreadsQueryKey,
+} from "@/api";
+import { currentLocale } from "@/i18n";
 import { trackError } from "@/lib/logger";
 import { replaySessionId } from "@/lib/posthog";
 import { queryClient } from "@/lib/query-client";
@@ -28,6 +38,35 @@ interface CoachChatEntry {
 /** One entry per conversation opened this session — bounded by the thread
  *  list, and small: a transcript is text and card JSON. */
 const entries = new Map<string, CoachChatEntry>();
+
+/** The tool the coach stores a goal race, a target time or a long-run day
+ *  through. Mirrors `setAthleteContext` in apps/api/src/coach.ts. */
+const CONTEXT_TOOL = "setAthleteContext";
+
+/**
+ * Whether a turn changed what the briefing says.
+ *
+ * The goal race the rail draws — and the card on the home page — comes from
+ * `GET /api/coach/briefing`, which is cached for a minute like every other
+ * query. So a race the coach had just been told about was written to the
+ * database and then read back from a snapshot taken before it existed: the
+ * athlete answered "which race?", the coach confirmed it in prose, and the
+ * panel beside the answer still said no goal race was set. A turn that called
+ * the tool is exactly the moment that snapshot became wrong.
+ *
+ * Read off the tool part rather than the coach's words, for the same reason
+ * the citations are: what it says it saved could be wrong, what it saved
+ * cannot. A call that failed leaves the part in `output-error`, and nothing
+ * was stored.
+ */
+export function wroteAthleteContext(message: UIMessage): boolean {
+  return message.parts.some(
+    (part) =>
+      isToolUIPart(part) &&
+      getToolName(part) === CONTEXT_TOOL &&
+      part.state === "output-available",
+  );
+}
 
 /**
  * PostHog's own header name for the replay in progress. The API reads it off
@@ -72,6 +111,10 @@ function createEntry(
                 trigger,
                 message_id: messageId,
                 range_weeks: options.rangeWeeks,
+                // Read per request for the same reason as the window: the
+                // toggle in the header can move between a chat being created
+                // and a message being sent.
+                language: currentLocale(),
               }
             : {
                 thread_id: id,
@@ -84,16 +127,25 @@ function createEntry(
                 // second copy of the question.
                 ...(messageId ? { message_id: messageId } : {}),
                 range_weeks: options.rangeWeeks,
+                language: currentLocale(),
               },
       }),
     }),
     // The first message names the thread and every message reorders the list.
     // Invalidated here rather than in the component because a finish can now
     // land while another screen is open.
-    onFinish: () => {
+    onFinish: ({ message }) => {
       void queryClient.invalidateQueries({
         queryKey: listCoachThreadsQueryKey(),
       });
+      // And the briefing, but only when the turn actually wrote what the
+      // briefing reads: it is a Strava round trip and four stored reads
+      // (buildBriefing), and most answers change nothing it shows.
+      if (wroteAthleteContext(message)) {
+        void queryClient.invalidateQueries({
+          queryKey: getCoachBriefingQueryKey(),
+        });
+      }
     },
     // The chat sits outside React Query, so the cache-level logger in
     // @/lib/query-client never sees this one. A stream that dies on the way to

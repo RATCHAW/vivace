@@ -62,6 +62,13 @@ import {
   type RunMention,
 } from "@/components/coach/coach-composer";
 import { CoachMessageEdit } from "@/components/coach/coach-message-edit";
+import {
+  asQuestionnaire,
+  CoachQuestionnaire,
+  CoachQuestionnaireStatus,
+  type QuestionnaireCard,
+} from "@/components/coach/coach-questionnaire";
+import { CoachSteps } from "@/components/coach/coach-steps";
 import { MonoLabel } from "@/components/mono";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -123,6 +130,7 @@ const TOOL_NAMES = [
   "getAthleteProfile",
   "getAthleteContext",
   "setAthleteContext",
+  "askAthlete",
   "listRuns",
   "summariseTraining",
   "getRunDebrief",
@@ -180,6 +188,39 @@ function textOf(message: UIMessage): string {
     .filter((part) => part.type === "text")
     .map((part) => part.text)
     .join("\n\n");
+}
+
+/** The tool whose result is a questionnaire. Mirrors `askAthlete` in coach.ts. */
+const QUESTIONNAIRE_TOOL = "askAthlete";
+
+/** The questionnaire a message asked, if it asked one. */
+function questionnaireOf(message: UIMessage): QuestionnaireCard | null {
+  for (const part of message.parts) {
+    if (
+      isToolUIPart(part) &&
+      getToolName(part) === QUESTIONNAIRE_TOOL &&
+      part.state === "output-available"
+    ) {
+      const card = asQuestionnaire(part.output);
+      if (card) return card;
+    }
+  }
+  return null;
+}
+
+/**
+ * Whether a part shows the coach *working* rather than what it concluded.
+ *
+ * The distinction is what collapses and what doesn't: the steps fold into one
+ * row once the turn is over, and the answer — the text, and any card a tool
+ * drew — never does. A tool still running is a step too, but it is never
+ * collapsed, because nothing collapses while the turn is live.
+ */
+function isStepPart(part: UIMessage["parts"][number]): boolean {
+  if (part.type === "reasoning") return true;
+  if (!isToolUIPart(part)) return false;
+  if (part.state !== "output-available") return true;
+  return asCoachCard(part.output) === null;
 }
 
 /** Every card drawn in one message. */
@@ -410,6 +451,28 @@ export function CoachChat({
 
   const isBusy = status === "submitted" || status === "streaming";
 
+  /**
+   * The questionnaire the coach is waiting on, if it is waiting on one.
+   *
+   * Only ever the last message's: anything the conversation has moved past is
+   * a question the athlete has already answered — in the form, or in prose —
+   * and a late submit would patch context they have since contradicted.
+   */
+  const pending = useMemo(() => {
+    const last = messages.at(-1);
+    if (last?.role !== "assistant") return null;
+    const card = questionnaireOf(last);
+    return card ? { messageId: last.id, card } : null;
+  }, [messages]);
+
+  /**
+   * Whether the form stands where the composer usually does.
+   *
+   * Not while an answer is arriving: `ask` drops a send mid-turn, so a form
+   * that accepted answers then would swallow them without a word.
+   */
+  const asking = pending && !isBusy ? pending : null;
+
   const accept = useMutation({
     ...acceptCoachPlanMutation(),
     onSuccess: async () => {
@@ -567,11 +630,134 @@ export function CoachChat({
             </div>
           )}
 
-          {messages.map((message) => {
+          {messages.map((message, position) => {
             const mention = mentionOf(message);
             const sources = sourcesOf(message, runs);
             const editing = editingId === message.id;
             const traceId = traceOf(message);
+            const isLast = position === messages.length - 1;
+
+            /** One part, whichever kind it turned out to be. */
+            const renderPart = ({
+              part,
+              key,
+            }: {
+              part: UIMessage["parts"][number];
+              key: string;
+            }) => {
+              if (part.type === "text") {
+                return (
+                  <MessageContent key={key}>
+                    <MessageResponse>{part.text}</MessageResponse>
+                  </MessageContent>
+                );
+              }
+
+              if (part.type === DEBRIEF_PART) {
+                const card = cardOf(part);
+                return card ? (
+                  <CoachCardView actions={actions} card={card} key={key} />
+                ) : null;
+              }
+
+              if (part.type === "reasoning") {
+                return (
+                  <Reasoning isStreaming={part.state === "streaming"} key={key}>
+                    <ReasoningTrigger />
+                    <ReasoningContent>{part.text}</ReasoningContent>
+                  </Reasoning>
+                );
+              }
+
+              if (isToolUIPart(part)) {
+                const name = getToolName(part);
+                const title = isToolName(name)
+                  ? t(`coach.tools.${name}`)
+                  : name;
+
+                if (part.state === "output-error") {
+                  // `errorText` is whatever the tool threw — a stack's worth of
+                  // Strava SDK wording, written for us and not for the athlete.
+                  // The API logs it; this says which tool it was.
+                  return (
+                    <p className="text-caption text-destructive" key={key}>
+                      {t("coach.toolFailed", { title })}
+                    </p>
+                  );
+                }
+
+                if (part.state !== "output-available") {
+                  return <CoachTyping key={key} label={title} />;
+                }
+
+                // The questions themselves are in the composer, or they have
+                // been answered and the answers are the message below. Either
+                // way what belongs in the transcript is one line saying so.
+                if (
+                  name === QUESTIONNAIRE_TOOL &&
+                  asQuestionnaire(part.output)
+                ) {
+                  return (
+                    <CoachQuestionnaireStatus
+                      answered={pending?.messageId !== message.id}
+                      key={key}
+                    />
+                  );
+                }
+
+                const card = asCoachCard(part.output);
+                if (card) {
+                  return (
+                    <CoachCardView actions={actions} card={card} key={key} />
+                  );
+                }
+
+                // A tool that reads rather than draws: the answer below is the
+                // output, so this is only a note that it was read.
+                const failure =
+                  typeof part.output === "object" &&
+                  part.output !== null &&
+                  "error" in part.output
+                    ? String((part.output as { error: unknown }).error)
+                    : null;
+
+                return (
+                  <p
+                    className={cn(
+                      "text-mono-badge font-mono uppercase",
+                      failure ? "text-destructive" : "text-stone",
+                    )}
+                    key={key}
+                  >
+                    {failure ?? title}
+                  </p>
+                );
+              }
+
+              return null;
+            };
+
+            // Keys come off the original position, so filtering the list into
+            // working and answer doesn't renumber either half.
+            const parts = message.parts.map((part, index) => ({
+              part,
+              key: `${message.id}-${index}`,
+            }));
+            const steps = parts.filter(({ part }) => isStepPart(part));
+            const answer = parts.filter(({ part }) => !isStepPart(part));
+
+            /**
+             * Fold the working away once it is working no longer.
+             *
+             * Never while the turn is live — the steps are the only evidence
+             * anything is happening — and never while a questionnaire is
+             * waiting, because its "awaiting your answer" line is the label on
+             * the form standing in the composer.
+             */
+            const collapsed =
+              steps.length > 0 &&
+              !(isBusy && isLast) &&
+              !(isLast && pending?.messageId === message.id);
 
             return (
               <Message from={message.role} key={message.id}>
@@ -591,101 +777,19 @@ export function CoachChat({
                   />
                 )}
 
-                {!editing &&
-                  message.parts.map((part, index) => {
-                    const key = `${message.id}-${index}`;
-
-                    if (part.type === "text") {
-                      return (
-                        <MessageContent key={key}>
-                          <MessageResponse>{part.text}</MessageResponse>
-                        </MessageContent>
-                      );
-                    }
-
-                    if (part.type === DEBRIEF_PART) {
-                      const card = cardOf(part);
-                      return card ? (
-                        <CoachCardView
-                          actions={actions}
-                          card={card}
-                          key={key}
-                        />
-                      ) : null;
-                    }
-
-                    if (part.type === "reasoning") {
-                      return (
-                        <Reasoning
-                          isStreaming={part.state === "streaming"}
-                          key={key}
-                        >
-                          <ReasoningTrigger />
-                          <ReasoningContent>{part.text}</ReasoningContent>
-                        </Reasoning>
-                      );
-                    }
-
-                    if (isToolUIPart(part)) {
-                      const name = getToolName(part);
-                      const title = isToolName(name)
-                        ? t(`coach.tools.${name}`)
-                        : name;
-
-                      if (part.state === "output-error") {
-                        // `errorText` is whatever the tool threw — a stack's
-                        // worth of Strava SDK wording, written for us and not
-                        // for the athlete. The API logs it; this says which
-                        // tool it was.
-                        return (
-                          <p
-                            className="text-caption text-destructive"
-                            key={key}
-                          >
-                            {t("coach.toolFailed", { title })}
-                          </p>
-                        );
-                      }
-
-                      if (part.state !== "output-available") {
-                        return <CoachTyping key={key} label={title} />;
-                      }
-
-                      const card = asCoachCard(part.output);
-                      if (card) {
-                        return (
-                          <CoachCardView
-                            actions={actions}
-                            card={card}
-                            key={key}
-                          />
-                        );
-                      }
-
-                      // A tool that reads rather than draws: the answer below is
-                      // the output, so this is only a note that it was read.
-                      const failure =
-                        typeof part.output === "object" &&
-                        part.output !== null &&
-                        "error" in part.output
-                          ? String((part.output as { error: unknown }).error)
-                          : null;
-
-                      return (
-                        <p
-                          className={cn(
-                            "text-mono-badge font-mono uppercase",
-                            failure ? "text-destructive" : "text-stone",
-                          )}
-                          key={key}
-                        >
-                          {failure ?? title}
-                        </p>
-                      );
-                    }
-
-                    return null;
-                  })}
+                {!editing && (
+                  <>
+                    {steps.length > 0 &&
+                      (collapsed ? (
+                        <CoachSteps count={steps.length}>
+                          {steps.map(renderPart)}
+                        </CoachSteps>
+                      ) : (
+                        steps.map(renderPart)
+                      ))}
+                    {answer.map(renderPart)}
+                  </>
+                )}
 
                 {/* Copy and rewrite, on the athlete's own turn. Hidden while
                     an answer is arriving for the same reason the coach's own
@@ -765,20 +869,33 @@ export function CoachChat({
       </Conversation>
 
       <div className="mx-auto w-full max-w-[760px] shrink-0 px-4 pb-4 sm:px-6 sm:pb-6">
-        <CoachComposer
-          attached={attached}
-          draft={draft}
-          onAsk={ask}
-          onAttach={setAttached}
-          onDraftChange={setDraft}
-          onPickerOpenChange={setPickerOpen}
-          onStop={stop}
-          onSubmit={handleSubmit}
-          pickerOpen={pickerOpen}
-          runs={runs}
-          status={status}
-          suggestions={suggestions}
-        />
+        {/* The coach's turn to ask takes the athlete's place to type. It is the
+            one spot on the screen that already means "your move", and the
+            questions leave it the moment they are answered — keyed by the
+            message that asked, so a second questionnaire is a fresh form and
+            not the last one with new words in it. */}
+        {asking ? (
+          <CoachQuestionnaire
+            card={asking.card}
+            key={asking.messageId}
+            onAnswer={ask}
+          />
+        ) : (
+          <CoachComposer
+            attached={attached}
+            draft={draft}
+            onAsk={ask}
+            onAttach={setAttached}
+            onDraftChange={setDraft}
+            onPickerOpenChange={setPickerOpen}
+            onStop={stop}
+            onSubmit={handleSubmit}
+            pickerOpen={pickerOpen}
+            runs={runs}
+            status={status}
+            suggestions={suggestions}
+          />
+        )}
       </div>
     </div>
   );

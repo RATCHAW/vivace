@@ -5,6 +5,7 @@ import {
   adoptTranscript,
   coachChatFor,
   disposeCoachChat,
+  wroteAthleteContext,
 } from "@/lib/coach-chats";
 
 // The real logger would try to POST the batch; nothing here asserts on it.
@@ -14,6 +15,11 @@ vi.mock("@/lib/logger", () => ({
 
 function message(id: string, text: string): UIMessage {
   return { id, role: "user", parts: [{ type: "text", text }] };
+}
+
+/** An answer the coach gave, as its parts arrived. */
+function answer(...parts: UIMessage["parts"]): UIMessage {
+  return { id: "a1", role: "assistant", parts };
 }
 
 /** `setStatus` is protected — the transport is what drives it in production,
@@ -85,6 +91,59 @@ describe("adoptTranscript", () => {
 
     adoptTranscript(chat, [message("m1", "hello"), message("m2", "late")]);
     expect(chat.messages).toHaveLength(1);
+  });
+});
+
+describe("wroteAthleteContext", () => {
+  it("sees the turn that stored a goal race", () => {
+    expect(
+      wroteAthleteContext(
+        answer(
+          {
+            type: "tool-setAthleteContext",
+            toolCallId: "call-1",
+            state: "output-available",
+            input: { race_name: "Casablanca Half" },
+            output: { saved: true },
+          },
+          { type: "text", text: "Casablanca Half it is." },
+        ),
+      ),
+    ).toBe(true);
+  });
+
+  it("ignores a call that failed — nothing was stored", () => {
+    expect(
+      wroteAthleteContext(
+        answer({
+          type: "tool-setAthleteContext",
+          toolCallId: "call-1",
+          state: "output-error",
+          input: { race_name: "Casablanca Half" },
+          errorText: "boom",
+        }),
+      ),
+    ).toBe(false);
+  });
+
+  it("ignores a turn that only read the context", () => {
+    expect(
+      wroteAthleteContext(
+        answer({
+          type: "tool-getAthleteContext",
+          toolCallId: "call-1",
+          state: "output-available",
+          input: {},
+          output: { race_name: null },
+        }),
+      ),
+    ).toBe(false);
+  });
+
+  it("ignores an answer that called nothing", () => {
+    expect(
+      wroteAthleteContext(answer({ type: "text", text: "Nice run." })),
+    ).toBe(false);
   });
 });
 

@@ -108,6 +108,10 @@ export interface PlanCard {
   accepted: boolean;
 }
 
+// The questionnaire is deliberately not one of these. A card is something the
+// coach drew for the athlete to read; a questionnaire is a turn they have to
+// take, so it lives in the composer rather than in the transcript — see
+// coach-questionnaire.tsx.
 export type CoachCard =
   DebriefCard | SplitsCard | VolumeCard | PredictionCard | PlanCard;
 

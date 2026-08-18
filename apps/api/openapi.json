@@ -931,6 +931,14 @@
             "minimum": 1,
             "maximum": 52,
             "default": 6
+          },
+          "language": {
+            "type": "string",
+            "enum": [
+              "en",
+              "fr"
+            ],
+            "default": "en"
           }
         },
         "required": [

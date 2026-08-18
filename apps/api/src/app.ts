@@ -1344,12 +1344,18 @@ app.openapi(coachChatRoute, async (c) => {
       thread_id: thread.id,
       trigger: body.trigger,
       range_weeks: body.range_weeks,
+      language: body.language,
     },
   });
 
   const result = streamText({
     model: config.model,
-    system: coachSystemPrompt(today, body.range_weeks, attachedRun(messages)),
+    system: coachSystemPrompt(
+      today,
+      body.range_weeks,
+      attachedRun(messages),
+      body.language,
+    ),
     messages: await convertToModelMessages(messages),
     tools: createCoachTools({
       accessToken,
