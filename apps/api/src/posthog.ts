@@ -118,6 +118,59 @@ export async function isFeatureEnabledFor(
   }
 }
 
+/** A multivariate flag's answer for one athlete: which arm, and its config. */
+export interface FeatureVariant {
+  /**
+   * What the flag evaluated to — the variant key for a multivariate flag
+   * (`control`, `sonnet-terse`), or `true` for a plain boolean one that exists
+   * only to carry a payload, which is PostHog's remote config.
+   */
+  value: string | true;
+  /**
+   * The variant's JSON payload, exactly as it was typed into PostHog.
+   *
+   * Deliberately `unknown`: a payload is edited in a browser textarea by
+   * whoever has access to the project, with no review and no deploy. The caller
+   * parses it and falls back on anything it doesn't recognise.
+   */
+  payload: unknown;
+}
+
+/**
+ * Evaluates a flag for one athlete and hands back the payload that says what
+ * the variant actually *is* — the built-in way to vary more than a boolean
+ * without inventing a config mechanism.
+ *
+ * `null` — PostHog off, unreachable, no such flag, or this athlete outside the
+ * rollout — means the shipped behaviour, exactly as `isFeatureEnabledFor`'s
+ * fallback does. That is what makes deleting the flag a safe act.
+ *
+ * `getFlag` is called before `getFlagPayload` on purpose: only the first counts
+ * as an access, and an access is what sends `$feature_flag_called`. That event
+ * is the exposure an experiment computes its statistics from, so it has to fire
+ * where the athlete actually receives the variant and nowhere else.
+ */
+export async function getFeatureVariantFor(
+  flag: string,
+  distinctId: string,
+): Promise<FeatureVariant | null> {
+  if (!client) return null;
+  try {
+    const flags = await client.evaluateFlags(distinctId);
+    const value = flags.getFlag(flag);
+    // `false` is the athlete in the holdout, `undefined` the flag not existing.
+    // Neither is a variant, and both mean what the app shipped with.
+    if (value === undefined || value === false) return null;
+    return { value, payload: flags.getFlagPayload(flag) };
+  } catch (err) {
+    logger.warn(
+      { event: "posthog.flag_failed", flag, err },
+      "Could not read a flag",
+    );
+    return null;
+  }
+}
+
 /**
  * Whether the athlete's words and the coach's reply are sent to PostHog
  * alongside the numbers.

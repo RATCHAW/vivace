@@ -39,6 +39,16 @@ describe("posthog, unconfigured", () => {
     ).resolves.toBe(false);
   });
 
+  it("hands back no variant, which every caller reads as the shipped one", async () => {
+    const { getFeatureVariantFor } = await import("./posthog.js");
+
+    // Null, not a variant with an empty payload: a caller that had to tell the
+    // two apart would get it wrong the first time PostHog was unreachable.
+    await expect(
+      getFeatureVariantFor("coach-model", "athlete-1"),
+    ).resolves.toBeNull();
+  });
+
   it("drops LLM traces, generations and spans on the floor", async () => {
     const { captureLlmGeneration, captureLlmSpan, captureLlmTrace } =
       await import("./posthog.js");

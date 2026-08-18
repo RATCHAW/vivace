@@ -331,6 +331,8 @@ the rest of the app is unaffected):
 LLM_GATEWAY_API_KEY=...
 # Optional: any model the gateway routes. Defaults to deepseek/deepseek-v4-flash.
 COACH_MODEL=deepseek/deepseek-v4-pro
+# Optional: which system prompt goes with it — v1 or v2-terse. Defaults to v1.
+COACH_PROMPT=v1
 ```
 
 The model is reached through [LLM Gateway](https://llmgateway.io), which speaks
@@ -339,6 +341,12 @@ rather than one SDK package each, and `COACH_MODEL` is the whole of switching
 between them. Write it `vendor/model`: a bare id lets the gateway pick the
 vendor, and a coach whose model moves underneath it answers differently for no
 reason the athlete can see.
+
+The model and the prompt move **together**, because a prompt tuned for one model
+isn't the prompt for another. `COACH_MODEL`/`COACH_PROMPT` set the pairing for a
+deploy; the [`coach-model` PostHog flag](#the-coach-model-flag--testing-models-and-prompts-on-real-traffic)
+sets it per athlete, so two pairings can run at once and be compared on real
+traffic without one.
 
 Swapping the gateway itself out is a change to `getCoachConfig()` in
 `apps/api/src/coach.ts` and nothing else — the tools, the prompt and both ends
@@ -498,6 +506,75 @@ switch: the browser hides the button and the API refuses to start a render. It
 **defaults to on** — no PostHog, no flag, or an unreachable PostHog all mean
 "behave exactly as the app shipped". Create a `video-render` flag in PostHog and
 roll it to 0% to switch rendering off without a deploy.
+
+### The `coach-model` flag — testing models and prompts on real traffic
+
+A boolean flag can't say which coach an athlete got. `coach-model` is
+**multivariate**, and each variant carries its own JSON payload — that payload
+*is* the config:
+
+| variant | payload |
+| --- | --- |
+| `control` | `{"model": "deepseek/deepseek-v4-flash", "prompt": "v1"}` |
+| `sonnet-terse` | `{"model": "anthropic/claude-sonnet-5", "prompt": "v2-terse"}` |
+
+One flag, not two. The unit that varies is the *pair* — a prompt tuned for one
+model is not the prompt for another — and a flag per axis would let a turn land
+on a combination nobody meant to ship. A PostHog **Experiment is this same flag
+with statistics attached**, so the flag can go in on its own and be promoted
+later without a line of the app changing; a payload-only *remote config* flag
+is the same mechanism for "switch the model for everyone, no split, no deploy".
+
+- **A version key, not the prompt text.** `prompt` names an entry in
+  `SYSTEM_PROMPTS` in `apps/api/src/coach.ts`. The payload *could* hold the
+  whole prompt and be edited in PostHog — but it names the tools the code must
+  actually have, and in a flag textarea it loses review, diff and its tests.
+  Adding a variant's prompt is a pull request; choosing between them isn't.
+- **A payload nobody reviewed is a payload that gets validated.** A model id
+  that isn't `vendor/model`, or a prompt version the catalogue has never heard
+  of, falls back to the shipped pairing whole — half a variant is a combination
+  nobody meant to ship either — and logs `coach.variant_invalid`. Same for a
+  typo in `COACH_PROMPT`.
+- **The whole LLM analytics view becomes filterable by variant.** The turn
+  carries `$feature/coach-model`, and `contextProperties` spreads it onto the
+  `$ai_trace`, every `$ai_generation` and every `$ai_span` — so cost, latency,
+  stop reason and tool-call count are per-variant for free. The thumbs up/down
+  below already writes `survey sent` against the same trace, which makes it a
+  usable experiment metric on day one.
+- **The exposure fires where the athlete gets the answer.** `getFlag` is what
+  sends `$feature_flag_called`, and the route reads the flag after every guard
+  has passed — a request about to 404 was never exposed to anything.
+- **Without PostHog, `COACH_MODEL` and `COACH_PROMPT` pick the pairing**, which
+  is how you read one variant's answers locally without creating a flag.
+- Turn on `POSTHOG_LLM_CAPTURE_CONTENT=true` **in staging only** while comparing
+  prompts. With the default privacy mode, comparing answer quality across
+  variants means comparing token counts, which isn't what's being tested.
+
+#### Why the prompts are still in the repo
+
+PostHog does more of this than it used to. **Prompt management** (beta) is a real
+registry: immutable versions, movable labels like `production`, version diffs, an
+SDK that fetches a prompt at runtime, and *prompt experiments*, which build the
+flag-per-version this section builds by hand. There is a playground for comparing
+models side by side, and evals with LLM-as-a-judge and datasets. Any claim that
+PostHog is only the live half is out of date.
+
+`SYSTEM_PROMPTS` stays in `apps/api/src/coach.ts` anyway, and the reason is the
+tools. The prompt names `askAthlete`, `proposeWeek` and `setAthleteContext` and
+states the rules those tools enforce — five questions, seven days numbered from
+Monday. A prompt fetched at runtime can go on naming a tool the deploy underneath
+it just removed, and the failure is a coach promising the athlete a form it can
+no longer draw. The catalogue cannot drift from `createCoachTools`, because one
+pull request moves both.
+
+What lives in PostHog is a **mirror**, not the source — `coach-system` and
+`coach-debrief` under
+[Prompt management](https://us.posthog.com/project/555099/llm-analytics/prompts),
+with `production` pointing at what the app actually sends, so a trace can be read
+next to the words that produced it. Its version numbers are the registry's own
+and do not match the catalogue keys: `coach-system` v3 is `v1`, v4 is `v2-terse`.
+Nothing reads it back, so re-publishing after a prompt change is a manual step
+and no test fails if you skip it.
 
 ### AI observability
 
