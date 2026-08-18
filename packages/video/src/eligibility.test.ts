@@ -6,7 +6,9 @@ import {
   templateEligibility,
 } from "./eligibility";
 import {
+  asPartner,
   FIXTURE_A,
+  FIXTURE_A_PARTNER,
   FIXTURE_B,
   FIXTURE_C,
   FIXTURE_D,
@@ -16,11 +18,38 @@ import {
 import { getTemplate, VIDEO_TEMPLATES } from "./registry";
 
 describe("eligibility", () => {
-  it("offers everything for a typical GPS run", () => {
-    for (const entry of templateEligibilities(FIXTURE_A)) {
+  it("offers everything for a typical GPS run with a partner on it", () => {
+    const input = { ...FIXTURE_A, partner: asPartner(FIXTURE_A_PARTNER) };
+    for (const entry of templateEligibilities(input)) {
       expect(entry.eligible, entry.id).toBe(true);
       expect(entry.reason, entry.id).toBeUndefined();
     }
+  });
+
+  it("holds the duo cut back until somebody has accepted", () => {
+    // Not a fact about the run: the same GPS run is eligible the moment an
+    // invitation on it is answered, which is why the picker greys it rather
+    // than hiding it.
+    const alone = templateEligibility("duo-replay", FIXTURE_A);
+    expect(alone.eligible).toBe(false);
+    expect(alone.reasonKey).toBe("needs-partner");
+    expect(
+      templateEligibility("duo-replay", {
+        ...FIXTURE_A,
+        partner: asPartner(FIXTURE_A_PARTNER),
+      }).eligible,
+    ).toBe(true);
+  });
+
+  it("still needs a route of its own, partner or not", () => {
+    // The partner's run is drawn beside this one, not instead of it: a
+    // treadmill run with a friend on it has nothing to draw.
+    expect(
+      templateEligibility("duo-replay", {
+        ...FIXTURE_B,
+        partner: asPartner(FIXTURE_A_PARTNER),
+      }).reasonKey,
+    ).toBe("needs-route");
   });
 
   it("turns the map templates away from a treadmill, and keeps the rest", () => {

@@ -180,6 +180,7 @@ export const fr: Translated<Messages> = {
     avatarPending: "Vérification de votre profil Strava…",
     avatarFailed: "Votre profil Strava n’a pas pu être lu.",
     avatarMissing: "Ajoutez une photo sur Strava pour l’utiliser.",
+    you: "Vous",
   },
 
   video: {
@@ -188,6 +189,11 @@ export const fr: Translated<Messages> = {
         label: "Replay du tracé",
         description:
           "Le tracé se dessine sous les données en direct, caméra sur le coureur. Un seul plan, 9:16.",
+      },
+      "duo-replay": {
+        label: "Replay à deux",
+        description:
+          "Vos deux tracés se dessinent en même temps sur une seule carte, chacun dans sa couleur, avec une barre de données en direct pour chacun en dessous. Nécessite que quelqu’un ait accepté l’invitation sur cette sortie.",
       },
       "split-rush": {
         label: "Rush des splits",
@@ -226,6 +232,7 @@ export const fr: Translated<Messages> = {
       "needs-route": "Nécessite un tracé GPS — absent ici",
       "needs-two-km": "Nécessite au moins 2 km",
       "needs-distance-time": "Nécessite distance et temps de la montre",
+      "needs-partner": "Nécessite qu’un partenaire accepte l’invitation",
     },
   },
 

@@ -308,6 +308,44 @@
           "data"
         ]
       },
+      "RunPartnerState": {
+        "type": "object",
+        "properties": {
+          "partner": {
+            "$ref": "#/components/schemas/RunPartner"
+          }
+        },
+        "required": [
+          "partner"
+        ]
+      },
+      "RunPartner": {
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "Marianne"
+          },
+          "avatar_url": {
+            "type": "string"
+          },
+          "activity": {
+            "$ref": "#/components/schemas/Run"
+          },
+          "streams": {
+            "$ref": "#/components/schemas/RunStreams"
+          }
+        },
+        "required": [
+          "name",
+          "avatar_url",
+          "activity",
+          "streams"
+        ]
+      },
       "RunRenderState": {
         "type": "object",
         "properties": {
@@ -392,6 +430,7 @@
         "type": "string",
         "enum": [
           "run-video",
+          "duo-replay",
           "split-rush",
           "living-poster",
           "minimal-numbers"
@@ -1435,6 +1474,65 @@
         }
       }
     },
+    "/api/runs/{id}/partner": {
+      "get": {
+        "operationId": "getRunPartner",
+        "tags": [
+          "Runs"
+        ],
+        "summary": "Get the other runner on this run, if somebody accepted",
+        "description": "The run and streams of whoever accepted an invitation to appear in this run's video, read with their own Strava token. `partner` is null when nobody has accepted, or when the athlete who did has since disconnected Strava — the browser reads it to decide whether the two-runner templates can be offered, and to play them without going back to Strava itself.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$",
+              "example": "987654321"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The other runner, or null if there isn't one.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunPartnerState"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Strava rejected or failed the upstream request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/runs/{id}/render": {
       "get": {
         "operationId": "getRunRender",
@@ -1497,7 +1595,7 @@
           "Runs"
         ],
         "summary": "Render this run's video on Remotion Lambda",
-        "description": "Fetches the run and its streams from Strava, starts a Remotion Lambda render of the chosen template, and persists the render state. The MP4 lands in the Remotion S3 bucket. Idempotent while a render is in flight or already done with the same options — those return the existing state; a failed render, or one whose options no longer match, is rendered again. Each template gets its own render, so switching template does not replace the video already made with the last one. The body is optional and defaults to the plain replay.",
+        "description": "Fetches the run and its streams from Strava, starts a Remotion Lambda render of the chosen template, and persists the render state. The MP4 lands in the Remotion S3 bucket. Idempotent while a render is in flight or already done with the same options — those return the existing state; a failed render, or one whose options no longer match, is rendered again. Each template gets its own render, so switching template does not replace the video already made with the last one. A template that draws two runners also reads the run's accepted invitation and the partner's own Strava data, and is refused with 409 when there is none. The body is optional and defaults to the plain replay.",
         "security": [
           {
             "sessionCookie": []
@@ -1547,6 +1645,16 @@
           },
           "403": {
             "description": "The stored Strava token lacks the activity:read scope; sign out and back in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "This template needs a second runner, and nobody has accepted an invitation to this run — or the athlete who did has since disconnected Strava.",
             "content": {
               "application/json": {
                 "schema": {

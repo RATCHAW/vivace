@@ -16,6 +16,7 @@ import {
   getTemplate,
   type TemplateId,
   type ThemeName,
+  type VideoPartner,
 } from "@repo/video";
 import { VIDEO_COMPONENTS } from "@repo/video/compositions";
 import type { Run, RunStreams } from "@/api";
@@ -76,6 +77,8 @@ export function RunPlayer({
   streams,
   mapboxToken,
   avatarUrl,
+  athleteName,
+  partner = null,
   theme,
   fit = "width",
   chrome = "studio",
@@ -92,6 +95,11 @@ export function RunPlayer({
   /** The athlete's picture when the avatar option is on, else "" — see
    *  `<VideoOptions>`. A change re-renders the film, not the player. */
   avatarUrl: string;
+  /** What to call them on their own bar in a two-runner film. */
+  athleteName: string;
+  /** Whoever accepted an invitation to this run, with their own run attached.
+   *  Null on a solo run, and ignored by every template but the duo cut. */
+  partner?: VideoPartner | null;
   /** Which of the three looks to cut it in. */
   theme: ThemeName;
   /** Whether the frame is measured off its column or off the space left in the
@@ -166,7 +174,15 @@ export function RunPlayer({
       <Player
         ref={player}
         component={VIDEO_COMPONENTS[template]}
-        inputProps={{ activity, streams, mapboxToken, avatarUrl, theme }}
+        inputProps={{
+          activity,
+          streams,
+          mapboxToken,
+          avatarUrl,
+          theme,
+          athleteName,
+          partner,
+        }}
         durationInFrames={durationInFrames}
         fps={fps}
         compositionWidth={width}

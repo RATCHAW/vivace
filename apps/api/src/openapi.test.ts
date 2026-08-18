@@ -24,6 +24,7 @@ describe("openapi", () => {
       "/api/me/strava",
       "/api/me/runs",
       "/api/runs/{id}/streams",
+      "/api/runs/{id}/partner",
       "/api/runs/{id}/render",
       "/api/runs/{id}/render/progress",
       "/api/runs/{id}/invite",

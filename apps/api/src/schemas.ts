@@ -212,6 +212,34 @@ export const RunRenderStateSchema = z
 
 export type RunRenderState = z.infer<typeof RunRenderStateSchema>;
 
+/**
+ * The other runner on a run, for the templates that draw two.
+ *
+ * Everything here was read with the *invitee's* own Strava token — their pace is
+ * not readable any other way — so the existence of this object is itself the
+ * evidence that an invitation was accepted and not withdrawn. It carries a whole
+ * run because the film draws one: the browser plays the same props Lambda
+ * renders, and neither can go back to Strava for the rest of it.
+ */
+export const RunPartnerSchema = z
+  .object({
+    /** Their first name, as Strava spells it. A label on a bar, not a profile. */
+    name: z.string().openapi({ example: "Marianne" }),
+    /** Their Strava picture, or "" when they never set one. */
+    avatar_url: z.string(),
+    /** Which of their runs they said was the same run. */
+    activity: RunSchema,
+    streams: RunStreamsSchema,
+  })
+  .openapi("RunPartner");
+
+export type RunPartner = z.infer<typeof RunPartnerSchema>;
+
+/** Wrapper so "nobody has accepted" is an ordinary 200 with `partner: null`. */
+export const RunPartnerStateSchema = z
+  .object({ partner: RunPartnerSchema.nullable() })
+  .openapi("RunPartnerState");
+
 /** Where an invitation to appear in someone's run video has got to. */
 export const RunInviteStatusSchema = z
   .enum(["pending", "accepted", "declined", "revoked", "expired"])

@@ -1,16 +1,8 @@
-import { useMemo } from "react";
-import { AbsoluteFill } from "remotion";
-import { projectRoute, ROUTE_PADDING, sampleIndex, type LatLng } from "./data";
-import { RunnerAvatar } from "./RunnerAvatar";
+import { RouteCanvas } from "../../core/RouteCanvas";
+import { ROUTE_COLOR, ROUTE_PADDING, sampleIndex, type LatLng } from "./data";
 
-// DESIGN.md {colors.primary} — cobalt as illustration ink on the black canvas.
-const ROUTE_COLOR = "#494fdf";
-
-const toSvgPoints = (points: [number, number][]) =>
-  points.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
-
-/** No Mapbox token yet: draw the route on the bare canvas-dark plate so the
- *  video still tells the story. Same trace + runner-dot language as the map. */
+/** No Mapbox token yet: the replay's route on the bare canvas-dark plate, so the
+ *  video still tells the story. One layer of `core/RouteCanvas`. */
 export function RouteFallback({
   points,
   progress,
@@ -24,60 +16,20 @@ export function RouteFallback({
   height: number;
   avatarUrl: string;
 }) {
-  const projected = useMemo(
-    () => projectRoute(points, width, height, ROUTE_PADDING),
-    [points, width, height],
-  );
-
-  if (projected.length < 2) return null;
-
-  const idx = sampleIndex(projected.length, progress);
-  const partial = projected.slice(0, Math.max(idx + 1, 2));
-  const [startX, startY] = projected[0];
-  const [runnerX, runnerY] = projected[idx];
-
   return (
-    <AbsoluteFill style={{ backgroundColor: "#000000" }}>
-      <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
-        <polyline
-          points={toSvgPoints(projected)}
-          fill="none"
-          stroke="rgba(255,255,255,0.22)"
-          strokeWidth={5}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        <polyline
-          points={toSvgPoints(partial)}
-          fill="none"
-          stroke={ROUTE_COLOR}
-          strokeWidth={10}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        <circle
-          cx={startX}
-          cy={startY}
-          r={9}
-          fill="#000000"
-          stroke="#ffffff"
-          strokeWidth={4}
-        />
-        {!avatarUrl && (
-          <circle
-            cx={runnerX}
-            cy={runnerY}
-            r={13}
-            fill="#ffffff"
-            stroke={ROUTE_COLOR}
-            strokeWidth={7}
-          />
-        )}
-      </svg>
-      {/* Over the SVG rather than a <foreignObject> in it: the puck is a plain
-          DOM image, and the route here is already projected into the same
-          composition pixels it is positioned in. */}
-      {avatarUrl && <RunnerAvatar src={avatarUrl} x={runnerX} y={runnerY} />}
-    </AbsoluteFill>
+    <RouteCanvas
+      layers={[
+        {
+          key: "run",
+          points,
+          drawn: sampleIndex(points.length, progress) + 1,
+          color: ROUTE_COLOR,
+          avatarUrl,
+        },
+      ]}
+      width={width}
+      height={height}
+      padding={ROUTE_PADDING}
+    />
   );
 }

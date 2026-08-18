@@ -121,6 +121,34 @@ export async function listInvitesForRun(
 }
 
 /**
+ * The answered invitation that puts a second runner in this run's film.
+ *
+ * At most one is ever used, and the newest wins: `createInvite` will not mint a
+ * second link while one is live, so two accepted rows on one run means the first
+ * partner's invitation was superseded rather than that the film has three people
+ * in it. Expiry is not consulted — an accepted invitation is a permission that
+ * was given, and the link's clock only ever governed answering it.
+ */
+export async function acceptedInviteForRun(
+  inviterUserId: string,
+  inviterActivityId: number,
+): Promise<InviteRow | null> {
+  const [row] = await db
+    .select()
+    .from(runInvite)
+    .where(
+      and(
+        eq(runInvite.inviterUserId, inviterUserId),
+        eq(runInvite.inviterActivityId, inviterActivityId),
+        eq(runInvite.status, "accepted"),
+      ),
+    )
+    .orderBy(sql`${runInvite.respondedAt} desc`)
+    .limit(1);
+  return row ?? null;
+}
+
+/**
  * Answer a live invitation.
  *
  * The status is part of the WHERE rather than checked first, so two taps on a

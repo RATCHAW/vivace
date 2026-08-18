@@ -17,12 +17,22 @@ import {
   VIDEO_TEMPLATES,
   type TemplateId,
 } from "./registry";
-import type { VideoActivity, VideoStreams } from "./types";
+import type { VideoActivity, VideoPartner, VideoStreams } from "./types";
 
-/** What every rule is handed: the run, and whatever streams came with it. */
+/** What every rule is handed: the run, whatever streams came with it, and — on a
+ *  run somebody has accepted an invitation to — the other runner. */
 export interface TemplateInput {
   activity: VideoActivity;
   streams: VideoStreams;
+  /**
+   * The second runner, or null/absent when nobody has accepted.
+   *
+   * Absent is not the same as "this run can't have one", but the rules can't
+   * tell the two apart and don't need to: the browser resolves the partner
+   * before it draws the picker, and a template offered without one is refused
+   * by the render route anyway.
+   */
+  partner?: VideoPartner | null;
 }
 
 /**
@@ -34,7 +44,7 @@ export interface TemplateInput {
  * translation still says something true.
  */
 export type EligibilityReason =
-  "needs-route" | "needs-two-km" | "needs-distance-time";
+  "needs-route" | "needs-two-km" | "needs-distance-time" | "needs-partner";
 
 export interface Eligibility {
   eligible: boolean;
@@ -66,6 +76,19 @@ const RULES: Record<TemplateId, (input: TemplateInput) => Eligibility> = {
     (streams.latlng?.data?.length ?? 0) >= 2
       ? OK
       : no("needs-route", "Needs a GPS route — this run has none"),
+
+  // Two runners, and the only rule in here whose answer is not a fact about the
+  // run: it is a fact about whether somebody said yes. A run with no invitation
+  // sees the template greyed with what to do about it, which is the whole point
+  // of showing an ineligible template rather than hiding it.
+  "duo-replay": ({ streams, partner }) => {
+    if (!partner) {
+      return no("needs-partner", "Needs someone you ran with to accept");
+    }
+    return (streams.latlng?.data?.length ?? 0) >= 2
+      ? OK
+      : no("needs-route", "Needs a GPS route — this run has none");
+  },
 
   "split-rush": ({ activity, streams }) => {
     if (activity.distance < MIN_SPLIT_RUSH_METERS) {

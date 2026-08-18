@@ -63,6 +63,17 @@ export type NumberStream = {
     data: Array<number>;
 };
 
+export type RunPartnerState = {
+    partner: RunPartner;
+};
+
+export type RunPartner = {
+    name: string;
+    avatar_url: string;
+    activity: Run;
+    streams: RunStreams;
+} | null;
+
 export type RunRenderState = {
     render: RunRender;
 };
@@ -80,7 +91,7 @@ export type RunRender = {
     updated_at: string;
 } | null;
 
-export type VideoTemplate = 'run-video' | 'split-rush' | 'living-poster' | 'minimal-numbers';
+export type VideoTemplate = 'run-video' | 'duo-replay' | 'split-rush' | 'living-poster' | 'minimal-numbers';
 
 export type VideoTheme = 'charcoal' | 'cream' | 'accent';
 
@@ -387,6 +398,37 @@ export type GetRunStreamsResponses = {
 
 export type GetRunStreamsResponse = GetRunStreamsResponses[keyof GetRunStreamsResponses];
 
+export type GetRunPartnerData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/runs/{id}/partner';
+};
+
+export type GetRunPartnerErrors = {
+    /**
+     * No valid session.
+     */
+    401: ApiError;
+    /**
+     * Strava rejected or failed the upstream request.
+     */
+    502: ApiError;
+};
+
+export type GetRunPartnerError = GetRunPartnerErrors[keyof GetRunPartnerErrors];
+
+export type GetRunPartnerResponses = {
+    /**
+     * The other runner, or null if there isn't one.
+     */
+    200: RunPartnerState;
+};
+
+export type GetRunPartnerResponse = GetRunPartnerResponses[keyof GetRunPartnerResponses];
+
 export type GetRunRenderData = {
     body?: never;
     path: {
@@ -434,6 +476,10 @@ export type StartRunRenderErrors = {
      * The stored Strava token lacks the activity:read scope; sign out and back in.
      */
     403: ApiError;
+    /**
+     * This template needs a second runner, and nobody has accepted an invitation to this run — or the athlete who did has since disconnected Strava.
+     */
+    409: ApiError;
     /**
      * Strava or Lambda failed the upstream request.
      */

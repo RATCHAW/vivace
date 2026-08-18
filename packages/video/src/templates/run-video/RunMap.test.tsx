@@ -180,10 +180,10 @@ describe("RunMap in the Player", () => {
     });
 
     // Strava streams are [lat, lng]; Mapbox wants [lng, lat].
-    expect(map.sources["runner-marker"].data).toMatchObject({
+    expect(map.sources["run-runner-marker"].data).toMatchObject({
       geometry: { coordinates: [8.57, 47.37] },
     });
-    expect(map.sources["route-trace"].data).toMatchObject({
+    expect(map.sources["run-route-trace"].data).toMatchObject({
       geometry: { coordinates: POINTS.map(([lat, lng]) => [lng, lat]) },
     });
   });
@@ -211,7 +211,7 @@ describe("RunMap in the Player", () => {
     });
 
     // Two runners on one map: the Mapbox dot goes out as the puck comes in.
-    expect(map.layout["runner-marker-dot"]).toMatchObject({
+    expect(map.layout["run-runner-marker-dot"]).toMatchObject({
       visibility: "none",
     });
 

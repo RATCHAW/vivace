@@ -12,6 +12,15 @@ export const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
 export const secondsToFrames = (seconds: number, fps: number) =>
   Math.max(0, Math.round(seconds * fps));
 
+/** Map a 0–1 progress onto an index into a stream of `length` samples. Here
+ *  rather than beside the streams it reads: the camera, the traces and the live
+ *  numbers all have to land on the *same* sample, or the dot on the map and the
+ *  pace under it disagree. */
+export function sampleIndex(length: number, progress: number): number {
+  if (length <= 0) return 0;
+  return Math.min(length - 1, Math.floor(clamp01(progress) * (length - 1)));
+}
+
 /** One movement of a template, in frames. `to` is exclusive-ish: the beat is
  *  over at `to`, which is where the next one starts. */
 export interface Beat {

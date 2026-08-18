@@ -12,7 +12,7 @@
  * would put a kilometre of synthetic GPS in the Lambda bundle.
  */
 import { seededRandom } from "./core/seed";
-import type { VideoActivity, VideoStreams } from "./types";
+import type { VideoActivity, VideoPartner, VideoStreams } from "./types";
 
 export interface Fixture {
   /** The letter it is called by in the build spec's fixture table. */
@@ -166,6 +166,44 @@ export const FIXTURE_A = fixture("A", {
   shape: (t) => 0.94 + t * 0.12,
   route: "loop",
 });
+
+/**
+ * The other half of A: the same morning loop from the person running beside
+ * them.
+ *
+ * A minute and a half later off the line — one watch caught GPS before the
+ * other — a hair short of five kilometres, and a shade slower over the second
+ * half. This is the pair the duo replay is written against, and the stagger is
+ * the interesting part: it is what makes one bar sit empty while the other has
+ * already started, and it is a fact about the run rather than a bug.
+ */
+export const FIXTURE_A_PARTNER = fixture("A2", {
+  id: 1007,
+  name: "Morning loop",
+  startDate: "2026-08-09T07:13:30Z",
+  distanceMeters: 4980,
+  movingSeconds: 1571,
+  elevationGain: 40,
+  averageHeartrate: 146,
+  // Goes out with them and hangs on: the mirror image of A's negative split.
+  shape: (t) => 1.03 - t * 0.08,
+  route: "loop",
+});
+
+/** Somebody else's run, as a composition takes it. The name is the invitee's
+ *  first name in the real thing — see `run_invite` in apps/api. */
+export function asPartner(
+  source: Fixture,
+  name = "Marianne",
+  avatarUrl = "",
+): VideoPartner {
+  return {
+    name,
+    activity: source.activity,
+    streams: source.streams,
+    avatarUrl,
+  };
+}
 
 export const FIXTURE_B = fixture("B", {
   id: 1002,

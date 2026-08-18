@@ -176,6 +176,10 @@ export const en = {
     avatarPending: "Checking your Strava profile…",
     avatarFailed: "Your Strava profile could not be read.",
     avatarMissing: "Add a photo on Strava to use this.",
+    /** What the athlete's own bar is labelled when Strava has no first name for
+     *  them. The other bar always has a name — an invitation was accepted by
+     *  somebody. */
+    you: "You",
   },
 
   /**
@@ -192,6 +196,11 @@ export const en = {
         label: "Route replay",
         description:
           "The route drawing under live metrics, camera following the runner. One shot, 9:16.",
+      },
+      "duo-replay": {
+        label: "Duo replay",
+        description:
+          "The two of you drawing at once on one map, each in your own colour, with a bar of live numbers each underneath. Needs somebody to have accepted the invitation on this run.",
       },
       "split-rush": {
         label: "Split rush",
@@ -229,6 +238,7 @@ export const en = {
       "needs-route": "Needs a GPS route — this run has none",
       "needs-two-km": "Needs at least 2 km",
       "needs-distance-time": "Needs distance and time from the watch",
+      "needs-partner": "Needs someone you ran with to accept",
     },
   },
 

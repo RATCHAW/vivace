@@ -169,6 +169,7 @@ export type {
   RunInviteList,
   RunInvitePreview,
   RunInviteStatus,
+  RunPartner,
   RunRender,
   RunRenderState,
   RunStreams,

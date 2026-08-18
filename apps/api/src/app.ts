@@ -13,7 +13,12 @@ import {
   validateUIMessages,
   type UIMessage,
 } from "ai";
-import { DEFAULT_TEMPLATE_ID, DEFAULT_THEME, getTemplate } from "@repo/video";
+import {
+  avatarSource,
+  DEFAULT_TEMPLATE_ID,
+  DEFAULT_THEME,
+  getTemplate,
+} from "@repo/video";
 import { auth } from "./auth.js";
 import { track, trackError } from "./analytics.js";
 import { logger } from "./logger.js";
@@ -41,6 +46,8 @@ import {
   RunInvitePreviewSchema,
   RunInviteSchema,
   type RunInvite,
+  type RunPartner,
+  RunPartnerStateSchema,
   RunRenderOptionsSchema,
   type RunRenderOptions,
   RunRenderStateSchema,
@@ -71,6 +78,7 @@ import {
   updateRunRender,
 } from "./render-store.js";
 import {
+  acceptedInviteForRun,
   acceptInvite,
   createInvite,
   declineInvite,
@@ -542,6 +550,100 @@ const RunIdParamsSchema = z.object({
     }),
 });
 
+/**
+ * The other runner on a run, read with their own Strava token.
+ *
+ * That token is the whole point: a second athlete's pace is not readable any
+ * other way, so this returning something *is* the evidence that an invitation
+ * was accepted and the grant behind it is still live. Null covers all three ways
+ * there is nobody to draw — nobody accepted, the invitee disconnected Strava, or
+ * the row is half-answered — and every caller treats them the same, because to
+ * the athlete looking at the picker they are the same.
+ *
+ * Strava failures are thrown rather than swallowed: a partner we cannot read
+ * *right now* is a 502, not a film with one runner in it.
+ */
+async function loadRunPartner(
+  userId: string,
+  activityId: number,
+): Promise<{ invite: InviteRow; partner: RunPartner | null } | null> {
+  const invite = await acceptedInviteForRun(userId, activityId);
+  if (!invite?.inviteeUserId || invite.inviteeActivityId == null) return null;
+
+  const token = await stravaTokenFor(invite.inviteeUserId);
+  if (!token) {
+    logger.warn(
+      { event: "invite.invitee_token_missing", activityId },
+      "The partner's Strava grant is gone",
+    );
+    return { invite, partner: null };
+  }
+
+  const [activity, streams, athlete] = await Promise.all([
+    fetchRun(token, invite.inviteeActivityId),
+    fetchRunStreams(token, invite.inviteeActivityId),
+    fetchAthlete(token),
+  ]);
+  return {
+    invite,
+    partner: {
+      name: athlete.firstname,
+      // Strava hands back a sprite name for an athlete with no picture; the
+      // catalogue's own reader is what turns that into "no avatar".
+      avatar_url: avatarSource(athlete.profile),
+      activity,
+      streams,
+    },
+  };
+}
+
+const runPartnerRoute = createRoute({
+  method: "get",
+  path: "/api/runs/{id}/partner",
+  operationId: "getRunPartner",
+  tags: ["Runs"],
+  summary: "Get the other runner on this run, if somebody accepted",
+  description:
+    "The run and streams of whoever accepted an invitation to appear in this " +
+    "run's video, read with their own Strava token. `partner` is null when " +
+    "nobody has accepted, or when the athlete who did has since disconnected " +
+    "Strava — the browser reads it to decide whether the two-runner templates " +
+    "can be offered, and to play them without going back to Strava itself.",
+  security: [{ sessionCookie: [] }],
+  request: { params: RunIdParamsSchema },
+  responses: {
+    200: {
+      description: "The other runner, or null if there isn't one.",
+      content: { "application/json": { schema: RunPartnerStateSchema } },
+    },
+    401: {
+      description: "No valid session.",
+      content: { "application/json": { schema: ErrorSchema } },
+    },
+    502: {
+      description: "Strava rejected or failed the upstream request.",
+      content: { "application/json": { schema: ErrorSchema } },
+    },
+  },
+});
+
+app.openapi(runPartnerRoute, async (c) => {
+  const session = await currentUser(c);
+  if (!session) return c.json({ error: "Not signed in" }, 401);
+
+  const { id } = c.req.valid("param");
+  try {
+    const found = await loadRunPartner(session.user.id, Number(id));
+    return c.json({ partner: found?.partner ?? null }, 200);
+  } catch (err) {
+    logStravaFailure(c, err, "fetch the partner's run");
+    if (err instanceof StravaApiError) {
+      return c.json({ error: err.message }, 502);
+    }
+    throw err;
+  }
+});
+
 const RENDER_NOT_CONFIGURED =
   "Video rendering is not configured. Deploy Remotion Lambda " +
   "(pnpm video:deploy) and set REMOTION_FUNCTION_NAME / " +
@@ -564,6 +666,10 @@ export const RENDER_FLAG = "video-render";
 
 const RENDER_DISABLED =
   "Video rendering is temporarily switched off. It should be back shortly.";
+
+const RENDER_NEEDS_PARTNER =
+  "This video needs the person you ran with. Send them the invitation link, " +
+  "and render it once they've accepted.";
 
 const getRunRenderRoute = createRoute({
   method: "get",
@@ -613,8 +719,10 @@ const startRunRenderRoute = createRoute({
     "or already done with the same options — those return the existing state; " +
     "a failed render, or one whose options no longer match, is rendered again. " +
     "Each template gets its own render, so switching template does not " +
-    "replace the video already made with the last one. The body is optional " +
-    "and defaults to the plain replay.",
+    "replace the video already made with the last one. A template that draws " +
+    "two runners also reads the run's accepted invitation and the partner's " +
+    "own Strava data, and is refused with 409 when there is none. The body is " +
+    "optional and defaults to the plain replay.",
   security: [{ sessionCookie: [] }],
   request: {
     params: RunIdParamsSchema,
@@ -634,6 +742,13 @@ const startRunRenderRoute = createRoute({
     403: {
       description:
         "The stored Strava token lacks the activity:read scope; sign out and back in.",
+      content: { "application/json": { schema: ErrorSchema } },
+    },
+    409: {
+      description:
+        "This template needs a second runner, and nobody has accepted an " +
+        "invitation to this run — or the athlete who did has since " +
+        "disconnected Strava.",
       content: { "application/json": { schema: ErrorSchema } },
     },
     502: {
@@ -661,13 +776,13 @@ app.openapi(startRunRenderRoute, async (c) => {
   // is skipped entirely when a caller posts nothing.
   const body: RunRenderOptions | undefined = c.req.valid("json");
   const template = body?.template ?? DEFAULT_TEMPLATE_ID;
+  const entry = getTemplate(template);
   // A template that draws no runner has nothing to put a face on, so the option
   // is dropped here rather than stored as an answer that changed nothing.
-  const showAvatar =
-    (body?.show_avatar ?? false) && getTemplate(template).supportsAvatar;
+  const showAvatar = (body?.show_avatar ?? false) && entry.supportsAvatar;
   // Same rule for the look: a template whose plate isn't ours to re-tint stores
   // the default rather than an answer that changed nothing.
-  const theme = getTemplate(template).supportsTheme
+  const theme = entry.supportsTheme
     ? (body?.theme ?? DEFAULT_THEME)
     : DEFAULT_THEME;
   const options = { showAvatar, theme };
@@ -692,9 +807,28 @@ app.openapi(startRunRenderRoute, async (c) => {
     return c.json({ error: RENDER_DISABLED }, 503);
   }
 
+  // Who else is in the film, if this template draws two. Read from our own row
+  // rather than from Strava, and read *before* the reuse check below: the
+  // partner's run id is half of what identifies the render, and the invitation
+  // knows it without spending a Strava request on a video we may already have.
+  const invite = entry.needsPartner
+    ? await acceptedInviteForRun(session.user.id, activityId)
+    : null;
+  if (entry.needsPartner && invite?.inviteeActivityId == null) {
+    log.info(
+      { event: "render.needs_partner", activityId, template },
+      "No accepted invitation on this run",
+    );
+    return c.json({ error: RENDER_NEEDS_PARTNER }, 409);
+  }
+
   // Don't double-render: an in-flight or finished render is simply returned —
   // unless it was made with different options, which makes it a different video.
-  const propsHash = renderPropsHash(template, options);
+  const propsHash = renderPropsHash(
+    template,
+    options,
+    invite?.inviteeActivityId ?? null,
+  );
   const existing = await getRunRender(session.user.id, activityId, template);
   if (
     existing &&
@@ -714,20 +848,37 @@ app.openapi(startRunRenderRoute, async (c) => {
   if (!accessToken) return c.json({ error: "No Strava access token" }, 401);
 
   try {
-    const [run, streams, athlete] = await Promise.all([
+    const [run, streams, athlete, found] = await Promise.all([
       fetchRun(accessToken, activityId),
       fetchRunStreams(accessToken, activityId),
       // Read from Strava rather than taken from the request: the browser does
-      // not get to choose the picture that is baked into the video.
-      showAvatar ? fetchAthlete(accessToken) : null,
+      // not get to choose the picture, or the name, that is baked into the
+      // video. A two-runner film needs the name whatever the avatar option said.
+      showAvatar || entry.needsPartner ? fetchAthlete(accessToken) : null,
+      // With the partner's own token — see `loadRunPartner`.
+      entry.needsPartner ? loadRunPartner(session.user.id, activityId) : null,
     ]);
-    const { renderId, bucketName } = await startLambdaRender(
-      target,
+
+    // Between the row read above and this fetch, the only thing that can have
+    // changed is the invitee's grant. Nothing renders a duo film with one
+    // runner in it: that is a different template, and they can pick it.
+    if (entry.needsPartner && !found?.partner) {
+      log.warn(
+        { event: "render.partner_unreadable", activityId, template },
+        "The partner's Strava grant is gone",
+      );
+      return c.json({ error: RENDER_NEEDS_PARTNER }, 409);
+    }
+
+    const { renderId, bucketName } = await startLambdaRender(target, {
       run,
       streams,
-      athlete?.profile ?? "",
+      avatarUrl: showAvatar ? (athlete?.profile ?? "") : "",
+      showAvatar,
+      athleteName: athlete?.firstname ?? "You",
       theme,
-    );
+      partner: found?.partner ?? null,
+    });
     const row = await saveStartedRender({
       userId: session.user.id,
       activityId,

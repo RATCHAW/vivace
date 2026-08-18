@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, ServerSentEventsResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { AcceptCoachPlanData, AcceptCoachPlanErrors, AcceptCoachPlanResponses, AcceptRunInviteData, AcceptRunInviteErrors, AcceptRunInviteResponses, CoachChatData, CoachChatErrors, CoachChatResponse, CoachChatResponses, CreateCoachThreadData, CreateCoachThreadErrors, CreateCoachThreadResponses, CreateRunInviteData, CreateRunInviteErrors, CreateRunInviteResponses, DeclineRunInviteData, DeclineRunInviteErrors, DeclineRunInviteResponses, DeleteCoachThreadData, DeleteCoachThreadErrors, DeleteCoachThreadResponses, GetCoachBriefingData, GetCoachBriefingErrors, GetCoachBriefingResponses, GetCoachThreadData, GetCoachThreadErrors, GetCoachThreadResponses, GetHealthData, GetHealthResponses, GetRunInviteCandidatesData, GetRunInviteCandidatesErrors, GetRunInviteCandidatesResponses, GetRunInviteData, GetRunInviteErrors, GetRunInviteResponses, GetRunRenderData, GetRunRenderErrors, GetRunRenderResponses, GetRunsData, GetRunsErrors, GetRunsResponses, GetRunStreamsData, GetRunStreamsErrors, GetRunStreamsResponses, GetStravaAthleteData, GetStravaAthleteErrors, GetStravaAthleteResponses, ListCoachThreadsData, ListCoachThreadsErrors, ListCoachThreadsResponses, ListRunInvitesData, ListRunInvitesErrors, ListRunInvitesResponses, PostClientLogsData, PostClientLogsResponses, ReceiveStravaWebhookData, ReceiveStravaWebhookErrors, ReceiveStravaWebhookResponses, RevokeRunInviteData, RevokeRunInviteErrors, RevokeRunInviteResponses, StartRunRenderData, StartRunRenderErrors, StartRunRenderResponses, StreamRunRenderProgressData, StreamRunRenderProgressErrors, StreamRunRenderProgressResponse, StreamRunRenderProgressResponses, UpdateCoachContextData, UpdateCoachContextErrors, UpdateCoachContextResponses, ValidateStravaWebhookData, ValidateStravaWebhookErrors, ValidateStravaWebhookResponses } from './types.gen';
+import type { AcceptCoachPlanData, AcceptCoachPlanErrors, AcceptCoachPlanResponses, AcceptRunInviteData, AcceptRunInviteErrors, AcceptRunInviteResponses, CoachChatData, CoachChatErrors, CoachChatResponse, CoachChatResponses, CreateCoachThreadData, CreateCoachThreadErrors, CreateCoachThreadResponses, CreateRunInviteData, CreateRunInviteErrors, CreateRunInviteResponses, DeclineRunInviteData, DeclineRunInviteErrors, DeclineRunInviteResponses, DeleteCoachThreadData, DeleteCoachThreadErrors, DeleteCoachThreadResponses, GetCoachBriefingData, GetCoachBriefingErrors, GetCoachBriefingResponses, GetCoachThreadData, GetCoachThreadErrors, GetCoachThreadResponses, GetHealthData, GetHealthResponses, GetRunInviteCandidatesData, GetRunInviteCandidatesErrors, GetRunInviteCandidatesResponses, GetRunInviteData, GetRunInviteErrors, GetRunInviteResponses, GetRunPartnerData, GetRunPartnerErrors, GetRunPartnerResponses, GetRunRenderData, GetRunRenderErrors, GetRunRenderResponses, GetRunsData, GetRunsErrors, GetRunsResponses, GetRunStreamsData, GetRunStreamsErrors, GetRunStreamsResponses, GetStravaAthleteData, GetStravaAthleteErrors, GetStravaAthleteResponses, ListCoachThreadsData, ListCoachThreadsErrors, ListCoachThreadsResponses, ListRunInvitesData, ListRunInvitesErrors, ListRunInvitesResponses, PostClientLogsData, PostClientLogsResponses, ReceiveStravaWebhookData, ReceiveStravaWebhookErrors, ReceiveStravaWebhookResponses, RevokeRunInviteData, RevokeRunInviteErrors, RevokeRunInviteResponses, StartRunRenderData, StartRunRenderErrors, StartRunRenderResponses, StreamRunRenderProgressData, StreamRunRenderProgressErrors, StreamRunRenderProgressResponse, StreamRunRenderProgressResponses, UpdateCoachContextData, UpdateCoachContextErrors, UpdateCoachContextResponses, ValidateStravaWebhookData, ValidateStravaWebhookErrors, ValidateStravaWebhookResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -69,6 +69,21 @@ export const getRunStreams = <ThrowOnError extends boolean = false>(options: Opt
 });
 
 /**
+ * Get the other runner on this run, if somebody accepted
+ *
+ * The run and streams of whoever accepted an invitation to appear in this run's video, read with their own Strava token. `partner` is null when nobody has accepted, or when the athlete who did has since disconnected Strava — the browser reads it to decide whether the two-runner templates can be offered, and to play them without going back to Strava itself.
+ */
+export const getRunPartner = <ThrowOnError extends boolean = false>(options: Options<GetRunPartnerData, ThrowOnError>): RequestResult<GetRunPartnerResponses, GetRunPartnerErrors, ThrowOnError> => (options.client ?? client).get<GetRunPartnerResponses, GetRunPartnerErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'better-auth.session_token',
+            type: 'apiKey'
+        }],
+    url: '/api/runs/{id}/partner',
+    ...options
+});
+
+/**
  * Get one run's stored render
  *
  * Reads the persisted render state for this run, athlete and template. `render` is null when this run has never been rendered with this template. While a render is in flight, live progress comes from the SSE endpoint, which also keeps this state up to date.
@@ -86,7 +101,7 @@ export const getRunRender = <ThrowOnError extends boolean = false>(options: Opti
 /**
  * Render this run's video on Remotion Lambda
  *
- * Fetches the run and its streams from Strava, starts a Remotion Lambda render of the chosen template, and persists the render state. The MP4 lands in the Remotion S3 bucket. Idempotent while a render is in flight or already done with the same options — those return the existing state; a failed render, or one whose options no longer match, is rendered again. Each template gets its own render, so switching template does not replace the video already made with the last one. The body is optional and defaults to the plain replay.
+ * Fetches the run and its streams from Strava, starts a Remotion Lambda render of the chosen template, and persists the render state. The MP4 lands in the Remotion S3 bucket. Idempotent while a render is in flight or already done with the same options — those return the existing state; a failed render, or one whose options no longer match, is rendered again. Each template gets its own render, so switching template does not replace the video already made with the last one. A template that draws two runners also reads the run's accepted invitation and the partner's own Strava data, and is refused with 409 when there is none. The body is optional and defaults to the plain replay.
  */
 export const startRunRender = <ThrowOnError extends boolean = false>(options: Options<StartRunRenderData, ThrowOnError>): RequestResult<StartRunRenderResponses, StartRunRenderErrors, ThrowOnError> => (options.client ?? client).post<StartRunRenderResponses, StartRunRenderErrors, ThrowOnError>({
     security: [{

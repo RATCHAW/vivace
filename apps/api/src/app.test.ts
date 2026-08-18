@@ -110,6 +110,14 @@ describe("api", () => {
     expect(await res.json()).toEqual({ error: "Invalid request" });
   });
 
+  it("rejects reading a run's other runner without a session", async () => {
+    // The partner is a whole run of somebody else's, readable only because they
+    // accepted an invitation from *this* athlete — so the session is what says
+    // which athlete is asking, and there is no answer without one.
+    const res = await app.request("/api/runs/123/partner");
+    expect(res.status).toBe(401);
+  });
+
   it("rejects the invite endpoints that act on somebody's behalf", async () => {
     // Everything that mints, answers or withdraws an invitation is a signed-in
     // action — the preview below is the one deliberate exception.
