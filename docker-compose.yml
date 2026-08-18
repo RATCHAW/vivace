@@ -16,6 +16,33 @@ services:
       timeout: 5s
       retries: 10
 
+  # The end-to-end suite's own database, on its own port and its own volume.
+  #
+  # Separate from `db` on purpose: apps/e2e truncates every table it knows about
+  # between runs, and that must never be one typo away from the database you
+  # have been signing into all afternoon. Behind a profile so `docker compose up`
+  # doesn't start it, and on 5434 so `pnpm dev` can keep running while the suite
+  # does. `tmpfs` because none of it is worth surviving a reboot.
+  db-e2e:
+    profiles: ["e2e"]
+    image: postgres:18-alpine@sha256:a1d02e4bd40c94d3bf2bdd3678c137388e76d9efcd23c285e9429d336a834b44
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+      POSTGRES_DB: app
+    ports:
+      - "127.0.0.1:5434:5432"
+    # Mounted at /var/lib/postgresql rather than its `data` subdirectory: the
+    # postgres:18 image puts the cluster one level down and refuses to initialise
+    # when the mount point lands on the boundary between the two.
+    tmpfs:
+      - /var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d app"]
+      interval: 3s
+      timeout: 3s
+      retries: 15
+
   # Log storage. Started by both profiles, because the API pushes to it
   # directly — there is no agent scraping container stdout.
   loki:

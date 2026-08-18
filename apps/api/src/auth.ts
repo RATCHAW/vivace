@@ -15,6 +15,19 @@ const secret = process.env.BETTER_AUTH_SECRET;
 const stravaClientId = process.env.STRAVA_CLIENT_ID ?? "";
 const stravaClientSecret = process.env.STRAVA_CLIENT_SECRET ?? "";
 
+/**
+ * Where the OAuth dance happens.
+ *
+ * `STRAVA_OAUTH_BASE_URL` is the sibling of `STRAVA_API_BASE_URL` in
+ * @repo/strava-api, and exists for the same reason: the end-to-end suite signs
+ * two athletes in for real, through better-auth's own redirect and token
+ * exchange, against a Strava it controls. Also **inert in production** — an
+ * override there would send athletes to somebody else's consent screen.
+ */
+const stravaOAuthBase =
+  (!production && process.env.STRAVA_OAUTH_BASE_URL) ||
+  "https://www.strava.com";
+
 if (production) {
   const missing = [
     ["BETTER_AUTH_URL", process.env.BETTER_AUTH_URL],
@@ -68,8 +81,8 @@ export const auth = betterAuth({
           providerId: "strava",
           clientId: stravaClientId,
           clientSecret: stravaClientSecret,
-          authorizationUrl: "https://www.strava.com/oauth/authorize",
-          tokenUrl: "https://www.strava.com/oauth/token",
+          authorizationUrl: `${stravaOAuthBase}/oauth/authorize`,
+          tokenUrl: `${stravaOAuthBase}/oauth/token`,
           // Strava expects client_id/client_secret in the POST body, not Basic auth
           authentication: "post",
           // Strava scopes are comma-separated, so keep them in a single entry.
