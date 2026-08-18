@@ -619,7 +619,7 @@ export type RevokeRunInviteErrors = {
      */
     404: ApiError;
     /**
-     * It has already been answered or has expired.
+     * It was declined or has already been withdrawn.
      */
     409: ApiError;
 };

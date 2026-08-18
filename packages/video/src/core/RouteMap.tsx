@@ -56,6 +56,51 @@ function headPoint(layer: RouteLayer): LatLng | null {
   return layer.points[Math.min(layer.drawn, layer.points.length) - 1];
 }
 
+export interface RouteMapProps {
+  layers: RouteLayer[];
+  /** The shot this frame is drawn with, from the template's camera track. */
+  camera: Camera | null;
+  token: string;
+  width: number;
+  height: number;
+}
+
+/**
+ * Which routes a plate was built for.
+ *
+ * The name each runner's sources are under, how many points they have and
+ * where those points begin and end — enough to tell one runner's route from
+ * another's, and cheap enough to compute on every frame. Two runs that agree on
+ * all of it draw the same line, so a collision costs nothing: the plate already
+ * shows what it would have been remounted to show.
+ */
+function plateOf(layers: RouteLayer[]): string {
+  return layers
+    .map((layer) => {
+      const first = layer.points[0];
+      const last = layer.points[layer.points.length - 1];
+      return `${layer.key}:${layer.points.length}:${first ?? ""}:${last ?? ""}`;
+    })
+    .join("|");
+}
+
+/**
+ * The plate, remounted when the runners on it change.
+ *
+ * `RouteMapPlate` builds its Mapbox sources once, from the frame it opens on,
+ * and every frame after that only pushes new data into the sources that already
+ * exist — which is what keeps a moving film cheap. It is also why a runner who
+ * arrives *later* would otherwise never get a line, and one taken back out
+ * would leave theirs painted there for good: an invitation accepted or removed
+ * while the player is open changes the cast of a film that is already running.
+ *
+ * A headless render never sees this — its props are fixed for the whole render,
+ * so Lambda mounts exactly one map, as before.
+ */
+export function RouteMap(props: RouteMapProps) {
+  return <RouteMapPlate key={plateOf(props.layers)} {...props} />;
+}
+
 /**
  * A deterministic Mapbox plate: every route's full line sits faint under a
  * coloured trace that draws with it, and the camera is handed in rather than
@@ -65,23 +110,17 @@ function headPoint(layer: RouteLayer): LatLng | null {
  * the images never have to be decoded into the GL context, and a frame can be
  * held on their load.
  *
- * Mount one per set of routes — `layers` may change every frame, but adding or
- * removing a runner needs a remount, because the sources are built once.
+ * One mount per set of routes: `layers` may change every frame, but the sources
+ * are built once, so adding or removing a runner is a remount — see `RouteMap`
+ * above, which is what everything else uses.
  */
-export function RouteMap({
+function RouteMapPlate({
   layers,
   camera,
   token,
   width,
   height,
-}: {
-  layers: RouteLayer[];
-  /** The shot this frame is drawn with, from the template's camera track. */
-  camera: Camera | null;
-  token: string;
-  width: number;
-  height: number;
-}) {
+}: RouteMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const { delayRender, continueRender } = useDelayRender();
   const [map, setMap] = useState<MapboxMap | null>(null);

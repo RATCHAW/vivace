@@ -50,6 +50,13 @@ describe("eligibility", () => {
         partner: asPartner(FIXTURE_A_PARTNER),
       }).reasonKey,
     ).toBe("needs-route");
+    // And says so *before* it asks for a partner. `needs-partner` is what the
+    // studio keeps selectable and hangs the invitation off, so it has to mean
+    // the acceptance is the only thing missing — a treadmill run answering it
+    // would offer a link that could never make a film.
+    expect(templateEligibility("duo-replay", FIXTURE_B).reasonKey).toBe(
+      "needs-route",
+    );
   });
 
   it("turns the map templates away from a treadmill, and keeps the rest", () => {

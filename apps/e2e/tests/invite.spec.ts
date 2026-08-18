@@ -53,6 +53,14 @@ test("an athlete invites the person they ran with, who accepts", async ({
     await expect(ayoub.getByText(SHARED_RUN.name).first()).toBeVisible();
 
     // --- and invites somebody to it ----------------------------------------
+    // Through the duo cut, because that is the only place the invitation is
+    // offered — a film with one lane has nowhere to put a second runner. The
+    // row is selectable while it waits for somebody, which is the whole reason
+    // it stays clickable in the picker rather than greyed like a treadmill
+    // run's route replay.
+    await ayoub.getByRole("combobox", { name: "Video template" }).click();
+    await ayoub.getByRole("option", { name: /^Duo replay/ }).click();
+
     // The token is read off the API response rather than the clipboard: the
     // component hands the link to `navigator.share` first and the clipboard
     // only as a fallback, and which of those runs is the browser's business.
@@ -67,8 +75,13 @@ test("an athlete invites the person they ran with, who accepts", async ({
 
     // The studio now says it is waiting on somebody.
     await expect(
-      ayoub.getByRole("button", { name: "Copy the link again" }),
+      ayoub.getByRole("button", { name: "Copy link" }),
     ).toBeVisible();
+
+    // Nobody has answered yet, and asking says so out loud — a refresh that
+    // redrew nothing would be indistinguishable from a dead button.
+    await ayoub.getByRole("button", { name: "Check for an answer" }).click();
+    await expect(ayoub.getByText("No answer yet")).toBeVisible();
 
     // --- Sam opens the link, having never been here ------------------------
     const sam = await invitee.newPage();
@@ -107,14 +120,98 @@ test("an athlete invites the person they ran with, who accepts", async ({
     await sam.getByRole("button", { name: "Make the video together" }).click();
     await expect(sam.getByText("You're in")).toBeVisible();
 
-    // --- and Ayoub sees it -------------------------------------------------
-    await ayoub.reload();
+    // --- and Ayoub sees it, without reloading anything ---------------------
+    // The acceptance happened in another browser entirely, so this tab has no
+    // way of hearing about it: the refresh beside the link is the whole point.
+    await ayoub.getByRole("button", { name: "Check for an answer" }).click();
     await expect(
       ayoub.getByText(`${ATHLETES.sam.firstname} is in`),
     ).toBeVisible();
+
+    // --- and still sees it after a reload -----------------------------------
+    // The reload puts the studio back on the default cut, so the duo one is
+    // picked again — and this time it is eligible rather than merely
+    // selectable, which is the acceptance arriving in the picker too.
+    await ayoub.reload();
+    await ayoub.getByRole("combobox", { name: "Video template" }).click();
+    await ayoub.getByRole("option", { name: /^Duo replay$/ }).click();
+    await expect(
+      ayoub.getByText(`${ATHLETES.sam.firstname} is in`),
+    ).toBeVisible();
+
+    // --- until Ayoub takes them back out ------------------------------------
+    // The wrong person can accept — two people who ran at the same time both
+    // hold a link the moment it is forwarded once. Removing is what makes that
+    // recoverable, and what it recovers to is the invitation, ready for
+    // somebody else.
+    await ayoub
+      .getByRole("button", { name: `Remove ${ATHLETES.sam.firstname}` })
+      .click();
+    await expect(
+      ayoub.getByText(`${ATHLETES.sam.firstname} is no longer in this video`),
+    ).toBeVisible();
+    await expect(
+      ayoub.getByRole("button", { name: "Add who you ran with" }),
+    ).toBeVisible();
+
+    // And a second link is mintable, which the first one being live would have
+    // prevented — the removed invitation is closed, not merely hidden.
+    const remade = ayoub.waitForResponse(
+      (response) =>
+        response.url().includes(`/api/runs/${SHARED_RUN.id}/invite`) &&
+        response.request().method() === "POST",
+    );
+    await ayoub.getByRole("button", { name: "Add who you ran with" }).click();
+    const next = ((await (await remade).json()) as { token: string }).token;
+    expect(next).not.toBe(token);
   } finally {
     await inviter.close();
     await invitee.close();
+  }
+});
+
+test("on a phone the invitation is behind the options sheet", async ({
+  browser,
+}) => {
+  // It had a cell of the action row while it was one tap. It stopped fitting
+  // when it grew a state — waiting, checking, removing — and the row is four
+  // icons measured off the film, with no room for a sentence under any of them.
+  const context = await browser.newContext({
+    viewport: { width: 390, height: 844 },
+    hasTouch: true,
+  });
+  try {
+    const ayoub = await context.newPage();
+    await ayoub.goto(url("/"));
+    await signIn(ayoub, "ayoub");
+
+    // The database is truncated once per run, not once per test, and the case
+    // above leaves this run holding a fresh link. Close whatever is live so
+    // this one starts where an athlete who has invited nobody starts.
+    const live = (await (
+      await ayoub.request.get(`/api/runs/${SHARED_RUN.id}/invites`)
+    ).json()) as { invites: { token: string; status: string }[] };
+    for (const invite of live.invites) {
+      if (invite.status === "pending" || invite.status === "accepted") {
+        await ayoub.request.delete(`/api/invites/${invite.token}`);
+      }
+    }
+
+    await ayoub.goto(url(`/replays?run=${SHARED_RUN.id}`));
+    await ayoub.getByRole("combobox", { name: "Video template" }).click();
+    await ayoub.getByRole("option", { name: /^Duo replay/ }).click();
+
+    // Not on the row behind the sheet, and not merely hidden by it.
+    await expect(
+      ayoub.getByRole("button", { name: "Add who you ran with" }),
+    ).toHaveCount(0);
+
+    await ayoub.getByRole("button", { name: "Video options" }).click();
+    await expect(
+      ayoub.getByRole("button", { name: "Add who you ran with" }),
+    ).toBeVisible();
+  } finally {
+    await context.close();
   }
 });
 

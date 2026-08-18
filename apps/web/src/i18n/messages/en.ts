@@ -254,8 +254,6 @@ export const en = {
    */
   invite: {
     action: "Add who you ran with",
-    /** The phone's icon-only action row. */
-    actionShort: "Invite",
     creating: "Making a link…",
     createFailed: "Could not make an invitation link",
     linkCopied: "Invitation link copied",
@@ -266,11 +264,21 @@ export const en = {
     pendingTitle: "Waiting on your running partner",
     pendingBody:
       "The link is live for {{days}} days. Whoever opens it confirms which run was theirs.",
-    copyAgain: "Copy the link again",
+    /** Short because it shares a 208px row with the check beside it. */
+    copyAgain: "Copy link",
+    /** The icon beside it: an acceptance happens on somebody else's phone. */
+    check: "Check for an answer",
+    checkPending: "No answer yet",
     revoke: "Cancel the invitation",
     revokeFailed: "Could not cancel the invitation",
     acceptedTitle: "{{name}} is in",
-    acceptedBody: "They confirmed their run. Nothing else to do.",
+    acceptedBody: "They confirmed their run, and the video has you both.",
+    /** Taking the second runner back out, to give the film to someone else. */
+    remove: "Remove {{name}}",
+    removed: "{{name}} is no longer in this video",
+    removedBody:
+      "Invite whoever you ran with instead — they confirm a run of their own, same as before.",
+    removeFailed: "Could not remove {{name}}",
     declinedTitle: "{{name}} said no",
     declinedBody: "Nothing was shared. You can invite someone else.",
     expiredTitle: "That link has expired",

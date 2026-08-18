@@ -24,6 +24,13 @@ import {
  * route replay exists and understand in four words why this run can't have one.
  * A catalogue that changes length as you click down the list reads as a bug.
  *
+ * One reason is not like the others. `needs-partner` says the run is fine and
+ * nobody has accepted yet — the athlete can fix that from this screen, and
+ * choosing the cut is how they get to the invitation, which the studio only
+ * offers on a template with a second lane in it. So that row stays selectable
+ * and keeps its second line; every other reason is a fact about the run that no
+ * click from here can change, and those rows stay dead.
+ *
  * That reason is the *only* second line here. The templates describe themselves
  * well enough by name, and a sentence under each of four rows turns a choice
  * into a page to read.
@@ -50,6 +57,7 @@ export function TemplateSelect({
         id: entry.id,
         eligible: true,
         reason: undefined,
+        reasonKey: undefined,
       }));
 
   return (
@@ -79,7 +87,7 @@ export function TemplateSelect({
             <SelectItem
               key={entry.id}
               value={entry.id}
-              disabled={!entry.eligible}
+              disabled={!entry.eligible && entry.reasonKey !== "needs-partner"}
               className={cn(reason && "items-start py-2.5")}
             >
               <span className="flex flex-col gap-1">

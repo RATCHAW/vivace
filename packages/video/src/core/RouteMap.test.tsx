@@ -1,0 +1,203 @@
+import { type ReactElement } from "react";
+import { act, render } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { RouteLayer } from "./RouteMap";
+
+/** The same stand-in `RunMap.test.tsx` drives, cut down to what a plate asks
+ *  of a map: which sources it was built with, and whether it is still alive. */
+const { instances, FakeMap } = vi.hoisted(() => {
+  const instances: FakeMap[] = [];
+
+  class FakeMap {
+    handlers: Record<string, Array<() => void>> = {};
+    onceHandlers: Record<string, Array<() => void>> = {};
+    sources: Record<string, { data: unknown }> = {};
+    removed = false;
+
+    constructor() {
+      instances.push(this);
+    }
+
+    on(event: string, cb: () => void) {
+      (this.handlers[event] ??= []).push(cb);
+    }
+
+    once(event: string, cb: () => void) {
+      (this.onceHandlers[event] ??= []).push(cb);
+    }
+
+    emit(event: string) {
+      const once = this.onceHandlers[event] ?? [];
+      this.onceHandlers[event] = [];
+      for (const cb of [...(this.handlers[event] ?? []), ...once]) cb();
+    }
+
+    addSource(id: string, source: { data: unknown }) {
+      if (this.removed) throw new Error("Cannot mutate a removed map");
+      this.sources[id] = { data: source.data };
+    }
+
+    addLayer() {}
+
+    getSource(id: string) {
+      const source = this.sources[id];
+      if (!source) return undefined;
+      return {
+        setData: (data: unknown) => {
+          source.data = data;
+        },
+      };
+    }
+
+    setLayoutProperty() {}
+    jumpTo() {}
+    triggerRepaint() {}
+
+    remove() {
+      this.removed = true;
+    }
+  }
+
+  return { instances, FakeMap };
+});
+
+vi.mock("mapbox-gl", () => ({ default: { Map: FakeMap } }));
+
+// After the mock, like `RunMap.test.tsx`: the component reaches for mapbox-gl
+// at module scope, so it must not be imported before the fake is in place.
+const { RouteMap } = await import("./RouteMap");
+
+const YOU = [
+  [47.37, 8.54],
+  [47.39, 8.54],
+  [47.39, 8.57],
+] as [number, number][];
+const THEM = [
+  [47.38, 8.55],
+  [47.4, 8.55],
+  [47.4, 8.58],
+] as [number, number][];
+// Somebody else entirely, under the same name: the second athlete to accept an
+// invitation is the `partner` layer just as the first one was.
+const SOMEBODY_ELSE = [
+  [40.71, -74.01],
+  [40.73, -74.01],
+] as [number, number][];
+
+const layer = (key: string, points: [number, number][]): RouteLayer => ({
+  key,
+  points,
+  drawn: points.length,
+  color: "#ffffff",
+  avatarUrl: "",
+});
+
+const plate = (layers: RouteLayer[]): ReactElement => (
+  <RouteMap
+    layers={layers}
+    camera={{ center: [8.54, 47.37], zoom: 13 }}
+    token="pk.test"
+    width={1080}
+    height={1920}
+  />
+);
+
+const live = () => instances.filter((map) => !map.removed);
+
+/** Walk a freshly-constructed map through style load and first paint. */
+function settle() {
+  const [map] = live();
+  act(() => {
+    map.emit("load");
+  });
+  act(() => {
+    map.emit("idle");
+  });
+  return map;
+}
+
+beforeEach(() => {
+  instances.length = 0;
+  // Remotion reads NODE_ENV to decide whether it is rendering, and vitest sets
+  // it to "test" — the <Player> path is the one where the cast can change.
+  vi.stubEnv("NODE_ENV", "development");
+});
+
+describe("RouteMap when the cast changes", () => {
+  it("gives a runner who arrives mid-film their line", () => {
+    // An invitation accepted in somebody else's browser reaches this one as a
+    // second layer on a plate that is already running. The sources are built
+    // once, so without a remount the newcomer is a set of live numbers under a
+    // map that never draws them.
+    const { rerender } = render(plate([layer("you", YOU)]));
+    const solo = settle();
+    expect(solo.sources["partner-route-trace"]).toBeUndefined();
+
+    act(() => {
+      rerender(plate([layer("you", YOU), layer("partner", THEM)]));
+    });
+    const duo = settle();
+
+    expect(solo.removed).toBe(true);
+    expect(live()).toHaveLength(1);
+    expect(duo.sources["partner-route-trace"]).toBeDefined();
+    expect(duo.sources["you-route-trace"]).toBeDefined();
+  });
+
+  it("takes the line away with the runner", () => {
+    const { rerender } = render(
+      plate([layer("you", YOU), layer("partner", THEM)]),
+    );
+    settle();
+
+    act(() => {
+      rerender(plate([layer("you", YOU)]));
+    });
+    const alone = settle();
+
+    // Not merely absent from the props: the trace an athlete removed is off the
+    // map, rather than left painted on it at whatever it last drew.
+    expect(alone.sources["partner-route-trace"]).toBeUndefined();
+    expect(live()).toHaveLength(1);
+  });
+
+  it("redraws when one partner is swapped for another", () => {
+    // Both are the `partner` layer, so the key alone cannot tell them apart —
+    // remove somebody, invite somebody else, and the first one's route would
+    // otherwise stay on the plate under the second one's numbers.
+    const { rerender } = render(
+      plate([layer("you", YOU), layer("partner", THEM)]),
+    );
+    settle();
+
+    act(() => {
+      rerender(plate([layer("you", YOU), layer("partner", SOMEBODY_ELSE)]));
+    });
+    const swapped = settle();
+
+    expect(swapped.sources["partner-route-full"]).toMatchObject({
+      data: {
+        geometry: {
+          coordinates: SOMEBODY_ELSE.map(([lat, lng]) => [lng, lat]),
+        },
+      },
+    });
+  });
+
+  it("keeps one map across the frames of a film", () => {
+    // The plate is rebuilt for a change of cast and for nothing else: `drawn`
+    // moves on every frame of every film, and a remount there would reload the
+    // tiles twenty-five times a second.
+    const { rerender } = render(plate([layer("you", YOU)]));
+    const map = settle();
+
+    for (const drawn of [1, 2, 3]) {
+      act(() => {
+        rerender(plate([{ ...layer("you", YOU), drawn }]));
+      });
+    }
+
+    expect(instances).toHaveLength(1);
+    expect(map.removed).toBe(false);
+  });
+});

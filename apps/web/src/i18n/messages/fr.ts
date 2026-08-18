@@ -238,7 +238,6 @@ export const fr: Translated<Messages> = {
 
   invite: {
     action: "Ajouter votre partenaire de course",
-    actionShort: "Inviter",
     creating: "Création du lien…",
     createFailed: "Impossible de créer le lien d’invitation",
     linkCopied: "Lien d’invitation copié",
@@ -248,11 +247,19 @@ export const fr: Translated<Messages> = {
     pendingTitle: "En attente de votre partenaire",
     pendingBody:
       "Le lien reste actif {{days}} jours. La personne qui l’ouvre confirme quelle sortie était la sienne.",
-    copyAgain: "Copier le lien à nouveau",
+    copyAgain: "Copier le lien",
+    check: "Vérifier la réponse",
+    checkPending: "Toujours pas de réponse",
     revoke: "Annuler l’invitation",
     revokeFailed: "Impossible d’annuler l’invitation",
     acceptedTitle: "{{name}} est de la partie",
-    acceptedBody: "Sa sortie est confirmée. Rien d’autre à faire.",
+    acceptedBody:
+      "Sa sortie est confirmée, et la vidéo vous réunit tous les deux.",
+    remove: "Retirer {{name}}",
+    removed: "{{name}} n’apparaît plus dans cette vidéo",
+    removedBody:
+      "Invitez plutôt la personne avec qui vous avez couru — elle confirme sa propre sortie, comme précédemment.",
+    removeFailed: "Impossible de retirer {{name}}",
     declinedTitle: "{{name}} a refusé",
     declinedBody:
       "Rien n’a été partagé. Vous pouvez inviter quelqu’un d’autre.",

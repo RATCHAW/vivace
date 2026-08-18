@@ -64,7 +64,10 @@ function done(): RunRenderState {
   };
 }
 
-function renderControls(initial: RunRenderState) {
+function renderControls(
+  initial: RunRenderState,
+  blocked: string | null = null,
+) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false, staleTime: Infinity } },
   });
@@ -81,6 +84,7 @@ function renderControls(initial: RunRenderState) {
         showAvatar={false}
         theme="charcoal"
         layout="tile"
+        blocked={blocked}
       />
     </div>,
     { wrapper: Wrapper },
@@ -129,6 +133,27 @@ describe("mobile render controls", () => {
       client.setQueryData(renderKey(), done());
     });
     expect(click).toHaveBeenCalledOnce();
+  });
+
+  it("stops a render the film cannot serve, and says which piece is missing", () => {
+    // The duo cut with nobody in the other lane: the API answers that request
+    // with a 409, so the tile carries the reason as its only word rather than
+    // spending a Lambda invocation to come back with the same sentence.
+    renderControls({ render: null }, "Needs someone you ran with to accept");
+
+    const button = screen.getByRole<HTMLButtonElement>("button", {
+      name: "Needs someone you ran with to accept",
+    });
+    expect(button.disabled).toBe(true);
+
+    cleanup();
+
+    // A film already on disk is still theirs, whatever the current cut is
+    // missing — the block is on starting something new.
+    renderControls(done(), "Needs someone you ran with to accept");
+    expect(
+      screen.getByRole("button", { name: "Download video" }),
+    ).toBeDefined();
   });
 
   it("does not download a video that was already finished on arrival", () => {

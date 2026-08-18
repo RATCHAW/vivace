@@ -77,17 +77,22 @@ const RULES: Record<TemplateId, (input: TemplateInput) => Eligibility> = {
       ? OK
       : no("needs-route", "Needs a GPS route — this run has none"),
 
-  // Two runners, and the only rule in here whose answer is not a fact about the
-  // run: it is a fact about whether somebody said yes. A run with no invitation
-  // sees the template greyed with what to do about it, which is the whole point
-  // of showing an ineligible template rather than hiding it.
+  // Two runners, and the only rule in here whose last answer is not a fact
+  // about the run: it is a fact about whether somebody said yes.
+  //
+  // The route is checked first, and the order is load-bearing rather than
+  // stylistic. `needs-partner` is the one verdict the athlete can overturn from
+  // the studio, so it is also the one the picker keeps selectable and the one
+  // the invitation hangs off — which only holds if it means *everything else
+  // about this run is fine*. Asked the other way round, a treadmill run would
+  // offer an invitation that could never produce a film.
   "duo-replay": ({ streams, partner }) => {
-    if (!partner) {
-      return no("needs-partner", "Needs someone you ran with to accept");
+    if ((streams.latlng?.data?.length ?? 0) < 2) {
+      return no("needs-route", "Needs a GPS route — this run has none");
     }
-    return (streams.latlng?.data?.length ?? 0) >= 2
+    return partner
       ? OK
-      : no("needs-route", "Needs a GPS route — this run has none");
+      : no("needs-partner", "Needs someone you ran with to accept");
   },
 
   "split-rush": ({ activity, streams }) => {

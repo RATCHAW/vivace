@@ -86,7 +86,7 @@ export const getRunPartner = <ThrowOnError extends boolean = false>(options: Opt
 /**
  * Get one run's stored render
  *
- * Reads the persisted render state for this run, athlete and template. `render` is null when this run has never been rendered with this template. While a render is in flight, live progress comes from the SSE endpoint, which also keeps this state up to date.
+ * Reads the persisted render state for this run, athlete and template. `render` is null when this run has never been rendered with this template, and equally when the render it has was made with a second runner who is no longer on this run — that file is a film of two other people. While a render is in flight, live progress comes from the SSE endpoint, which also keeps this state up to date.
  */
 export const getRunRender = <ThrowOnError extends boolean = false>(options: Options<GetRunRenderData, ThrowOnError>): RequestResult<GetRunRenderResponses, GetRunRenderErrors, ThrowOnError> => (options.client ?? client).get<GetRunRenderResponses, GetRunRenderErrors, ThrowOnError>({
     security: [{
@@ -163,9 +163,9 @@ export const listRunInvites = <ThrowOnError extends boolean = false>(options: Op
 });
 
 /**
- * Withdraw an invitation I sent
+ * Withdraw an invitation I sent, or take the runner it brought back out
  *
- * Kills the link. Only the athlete who sent it may, and only while it is still unanswered — an accepted invitation is a consent that was given, and taking it back is the invitee's to do, not the inviter's.
+ * Kills the link, and with it the second runner if somebody had already accepted — the film belongs to the athlete making it, so a run that ended up with the wrong person on it can be given to somebody else instead. Only the athlete who sent it may, and only while it is still live: a declined or already-withdrawn invitation is settled. What this does not do is erase the record of who consented to what, and it is not the invitee's way out — that is disconnecting Strava, which withdraws every grant they have given in either direction.
  */
 export const revokeRunInvite = <ThrowOnError extends boolean = false>(options: Options<RevokeRunInviteData, ThrowOnError>): RequestResult<RevokeRunInviteResponses, RevokeRunInviteErrors, ThrowOnError> => (options.client ?? client).delete<RevokeRunInviteResponses, RevokeRunInviteErrors, ThrowOnError>({
     security: [{

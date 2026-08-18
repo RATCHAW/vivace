@@ -680,7 +680,9 @@ const getRunRenderRoute = createRoute({
   description:
     "Reads the persisted render state for this run, athlete and template. " +
     "`render` is null when this run has never been rendered with this " +
-    "template. While a render is in flight, live progress comes from the SSE " +
+    "template, and equally when the render it has was made with a second " +
+    "runner who is no longer on this run — that file is a film of two other " +
+    "people. While a render is in flight, live progress comes from the SSE " +
     "endpoint, which also keeps this state up to date.",
   security: [{ sessionCookie: [] }],
   request: { params: RunIdParamsSchema, query: TemplateQuerySchema },
@@ -703,7 +705,26 @@ app.openapi(getRunRenderRoute, async (c) => {
   const { id } = c.req.valid("param");
   const { template } = c.req.valid("query");
   const row = await getRunRender(session.user.id, Number(id), template);
-  return c.json({ render: row ? toRunRender(row) : null }, 200);
+  if (!row) return c.json({ render: null }, 200);
+
+  // A film with two runners in it is only this run's film while it is the same
+  // two runners. The row remembers the options it was made with — the browser
+  // compares those itself — but not who was in it; the hash does. So it is
+  // recomputed against whoever the run's accepted invitation names *now*, and a
+  // render made with somebody else reads as no render at all. Without this,
+  // removing a partner and inviting another would leave the download button
+  // handing over the first one's video.
+  if (getTemplate(template).needsPartner) {
+    const invite = await acceptedInviteForRun(session.user.id, Number(id));
+    const expected = renderPropsHash(
+      template,
+      row.options,
+      invite?.inviteeActivityId ?? null,
+    );
+    if (expected !== row.propsHash) return c.json({ render: null }, 200);
+  }
+
+  return c.json({ render: toRunRender(row) }, 200);
 });
 
 const startRunRenderRoute = createRoute({
@@ -1079,6 +1100,9 @@ const InviteTokenParamsSchema = z.object({
 
 const INVITE_NOT_FOUND = "That invitation link is not valid.";
 const INVITE_CLOSED = "That invitation has already been answered or expired.";
+/** What the *inviter* hits: an accepted invitation is still theirs to undo, so
+ *  only a declined or already-withdrawn one is out of reach. */
+const INVITE_SETTLED = "That invitation is already closed.";
 const INVITE_OWN = "You can't accept your own invitation.";
 
 /** The stored row as the API serves it, resolving expiry against the clock. */
@@ -1542,11 +1566,17 @@ const revokeRunInviteRoute = createRoute({
   path: "/api/invites/{token}",
   operationId: "revokeRunInvite",
   tags: ["Invites"],
-  summary: "Withdraw an invitation I sent",
+  summary:
+    "Withdraw an invitation I sent, or take the runner it brought back out",
   description:
-    "Kills the link. Only the athlete who sent it may, and only while it is " +
-    "still unanswered — an accepted invitation is a consent that was given, " +
-    "and taking it back is the invitee's to do, not the inviter's.",
+    "Kills the link, and with it the second runner if somebody had already " +
+    "accepted — the film belongs to the athlete making it, so a run that ended " +
+    "up with the wrong person on it can be given to somebody else instead. " +
+    "Only the athlete who sent it may, and only while it is still live: a " +
+    "declined or already-withdrawn invitation is settled. What this does not " +
+    "do is erase the record of who consented to what, and it is not the " +
+    "invitee's way out — that is disconnecting Strava, which withdraws every " +
+    "grant they have given in either direction.",
   security: [{ sessionCookie: [] }],
   request: { params: InviteTokenParamsSchema },
   responses: {
@@ -1563,7 +1593,7 @@ const revokeRunInviteRoute = createRoute({
       content: { "application/json": { schema: ErrorSchema } },
     },
     409: {
-      description: "It has already been answered or has expired.",
+      description: "It was declined or has already been withdrawn.",
       content: { "application/json": { schema: ErrorSchema } },
     },
   },
@@ -1582,9 +1612,18 @@ app.openapi(revokeRunInviteRoute, async (c) => {
   }
 
   const revoked = await revokeInvite(token, session.user.id);
-  if (!revoked) return c.json({ error: INVITE_CLOSED }, 409);
+  if (!revoked) return c.json({ error: INVITE_SETTLED }, 409);
 
-  track(c, "invite.revoked", {}, "Withdrew a run invitation");
+  // One route, two things worth telling apart in a funnel: a link nobody ever
+  // answered is a share that went nowhere, and a runner taken back out is a
+  // film being remade with somebody else.
+  const removed = invite.status === "accepted";
+  track(
+    c,
+    "invite.revoked",
+    { removedPartner: removed },
+    removed ? "Took the second runner back out" : "Withdrew a run invitation",
+  );
   return c.json(toRunInvite(revoked), 200);
 });
 

@@ -201,7 +201,21 @@ export async function declineInvite(
   return respond(token, "declined", { inviteeUserId });
 }
 
-/** The inviter taking the link back. Only a live one can be withdrawn. */
+/**
+ * The inviter taking it back — a link nobody answered, or the runner who did.
+ *
+ * `accepted` is in the WHERE deliberately. The film belongs to the athlete who
+ * is making it: a run that ended up with the wrong person on it, or with
+ * somebody they would rather not have in it now, has to be undoable, and this
+ * row is the only thing that puts them there. What it undoes is *this film's*
+ * use of the grant, which is why it leaves `inviteeUserId` and `consentText`
+ * where they are — the record of who agreed to what is not the inviter's to
+ * erase. The invitee's own way out is disconnecting Strava, which is
+ * `revokeAllForUser` and takes back every grant in both directions.
+ *
+ * A closed row — declined, already withdrawn — updates nothing and returns
+ * null, which the route reads as "already settled".
+ */
 export async function revokeInvite(
   token: string,
   inviterUserId: string,
@@ -213,7 +227,7 @@ export async function revokeInvite(
       and(
         eq(runInvite.token, token),
         eq(runInvite.inviterUserId, inviterUserId),
-        eq(runInvite.status, "pending"),
+        or(eq(runInvite.status, "pending"), eq(runInvite.status, "accepted")),
       ),
     )
     .returning();
