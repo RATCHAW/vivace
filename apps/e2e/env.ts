@@ -4,14 +4,28 @@
 // its database must never be one `docker compose up` away from truncating the
 // one you have been signing into all afternoon, and `pnpm dev` should be able to
 // keep running while the suite does.
+//
+// They are also all shiftable by one number. This repository is worked on in
+// several checkouts at once (see the harness in the README), and every one of
+// them wants the same four ports — so the second worktree to run `pnpm e2e`
+// would otherwise fail on a port bind, or worse, quietly find the first one's
+// database and truncate it. `E2E_PORT_OFFSET=10` moves the whole set.
 
-/** Postgres for the suite alone. `docker compose --profile e2e up -d db-e2e`. */
+/** Added to every port below. One number, so the set can never half-move. */
+const OFFSET = Number(process.env.E2E_PORT_OFFSET ?? 0);
+
+export const FAKE_STRAVA_PORT = 4100 + OFFSET;
+export const API_PORT = 3100 + OFFSET;
+export const WEB_PORT = 5273 + OFFSET;
+export const DB_PORT = Number(process.env.E2E_DB_PORT ?? 5434 + OFFSET);
+
+/**
+ * Postgres for the suite alone — `pnpm e2e:db`, which honours the same offset.
+ *
+ * `E2E_DATABASE_URL` wins outright, for a database that is not the compose one.
+ */
 export const DATABASE_URL =
-  process.env.E2E_DATABASE_URL ?? "postgres://app:app@localhost:5434/app";
-
-export const FAKE_STRAVA_PORT = 4100;
-export const API_PORT = 3100;
-export const WEB_PORT = 5273;
+  process.env.E2E_DATABASE_URL ?? `postgres://app:app@localhost:${DB_PORT}/app`;
 
 export const FAKE_STRAVA_URL = `http://127.0.0.1:${FAKE_STRAVA_PORT}`;
 export const API_URL = `http://127.0.0.1:${API_PORT}`;

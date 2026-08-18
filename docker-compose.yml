@@ -31,7 +31,10 @@ services:
       POSTGRES_PASSWORD: app
       POSTGRES_DB: app
     ports:
-      - "127.0.0.1:5434:5432"
+      # Shiftable, because several checkouts of this repository are worked on at
+      # once and each wants the same port. Keep in step with `E2E_PORT_OFFSET`
+      # in apps/e2e/env.ts — `pnpm e2e:db` passes it through.
+      - "127.0.0.1:${E2E_DB_PORT:-5434}:5432"
     # Mounted at /var/lib/postgresql rather than its `data` subdirectory: the
     # postgres:18 image puts the cluster one level down and refuses to initialise
     # when the mount point lands on the boundary between the two.

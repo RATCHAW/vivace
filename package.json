@@ -17,7 +17,7 @@
     "spec:pull": "pnpm --filter @repo/strava-api spec:pull",
     "video:deploy": "pnpm --filter @repo/video run deploy",
     "e2e": "pnpm --filter @repo/e2e e2e",
-    "e2e:db": "docker compose --profile e2e up -d db-e2e",
+    "e2e:db": "E2E_DB_PORT=${E2E_DB_PORT:-$((5434 + ${E2E_PORT_OFFSET:-0}))} docker compose --profile e2e up -d db-e2e",
     "db:up": "docker compose up -d db",
     "db:generate": "pnpm --filter @repo/api run db:generate",
     "db:migrate": "pnpm --filter @repo/api run db:migrate",

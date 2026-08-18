@@ -50,8 +50,20 @@ test.
 ## Ports and state
 
 Its own database on **5434**, its own API on **3100**, its own Vite on **5273**,
-fake Strava on **4100**. None of them are the development ports, so `pnpm dev`
-can keep running while the suite does — and, more importantly, a suite that
+fake Strava on **4100** — and the whole set shifts together:
+
+```sh
+E2E_PORT_OFFSET=10 pnpm e2e:db && E2E_PORT_OFFSET=10 pnpm e2e
+```
+
+That matters because this repository is worked on in several checkouts at once,
+and every one of them wants the same four ports. Without the offset the second
+worktree to run the suite fails on a port bind — or worse, quietly finds the
+first one's database and truncates it. One number moves all four, so the set can
+never half-move.
+
+None of them are the development ports either, so `pnpm dev` can keep running
+while the suite does — and, more importantly, a suite that
 truncates every table between runs is never one typo away from the database you
 have been signing into all afternoon. The container is `tmpfs`-backed; none of
 it is worth surviving a reboot.

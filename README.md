@@ -628,6 +628,9 @@ gate. The end-to-end suite is the slow one and runs as its own CI job:
 
 ```sh
 pnpm e2e:db && pnpm e2e
+
+# Another checkout already running its suite? Shift all four ports at once.
+E2E_PORT_OFFSET=10 pnpm e2e:db && E2E_PORT_OFFSET=10 pnpm e2e
 ```
 
 It drives a browser at the real Vite app, which proxies to the real Hono API,
