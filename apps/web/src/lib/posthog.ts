@@ -14,6 +14,33 @@ const key = import.meta.env.VITE_POSTHOG_KEY;
 /** US cloud unless the project lives in the EU or on a self-hosted instance. */
 const host = import.meta.env.VITE_POSTHOG_HOST || "https://us.i.posthog.com";
 
+/**
+ * Which deploy these events came from — `production`, `staging`, or the
+ * `development` a laptop reports.
+ *
+ * A PostHog project is one silo of data, so `pnpm dev` against a real key puts
+ * the athlete you are testing with in the same Persons list as the people
+ * actually using the app. Nothing in an event says where it came from unless we
+ * put it there; this is that property, and it is what a `environment =
+ * production` filter on the Persons list and the project's "Filter out internal
+ * and test users" setting both read.
+ *
+ * `VITE_APP_ENV` overrides it, because a staging deploy is a production *build*
+ * — Vite's own mode can't tell the two apart, and the API makes the same
+ * distinction with `APP_ENV`.
+ *
+ * A separate PostHog project for development is stronger than a property: the
+ * data never arrives at all. This doesn't replace that — it is what keeps the
+ * project honest without one. See the README.
+ */
+const environment =
+  import.meta.env.VITE_APP_ENV ||
+  // `MODE` is Vite's own build mode, not a value read from the environment, so
+  // turbo's `env` list has nothing to say about it — `vite build --mode` is
+  // what sets it, and that is part of the command, not of the cache key.
+  // eslint-disable-next-line turbo/no-undeclared-env-vars
+  import.meta.env.MODE;
+
 /** False on a fresh clone, in tests, and in any deploy without a key. */
 export const posthogEnabled = Boolean(key);
 
@@ -46,6 +73,10 @@ export function initPostHog(): void {
     // this off, `getSurveys` never answers.
     disable_surveys: false,
   });
+
+  // A super property: every event from this browser carries it, including the
+  // anonymous `$pageview`s and autocaptures that happen before anyone signs in.
+  posthog.register({ environment });
 }
 
 /**
@@ -55,7 +86,11 @@ export function initPostHog(): void {
  */
 export function identifyAthlete(id: string, name: string | null): void {
   if (!posthogEnabled) return;
-  posthog.identify(id, name ? { name } : undefined);
+  // On the *person*, not just the events: the Persons list filters on person
+  // properties, and "show me production's athletes" is the question it is
+  // asked. Set rather than set-once, so someone who is both a real athlete and
+  // the one testing locally isn't stuck as `development`.
+  posthog.identify(id, { ...(name ? { name } : {}), environment });
 }
 
 /** Sign-out: the next athlete on this browser must not inherit the last one. */

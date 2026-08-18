@@ -118,6 +118,42 @@ describe("with a project key", () => {
     vi.unstubAllEnvs();
     vi.resetModules();
   });
+
+  /**
+   * The one thing that tells a laptop's test athletes apart from the people
+   * actually using the app — they share a PostHog project, and nothing else in
+   * an event says which deploy it came from.
+   */
+  it("stamps the environment on every event and on the athlete", async () => {
+    vi.stubEnv("VITE_POSTHOG_KEY", "phc_test");
+    vi.stubEnv("VITE_APP_ENV", "staging");
+    vi.resetModules();
+
+    const posthogJs = (await import("posthog-js")).default;
+    vi.spyOn(posthogJs, "init").mockImplementation(() => posthogJs);
+    const register = vi
+      .spyOn(posthogJs, "register")
+      .mockImplementation(() => undefined);
+    const identify = vi
+      .spyOn(posthogJs, "identify")
+      .mockImplementation(() => undefined);
+    const { initPostHog, identifyAthlete } = await import("@/lib/posthog");
+
+    initPostHog();
+    identifyAthlete("athlete-1", "Ayoub");
+
+    // A super property, so the anonymous pageviews before anyone signs in
+    // carry it too.
+    expect(register).toHaveBeenCalledWith({ environment: "staging" });
+    // And on the person, which is what the Persons list filters on.
+    expect(identify).toHaveBeenCalledWith("athlete-1", {
+      name: "Ayoub",
+      environment: "staging",
+    });
+
+    vi.unstubAllEnvs();
+    vi.resetModules();
+  });
 });
 
 describe("coach feedback", () => {

@@ -22,6 +22,11 @@ ARG NEXT_PUBLIC_POSTHOG_KEY
 ENV NEXT_PUBLIC_POSTHOG_KEY=$NEXT_PUBLIC_POSTHOG_KEY
 ARG NEXT_PUBLIC_POSTHOG_HOST
 ENV NEXT_PUBLIC_POSTHOG_HOST=$NEXT_PUBLIC_POSTHOG_HOST
+# Which deploy the events say they came from. `next build` reports `production`
+# for every image built here, which is right for production and wrong for a
+# staging or local stack — this is how those say so.
+ARG NEXT_PUBLIC_APP_ENV
+ENV NEXT_PUBLIC_APP_ENV=$NEXT_PUBLIC_APP_ENV
 # This page's own origin. It goes into the canonical and hreflang tags, which
 # have to be absolute — a wrong one points search engines at the wrong host.
 ARG NEXT_PUBLIC_SITE_URL

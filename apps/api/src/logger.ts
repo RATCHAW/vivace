@@ -38,8 +38,17 @@ const streamLevel: LogLevel = (LEVELS as readonly string[]).includes(level)
   ? (level as LogLevel)
   : "trace";
 
-/** Distinguishes deployments in Loki — `{service="api", env="production"}`. */
-const env = process.env.APP_ENV ?? process.env.NODE_ENV ?? "development";
+/**
+ * Which deploy this process is.
+ *
+ * Distinguishes deployments in Loki — `{service="api", env="production"}` — and
+ * exported because PostHog needs the same answer: every event carries it as
+ * `environment`, which is what keeps a laptop's test athletes out of
+ * production's numbers (see posthog.ts). One definition, so the two can't
+ * disagree about which deploy a request came from.
+ */
+export const appEnv =
+  process.env.APP_ENV ?? process.env.NODE_ENV ?? "development";
 
 /**
  * Field paths that must never reach a log sink. `redact` matches whole paths,
@@ -73,7 +82,7 @@ function buildStreams(): StreamEntry[] {
   // Docker, CI and any log collector want the JSON.
   const usePretty = process.env.LOG_PRETTY
     ? process.env.LOG_PRETTY !== "false"
-    : env !== "production" && process.stdout.isTTY;
+    : appEnv !== "production" && process.stdout.isTTY;
 
   const streams: StreamEntry[] = [
     {
@@ -106,7 +115,7 @@ function buildStreams(): StreamEntry[] {
       // Loki indexes labels, so only ever put bounded-cardinality values here.
       // `event`, `route` and `userId` stay in the JSON body and are queried
       // with `| json | event="…"` — as labels they would explode the index.
-      labels: { app: "vivace", service: "api", env },
+      labels: { app: "vivace", service: "api", env: appEnv },
       propsToLabels: ["level"],
       batching: { interval: 2, maxBufferSize: 10_000 },
       // A dropped batch is worth a stderr line: silent log loss is worse than
@@ -122,7 +131,7 @@ function buildStreams(): StreamEntry[] {
 function createLogger(): Logger {
   const options = {
     level,
-    base: { service: "api", env },
+    base: { service: "api", env: appEnv },
     // Ship the level as "info"/"error", not 30/50 — Loki filters on the string.
     //
     // This is also why the streams are composed here rather than handed to
