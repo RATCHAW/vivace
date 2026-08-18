@@ -14,10 +14,14 @@ import {
   duoClock,
   duoDrawnAt,
   duoFrame,
+  duoOutro,
   duoRunners,
+  DUO_DRAW_FROM,
+  DUO_DRAW_TO,
   DUO_ROUTE_PADDING,
 } from "./duo";
 import { CREDIT_SIZE, DuoOverlay, StoryProgress, Watermark } from "./overlay";
+import { DuoOutroCards } from "./outro";
 
 // A type alias, not an interface — Remotion's <Composition> needs props
 // assignable to Record<string, unknown>, which interfaces never are.
@@ -35,13 +39,6 @@ export type DuoReplayProps = {
   athleteName: string;
 };
 
-// The draw is the whole film: it opens holding on the start line for a beat and
-// finishes early, so both completed routes hold under the final numbers — the
-// frame a story is paused on. Fractions rather than frames, because the length
-// is handed over at runtime and a plan laid out in frames would end on black.
-const DRAW_FROM = 0.06;
-const DRAW_TO = 0.92;
-
 /**
  * The replay, run twice at once.
  *
@@ -49,6 +46,13 @@ const DRAW_TO = 0.92;
  * of it, so the dot on the map and the pace under it belong to the same second
  * of the same athlete's run. See `duo.ts`: everything hard about this template
  * is the clock, and everything on screen is read off it.
+ *
+ * The last three and a half seconds are a second movement: the draw is over,
+ * the map goes out of focus, and the film rebuilds itself into a card — the
+ * mark and the title to the middle, each runner's name and fill out of the
+ * bottom band and up under their own face. The window is `DUO_OUTRO_FROM`, and
+ * `duoOutro` is the only thing that knows what is moving; nothing below reads
+ * the frame counter for it.
  */
 export function DuoReplay({
   activity,
@@ -64,10 +68,10 @@ export function DuoReplay({
   // Where the film is, 0–1. The story bar reads the same value.
   const t = Math.min(1, frame / Math.max(1, durationInFrames - 1));
 
-  const drawStart = Math.round(DRAW_FROM * durationInFrames);
+  const drawStart = Math.round(DUO_DRAW_FROM * durationInFrames);
   const drawEnd = Math.max(
     drawStart + 1,
-    Math.round(DRAW_TO * durationInFrames),
+    Math.round(DUO_DRAW_TO * durationInFrames),
   );
   const drawFrames = drawEnd - drawStart;
   const drawProgress = clamp01((frame - drawStart) / drawFrames);
@@ -118,27 +122,47 @@ export function DuoReplay({
   // one; released past 1, so the closing frame still holds the final numbers.
   const hudOpacity = envelope(t, 0, 1.02, 0.03, 0.01);
 
+  const outro = duoOutro(t);
+
   return (
     <AbsoluteFill style={{ backgroundColor: "#000000", color: "#ffffff" }}>
       {/* The map plate is the film — it stays mounted and lit for every frame;
           remounting it would cost a Mapbox style load mid-video. */}
-      <AbsoluteFill>
-        {hasMap ? (
-          <RouteMap
-            layers={layers}
-            camera={cameraAtProgress(track, drawProgress)}
-            token={mapboxToken}
-            width={width}
-            height={height}
-          />
-        ) : hasRoute ? (
-          <RouteCanvas
-            layers={layers}
-            width={width}
-            height={height}
-            padding={DUO_ROUTE_PADDING}
-          />
-        ) : null}
+      <AbsoluteFill style={{ overflow: "hidden" }}>
+        {/* The blur is what puts the closing card in front of the run rather
+            than on top of it. Applied only once it is worth anything: a filter
+            of `blur(0px)` still promotes the plate to its own layer and has
+            Chromium re-rasterise 1080×1920 on every frame of the replay. The
+            plate is pushed slightly past the frame at the same time, because a
+            blur pulls in the transparency outside it and would otherwise draw
+            its own soft border around the video. */}
+        <AbsoluteFill
+          style={
+            outro.veil > 0
+              ? {
+                  filter: `blur(${outro.veil * 20}px)`,
+                  transform: `scale(${1 + outro.veil * 0.06})`,
+                }
+              : undefined
+          }
+        >
+          {hasMap ? (
+            <RouteMap
+              layers={layers}
+              camera={cameraAtProgress(track, drawProgress)}
+              token={mapboxToken}
+              width={width}
+              height={height}
+            />
+          ) : hasRoute ? (
+            <RouteCanvas
+              layers={layers}
+              width={width}
+              height={height}
+              padding={DUO_ROUTE_PADDING}
+            />
+          ) : null}
+        </AbsoluteFill>
 
         {/* Scrims keep type legible over the map without breaking the
             no-drop-shadow rule — elevation via canvas luminance only. The
@@ -166,6 +190,15 @@ export function DuoReplay({
           }}
         />
 
+        {/* The card's own canvas. The blur alone leaves the run legible enough
+            to compete with the numbers standing in front of it. */}
+        <AbsoluteFill
+          style={{
+            backgroundColor: "#000000",
+            opacity: outro.veil * 0.55,
+          }}
+        />
+
         {hasMap && (
           <div
             style={{
@@ -181,8 +214,18 @@ export function DuoReplay({
         )}
       </AbsoluteFill>
 
-      <DuoOverlay activity={activity} frames={frames} opacity={hudOpacity} />
-      <Watermark />
+      {/* Under the overlay, deliberately: the name and the fill travel out of
+          the running layout and land *on* their card, so the layer they land on
+          has to be drawn first. */}
+      <DuoOutroCards frames={frames} plan={outro} />
+
+      <DuoOverlay
+        activity={activity}
+        frames={frames}
+        opacity={hudOpacity}
+        outro={outro}
+      />
+      <Watermark move={outro.move} />
       <StoryProgress progress={t} />
     </AbsoluteFill>
   );

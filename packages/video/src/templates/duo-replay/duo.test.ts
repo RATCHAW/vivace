@@ -4,7 +4,7 @@ import {
   cameraAtProgress,
   projectPoint,
 } from "../../core/camera";
-import { withinSafeArea } from "../../core/layout";
+import { PAGE_INSET, withinSafeArea } from "../../core/layout";
 import { RUNNER_CLEARANCE } from "../../core/marker";
 import {
   asPartner,
@@ -18,21 +18,40 @@ import {
   duoBarFill,
   duoClock,
   duoDrawnAt,
+  duoFillBox,
   duoFrame,
+  duoHeadlineBox,
+  duoNumbersWidth,
+  duoOutro,
+  duoOutroMetric,
   duoRunners,
   hasObscuredStart,
   progressAtSeconds,
   runSeconds,
+  DUO_BAR_HEIGHT,
+  DUO_DRAW_FROM,
+  DUO_DRAW_TO,
   DUO_INK,
+  DUO_OUTRO_BOX,
+  DUO_OUTRO_CARD_HEIGHT,
+  DUO_OUTRO_CARD_TOP,
+  DUO_OUTRO_COLUMN_LEFT,
+  DUO_OUTRO_COLUMN_WIDTH,
+  DUO_OUTRO_FROM,
+  DUO_OUTRO_GAP,
+  DUO_OUTRO_TRAVEL,
   DUO_ROUTE_PADDING,
   DUO_ROWS_BOX,
+  DUO_ROW_HEIGHT,
+  DUO_ROW_TOPS,
   DUO_TITLE_TOP,
 } from "./duo";
 
 const { fps, durationInFrames, width, height } = getTemplate("duo-replay");
 // The template's own draw window, spelled the way the composition computes it.
 const DRAW_FRAMES =
-  Math.round(0.92 * durationInFrames) - Math.round(0.06 * durationInFrames);
+  Math.round(DUO_DRAW_TO * durationInFrames) -
+  Math.round(DUO_DRAW_FROM * durationInFrames);
 
 const pair = (name = "Marianne") =>
   duoRunners(
@@ -344,5 +363,139 @@ describe("the layout", () => {
     expect(
       height - DUO_ROUTE_PADDING.top - DUO_ROUTE_PADDING.bottom,
     ).toBeGreaterThan(400);
+  });
+});
+
+describe("the closing card", () => {
+  it("keeps the whole card inside the story's safe area", () => {
+    // The frame the film is paused on, and the one somebody screenshots. A
+    // number under the reply bar is a number nobody reads.
+    expect(withinSafeArea(DUO_OUTRO_BOX)).toBe(true);
+  });
+
+  it("gives the two columns the same gutter the rows had", () => {
+    const [left, right] = DUO_OUTRO_COLUMN_LEFT;
+    expect(left).toBe(PAGE_INSET);
+    expect(right - (left + DUO_OUTRO_COLUMN_WIDTH)).toBe(DUO_OUTRO_GAP);
+    // The two columns and the gap between them fill the measure exactly, so the
+    // card reads against the same left and right edges as the replay did.
+    expect(right + DUO_OUTRO_COLUMN_WIDTH).toBe(width - left);
+  });
+
+  it("is over and held before the film ends", () => {
+    // A move still running on the last frame is a film that ends mid-gesture.
+    expect(DUO_OUTRO_FROM + DUO_OUTRO_TRAVEL).toBeLessThan(0.9);
+    // …and it starts after the draw has finished, not over the top of it.
+    expect(DUO_OUTRO_FROM).toBeGreaterThan(DUO_DRAW_TO);
+  });
+
+  it("leaves the replay untouched until its own window", () => {
+    for (const t of [0, 0.4, DUO_DRAW_TO, DUO_OUTRO_FROM]) {
+      const plan = duoOutro(t);
+      // Not `toBe(0)`: the easings are polynomials, and one of them lands a
+      // rounding error either side of zero at exactly this frame.
+      for (const [part, value] of Object.entries({
+        move: plan.move,
+        veil: plan.veil,
+        rowsOut: plan.rowsOut,
+        ...Object.fromEntries(plan.cardIn.map((v, i) => [`cardIn${i}`, v])),
+        ...Object.fromEntries(plan.avatarIn.map((v, i) => [`avatarIn${i}`, v])),
+      })) {
+        expect(value, `${part} at ${t}`).toBeCloseTo(0, 9);
+      }
+    }
+  });
+
+  it("has every part of the move landed by the final frame", () => {
+    const plan = duoOutro(1);
+    expect(plan.move).toBe(1);
+    expect(plan.veil).toBe(1);
+    expect(plan.rowsOut).toBe(1);
+    expect(plan.cardIn).toEqual([1, 1]);
+    // The faces overshoot on their way in and settle back onto 1.
+    expect(plan.avatarIn).toEqual([1, 1]);
+  });
+
+  it("moves every part exactly once, and only forwards", () => {
+    // Anything that goes back on itself reads as a stutter, and this is the one
+    // gesture in the film with four things moving at the same time.
+    let previous = duoOutro(0);
+    for (let i = 1; i <= 200; i += 1) {
+      const plan = duoOutro(i / 200);
+      expect(plan.move).toBeGreaterThanOrEqual(previous.move);
+      expect(plan.veil).toBeGreaterThanOrEqual(previous.veil);
+      expect(plan.rowsOut).toBeGreaterThanOrEqual(previous.rowsOut);
+      expect(plan.cardIn[0]).toBeGreaterThanOrEqual(previous.cardIn[0]);
+      expect(plan.cardIn[1]).toBeGreaterThanOrEqual(previous.cardIn[1]);
+      previous = plan;
+    }
+  });
+
+  it("empties the running row of numbers before the card's land on it", () => {
+    // The same three numbers dissolving through themselves at two sizes is the
+    // one way this move could read as a mistake. The plate underneath arrives
+    // whenever it likes — it is empty — but a number in it may not.
+    const at = (share: number) =>
+      duoOutro(DUO_OUTRO_FROM + DUO_OUTRO_TRAVEL * share);
+    expect(at(0.32 + 1e-4).rowsOut).toBe(1);
+    for (let card = 0; card < 2; card += 1) {
+      for (let order = 0; order < 3; order += 1) {
+        expect(duoOutroMetric(at(0.32), card, order)).toBeCloseTo(0, 9);
+      }
+    }
+    // …and the empty plate is up in time to catch the fill travelling to it.
+    expect(at(0.32).cardIn[0]).toBeGreaterThan(0.5);
+  });
+
+  it("walks each name from its row to the head of its own column", () => {
+    [0, 1].forEach((index) => {
+      const start = duoHeadlineBox(index, 0);
+      const end = duoHeadlineBox(index, 1);
+      // Both rows start on the same full-width measure…
+      expect(start.left).toBe(duoHeadlineBox(0, 0).left);
+      expect(start.top).toBe(DUO_ROW_TOPS[index]);
+      // …and end over their own column, level with each other.
+      expect(end.left).toBe(DUO_OUTRO_COLUMN_LEFT[index]);
+      expect(width - end.right - end.left).toBe(DUO_OUTRO_COLUMN_WIDTH);
+      expect(end.top).toBe(duoHeadlineBox(0, 1).top);
+    });
+  });
+
+  it("splits the two fills apart into the feet of the two cards", () => {
+    const [you, partner] = [duoFillBox(0, 1), duoFillBox(1, 1)];
+    // One leaves left and one leaves right — the rearrangement said in one
+    // element — and both land on the floor of their own plate.
+    expect(you.left).toBeLessThan(partner.left);
+    expect(you.top).toBe(partner.top);
+    expect(you.top + DUO_BAR_HEIGHT).toBeLessThan(
+      DUO_OUTRO_CARD_TOP + DUO_OUTRO_CARD_HEIGHT,
+    );
+    // Where they started: the foot of their row, on the full measure.
+    expect(duoFillBox(0, 0).top).toBe(
+      DUO_ROW_TOPS[0] + DUO_ROW_HEIGHT - DUO_BAR_HEIGHT,
+    );
+    expect(duoFillBox(0, 0).left).toBe(duoFillBox(1, 0).left);
+  });
+
+  it("keeps the title band clear of the mark it moves under", () => {
+    expect(DUO_OUTRO_BOX.top).toBe(DUO_TITLE_TOP);
+  });
+
+  it("still keeps a running name out of its own numbers", () => {
+    // The name travels, so it sits on its own layer and nothing pushes it any
+    // more. It is handed the room the numbers need instead, and a name too long
+    // for what is left has to be the thing that gives.
+    const runners = pair();
+    const [you] = duoFrame(runners, duoClock(runners), 1, fps, DRAW_FRAMES);
+    const numbers = duoNumbersWidth(you.live);
+    expect(numbers).toBeGreaterThan(400);
+
+    const box = duoHeadlineBox(0, 0, numbers);
+    expect(width - box.right).toBeLessThanOrEqual(width - PAGE_INSET - numbers);
+    // …and the room is given back on the way to the card, where the numbers
+    // are underneath rather than beside.
+    expect(duoHeadlineBox(0, 1, numbers).right).toBe(
+      duoHeadlineBox(0, 1, 0).right,
+    );
   });
 });

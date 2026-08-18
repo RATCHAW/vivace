@@ -20,11 +20,17 @@ export function RunnerAvatar({
   x,
   y,
   ring,
+  size = RUNNER_AVATAR_SIZE,
+  ringWidth = RUNNER_AVATAR_RING,
 }: {
   src: string;
   x: number;
   y: number;
   ring: string;
+  /** Diameter. The trace's own puck, unless a template is showing the athlete
+   *  rather than tracking them — the duo replay's closing card is bigger. */
+  size?: number;
+  ringWidth?: number;
 }) {
   const { delayRender, continueRender } = useDelayRender();
   const [handle] = useState(() => delayRender("Loading the runner avatar"));
@@ -45,12 +51,12 @@ export function RunnerAvatar({
         position: "absolute",
         left: x,
         top: y,
-        width: RUNNER_AVATAR_SIZE,
-        height: RUNNER_AVATAR_SIZE,
+        width: size,
+        height: size,
         // Positioned by its centre, which is the point the camera tracks.
         transform: "translate(-50%, -50%)",
         borderRadius: "50%",
-        border: `${RUNNER_AVATAR_RING}px solid ${ring}`,
+        border: `${ringWidth}px solid ${ring}`,
         boxSizing: "border-box",
         // Strava's pictures are square, but a non-square one would letterbox.
         objectFit: "cover",
