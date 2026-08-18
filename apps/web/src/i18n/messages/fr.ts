@@ -69,6 +69,7 @@ export const fr: Translated<Messages> = {
   },
 
   soon: "Bientôt",
+  new: "Nouveau",
 
   login: {
     titleLine1: "Chaque course,",
@@ -244,6 +245,7 @@ export const fr: Translated<Messages> = {
     linkCopiedBody:
       "Envoyez-le à la personne avec qui vous avez couru. Elle confirme sa sortie, et la vidéo vous réunit tous les deux.",
     shareTitle: "Rejoignez ma vidéo de course",
+    hint: "Ajoutez ici votre partenaire de course",
     pendingTitle: "En attente de votre partenaire",
     pendingBody:
       "Le lien reste actif {{days}} jours. La personne qui l’ouvre confirme quelle sortie était la sienne.",

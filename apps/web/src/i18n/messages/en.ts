@@ -61,6 +61,7 @@ export const en = {
   },
 
   soon: "Soon",
+  new: "New",
 
   login: {
     titleLine1: "Every run,",
@@ -260,6 +261,10 @@ export const en = {
     linkCopiedBody:
       "Send it to the person you ran with. They confirm their run, and the video has you both.",
     shareTitle: "Be in my run video",
+    /** The phone's callout on the Options tile, where the invitation lives.
+     *  One line: it is a tooltip on a 9:16 screen, and the tile it points at is
+     *  a quarter of the film's width. */
+    hint: "Add who you ran with in here",
     /** What the sheet says once a link exists. */
     pendingTitle: "Waiting on your running partner",
     pendingBody:

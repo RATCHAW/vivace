@@ -30,6 +30,7 @@ import {
 } from "@/api";
 import { useFormatters } from "@/i18n/format";
 import { InviteControls } from "@/components/invite-controls";
+import { InviteHint } from "@/components/invite-hint";
 import { MonoLabel } from "@/components/mono";
 import { RenderControls } from "@/components/render-controls";
 import { filmFrame, RunPlayer } from "@/components/run-player";
@@ -233,6 +234,11 @@ export function RunStudio({
   // failed, opens the film with the lane empty, which is what it draws anyway.
   const awaitingPartnerData =
     takesPartner && partnerState === undefined && !partnerError;
+  // The same emptiness the download refuses, once the answer is actually in
+  // rather than in flight — which is what the phone marks on its Options tile,
+  // because there the invitation is behind an icon rather than in view. See
+  // `InviteHint`.
+  const secondLaneEmpty = missingPartner && !awaitingPartnerData;
   const hasOptions = entry.supportsTheme || avatarSupported;
   // What the phone's Options tile opens: the switches, and the invitation on a
   // cut that takes two runners — a template that honours neither and asks
@@ -447,17 +453,32 @@ export function RunStudio({
                 share sheet — and stopped fitting the moment the athlete could
                 also be waiting on an answer, ask for it, or take somebody back
                 out. Those are states with sentences, and the sheet is where the
-                phone keeps everything that has one. */}
-            <Button
-              size="icon-fill"
-              variant="subtle"
-              aria-label={t("videoOptions.section")}
-              aria-expanded={optionsOpen}
-              disabled={!hasSheet}
-              onClick={() => setOptionsOpen(true)}
+                phone keeps everything that has one.
+
+                Which leaves a sliders icon standing for the only way to fill a
+                lane the athlete can see is empty, so it carries a dot while it
+                does — and says why once, on arrival. The dot outlives the
+                sentence: it is the state, where the callout is the moment. */}
+            <InviteHint
+              show={secondLaneEmpty && !optionsOpen}
+              activityId={run.id}
             >
-              <SlidersHorizontalIcon />
-            </Button>
+              <Button
+                size="icon-fill"
+                variant="subtle"
+                aria-label={t("videoOptions.section")}
+                aria-expanded={optionsOpen}
+                disabled={!hasSheet}
+                onClick={() => setOptionsOpen(true)}
+              >
+                <span className="relative">
+                  <SlidersHorizontalIcon />
+                  {secondLaneEmpty && (
+                    <span className="bg-brand animate-in fade-in zoom-in-75 absolute -top-1 -right-1.5 size-1.5 rounded-full" />
+                  )}
+                </span>
+              </Button>
+            </InviteHint>
 
             {render("tile")}
           </div>
