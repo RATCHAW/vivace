@@ -22,6 +22,7 @@ import {
 } from "@repo/video";
 import { getRunStreamsOptions, getStravaAthleteOptions, type Run } from "@/api";
 import { useFormatters } from "@/i18n/format";
+import { InviteControls } from "@/components/invite-controls";
 import { MonoLabel } from "@/components/mono";
 import { RenderControls } from "@/components/render-controls";
 import { filmFrame, RunPlayer } from "@/components/run-player";
@@ -315,13 +316,13 @@ export function RunStudio({
           {stage}
 
           {/* Everything the athlete can do with the film they are watching, on
-              one row measured off the film itself. Icons alone: at four across
+              one row measured off the film itself. Icons alone: at five across
               the width of a 9:16 phone film there is no room for a word, and a
               row that wrapped would take another slice out of the picture.
               Download is the loud pill because it is what they came to do; the
-              other three are the ring of secondary controls around it. */}
+              other four are the ring of secondary controls around it. */}
           <div
-            className="relative grid w-full shrink-0 grid-cols-4 gap-2"
+            className="relative grid w-full shrink-0 grid-cols-5 gap-2"
             style={railWidth}
           >
             <Button
@@ -347,6 +348,16 @@ export function RunStudio({
             >
               <SparklesIcon />
             </Button>
+
+            {/* Beside Share rather than behind the options sheet: bringing the
+                person you ran with is something you do *with* the film, like
+                sending it, not a setting that shapes it. */}
+            <InviteControls
+              key={`invite:${run.id}`}
+              activityId={run.id}
+              runName={run.name}
+              layout="tile"
+            />
 
             <Button
               size="icon-fill"
@@ -413,6 +424,12 @@ export function RunStudio({
         <MonoLabel>{t("videoOptions.section")}</MonoLabel>
         {options}
         {render("panel")}
+        <InviteControls
+          key={`invite:${run.id}`}
+          activityId={run.id}
+          runName={run.name}
+          layout="panel"
+        />
       </aside>
     </div>
   );

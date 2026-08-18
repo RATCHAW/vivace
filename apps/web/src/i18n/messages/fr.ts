@@ -229,6 +229,69 @@ export const fr: Translated<Messages> = {
     },
   },
 
+  invite: {
+    action: "Ajouter votre partenaire de course",
+    actionShort: "Inviter",
+    creating: "Création du lien…",
+    createFailed: "Impossible de créer le lien d’invitation",
+    linkCopied: "Lien d’invitation copié",
+    linkCopiedBody:
+      "Envoyez-le à la personne avec qui vous avez couru. Elle confirme sa sortie, et la vidéo vous réunit tous les deux.",
+    shareTitle: "Rejoignez ma vidéo de course",
+    pendingTitle: "En attente de votre partenaire",
+    pendingBody:
+      "Le lien reste actif {{days}} jours. La personne qui l’ouvre confirme quelle sortie était la sienne.",
+    copyAgain: "Copier le lien à nouveau",
+    revoke: "Annuler l’invitation",
+    revokeFailed: "Impossible d’annuler l’invitation",
+    acceptedTitle: "{{name}} est de la partie",
+    acceptedBody: "Sa sortie est confirmée. Rien d’autre à faire.",
+    declinedTitle: "{{name}} a refusé",
+    declinedBody:
+      "Rien n’a été partagé. Vous pouvez inviter quelqu’un d’autre.",
+    expiredTitle: "Ce lien a expiré",
+    expiredBody: "Vous pouvez en créer un nouveau quand vous voulez.",
+
+    accept: {
+      loading: "Ouverture de l’invitation…",
+      invalidTitle: "Cette invitation n’est pas valide",
+      invalidBody:
+        "Le lien a peut-être été retiré, déjà utilisé, ou mal recopié. Demandez-en un nouveau.",
+      title: "{{name}} veut vous voir dans sa vidéo de course",
+      runLine: "{{name}} · {{date}} · {{distance}} km · {{duration}}",
+      whatHappens:
+        "Vivace crée une courte vidéo à partir d’une sortie. Pour vous y intégrer, il nous faut votre sortie depuis votre propre Strava — vous devez donc vous connecter avec Strava.",
+      connect: "Continuer avec Strava",
+      decline: "Non merci",
+      declineFailed: "Impossible de refuser cette invitation",
+
+      pickTitle: "Quelle sortie était la vôtre ?",
+      pickBody: "Choisissez la sortie que vous avez faite ensemble.",
+      pickEmptyTitle: "Aucune sortie correspondante",
+      pickEmptyBody:
+        "Rien dans votre Strava ne correspond à ce jour et à cette heure. Si vous l’avez enregistrée ailleurs, il n’y a rien à associer ici.",
+      pickFailed: "Impossible de lire vos sorties",
+
+      consent:
+        "J’accepte que la distance, le temps, l’allure et le tracé de ma sortie apparaissent dans la vidéo de {{name}}.",
+      confirm: "Créer la vidéo ensemble",
+      confirming: "Configuration…",
+      confirmFailed: "Impossible d’accepter cette invitation",
+
+      doneTitle: "C’est fait",
+      doneBody:
+        "{{name}} peut maintenant créer la vidéo avec vos deux sorties. Vous la retrouverez aussi dans vos propres replays.",
+      goToApp: "Voir mes replays",
+
+      closedTitle: "Cette invitation est close",
+      closedBody: "Elle a déjà reçu une réponse, a été retirée, ou a expiré.",
+      ownTitle: "C’est votre propre invitation",
+      ownBody: "Envoyez plutôt le lien à la personne avec qui vous avez couru.",
+      withdrawNote:
+        "Vous changez d’avis plus tard ? Déconnecter Strava de Vivace retire aussi cet accord.",
+    },
+  },
+
   render: {
     loadErrorTitle: "Impossible de charger l’état de la vidéo",
     preparing: "Préparation de votre vidéo…",

@@ -21,6 +21,7 @@ import { captureServerException, isFeatureEnabledFor } from "./posthog.js";
 import { observeTurn, POSTHOG_SESSION_HEADER } from "./ai-observability.js";
 import { identify, requestLogger, type AppEnv } from "./request-logger.js";
 import {
+  AcceptRunInviteSchema,
   AthleteSchema,
   ClientLogAcceptedSchema,
   ClientLogBatchSchema,
@@ -35,6 +36,11 @@ import {
   ErrorSchema,
   HealthSchema,
   PlanProgressSchema,
+  RunInviteCandidatesSchema,
+  RunInviteListSchema,
+  RunInvitePreviewSchema,
+  RunInviteSchema,
+  type RunInvite,
   RunRenderOptionsSchema,
   type RunRenderOptions,
   RunRenderStateSchema,
@@ -64,6 +70,18 @@ import {
   toRunRender,
   updateRunRender,
 } from "./render-store.js";
+import {
+  acceptInvite,
+  createInvite,
+  declineInvite,
+  getInvite,
+  isOpen,
+  listInvitesForRun,
+  revokeAllForUser,
+  revokeInvite,
+  type InviteRow,
+} from "./invite-store.js";
+import { rankCandidates } from "./pairing.js";
 import {
   attachedRun,
   COACH_NOT_CONFIGURED,
@@ -129,6 +147,11 @@ export const openAPIConfig = {
     {
       name: "Runs",
       description: "The signed-in athlete's runs and their streams",
+    },
+    {
+      name: "Invites",
+      description:
+        "Inviting another athlete who ran the same run to appear in its video",
     },
     { name: "Coach", description: "Conversations with the AI running coach" },
     {
@@ -879,6 +902,541 @@ app.openapi(runRenderProgressRoute, async (c) => {
   });
 });
 
+// --- Invites ------------------------------------------------------------------
+//
+// Two athletes end up in one film by one of them sending a link and the other
+// answering it. There is no friendship here and no follower list, deliberately:
+// Strava's API exposes no social graph to read one from, and an invitation
+// scoped to a single run is both the smallest thing that works and the clearest
+// consent — the invitee agrees to *this* video, not to a standing relationship.
+//
+// The link is also the only way the film can exist at all. A second runner's
+// pace is readable only with that runner's own Strava token, so the invitation
+// is the data dependency rather than a growth channel bolted onto one.
+
+const InviteTokenParamsSchema = z.object({
+  token: z
+    .string()
+    .min(20)
+    .max(100)
+    .regex(/^[A-Za-z0-9_-]+$/)
+    .openapi({
+      param: { name: "token", in: "path" },
+      example: "u4Hs1ZxK9pQ2mR7vT0nB3cJ6yL8wF5dG1aE4hS7kX0M",
+    }),
+});
+
+const INVITE_NOT_FOUND = "That invitation link is not valid.";
+const INVITE_CLOSED = "That invitation has already been answered or expired.";
+const INVITE_OWN = "You can't accept your own invitation.";
+
+/** The stored row as the API serves it, resolving expiry against the clock. */
+function toRunInvite(
+  row: InviteRow,
+  inviteeName: string | null = null,
+): RunInvite {
+  return {
+    token: row.token,
+    activity_id: row.inviterActivityId,
+    status: isOpen(row) || row.status !== "pending" ? row.status : "expired",
+    // First name only: this is a label beside "accepted", not a profile.
+    invitee_name: inviteeName ? (inviteeName.split(" ")[0] ?? null) : null,
+    invitee_activity_id: row.inviteeActivityId,
+    expires_at: row.expiresAt.toISOString(),
+    responded_at: row.respondedAt?.toISOString() ?? null,
+    created_at: row.createdAt.toISOString(),
+  };
+}
+
+const createRunInviteRoute = createRoute({
+  method: "post",
+  path: "/api/runs/{id}/invite",
+  operationId: "createRunInvite",
+  tags: ["Invites"],
+  summary: "Invite someone who ran this run to appear in its video",
+  description:
+    "Mints a link the athlete sends themselves, through whatever they already " +
+    "message people with. This API never contacts the invitee: Strava's API " +
+    "terms forbid using its materials to initiate contact with a Strava user, " +
+    "and there is no address to send to anyway. A run that already has a live " +
+    "unanswered link returns that one rather than a second — every extra token " +
+    "would be another standing permission to view the run.",
+  security: [{ sessionCookie: [] }],
+  request: { params: RunIdParamsSchema },
+  responses: {
+    200: {
+      description:
+        "The invitation. `token` goes in the link the athlete sends.",
+      content: { "application/json": { schema: RunInviteSchema } },
+    },
+    401: {
+      description: "No valid session.",
+      content: { "application/json": { schema: ErrorSchema } },
+    },
+    403: {
+      description:
+        "The stored Strava token lacks the activity:read scope; sign out and back in.",
+      content: { "application/json": { schema: ErrorSchema } },
+    },
+    404: {
+      description: "No such run on the signed-in athlete's account.",
+      content: { "application/json": { schema: ErrorSchema } },
+    },
+    502: {
+      description: "Strava rejected or failed the upstream request.",
+      content: { "application/json": { schema: ErrorSchema } },
+    },
+  },
+});
+
+app.openapi(createRunInviteRoute, async (c) => {
+  const session = await currentUser(c);
+  if (!session) return c.json({ error: "Not signed in" }, 401);
+
+  const accessToken = await stravaAccessToken(c, session.user.id);
+  if (!accessToken) return c.json({ error: "No Strava access token" }, 401);
+
+  const activityId = Number(c.req.valid("param").id);
+
+  // Read the run before minting anything. Strava answers an activity by id only
+  // to the token that owns it, so this *is* the ownership check — without it an
+  // athlete could hand out a link naming a run that isn't theirs, and the
+  // invitee would be shown a preview built from somebody else's account.
+  try {
+    await fetchRun(accessToken, activityId);
+  } catch (err) {
+    logStravaFailure(c, err, "fetch the run to invite on");
+    if (err instanceof StravaApiError) {
+      if (err.status === 404) return c.json({ error: INVITE_NOT_FOUND }, 404);
+      if (err.status === 401 || err.status === 403) {
+        return c.json({ error: MISSING_SCOPE_ERROR }, 403);
+      }
+      return c.json({ error: err.message }, 502);
+    }
+    throw err;
+  }
+
+  const { invite, reused } = await createInvite({
+    inviterUserId: session.user.id,
+    inviterActivityId: activityId,
+  });
+  track(
+    c,
+    "invite.created",
+    { activityId, reused },
+    reused ? "Reused the run's live invitation" : "Created a run invitation",
+  );
+  return c.json(toRunInvite(invite), 200);
+});
+
+const listRunInvitesRoute = createRoute({
+  method: "get",
+  path: "/api/runs/{id}/invites",
+  operationId: "listRunInvites",
+  tags: ["Invites"],
+  summary: "List the invitations sent for this run",
+  description:
+    "Every invitation the signed-in athlete has sent for this run, newest " +
+    "first — which is what lets the studio say whether anyone has answered. " +
+    "A link nobody answered before it lapsed reads `expired`.",
+  security: [{ sessionCookie: [] }],
+  request: { params: RunIdParamsSchema },
+  responses: {
+    200: {
+      description: "The run's invitations.",
+      content: { "application/json": { schema: RunInviteListSchema } },
+    },
+    401: {
+      description: "No valid session.",
+      content: { "application/json": { schema: ErrorSchema } },
+    },
+  },
+});
+
+app.openapi(listRunInvitesRoute, async (c) => {
+  const session = await currentUser(c);
+  if (!session) return c.json({ error: "Not signed in" }, 401);
+
+  const rows = await listInvitesForRun(
+    session.user.id,
+    Number(c.req.valid("param").id),
+  );
+  return c.json(
+    { invites: rows.map((row) => toRunInvite(row.invite, row.inviteeName)) },
+    200,
+  );
+});
+
+const getRunInviteRoute = createRoute({
+  method: "get",
+  path: "/api/invites/{token}",
+  operationId: "getRunInvite",
+  tags: ["Invites"],
+  summary: "Preview an invitation (no session required)",
+  description:
+    "What the holder of a link is shown before they sign in — who is asking " +
+    "and which run, and nothing else. Deliberately unauthenticated: the whole " +
+    "point of the link is that it reaches somebody who does not have an " +
+    "account yet, and requiring one first would ask them to authorise us " +
+    "before telling them what for. The token is the credential.",
+  request: { params: InviteTokenParamsSchema },
+  responses: {
+    200: {
+      description: "The invitation, as much of it as an outsider may see.",
+      content: { "application/json": { schema: RunInvitePreviewSchema } },
+    },
+    404: {
+      description: "No invitation with that token.",
+      content: { "application/json": { schema: ErrorSchema } },
+    },
+    502: {
+      description: "Strava rejected or failed the upstream request.",
+      content: { "application/json": { schema: ErrorSchema } },
+    },
+  },
+});
+
+app.openapi(getRunInviteRoute, async (c) => {
+  const { token } = c.req.valid("param");
+  const invite = await getInvite(token);
+  if (!invite) return c.json({ error: INVITE_NOT_FOUND }, 404);
+
+  // Read with the *inviter's* token: it is their run, and the holder of the
+  // link has no Strava grant of their own yet — that is what they are here to
+  // be asked for.
+  const accessToken = await stravaTokenFor(invite.inviterUserId);
+  if (!accessToken) {
+    c.get("log").warn(
+      { event: "invite.inviter_token_missing", token },
+      "The inviter's Strava grant is gone",
+    );
+    return c.json({ error: INVITE_NOT_FOUND }, 404);
+  }
+
+  try {
+    const [run, athlete] = await Promise.all([
+      fetchRun(accessToken, invite.inviterActivityId),
+      fetchAthlete(accessToken),
+    ]);
+    return c.json(
+      {
+        status: toRunInvite(invite).status,
+        inviter_name: athlete.firstname,
+        run_name: run.name,
+        // The run's own local day — never the reader's, who may be anywhere.
+        run_date: run.start_date_local.slice(0, 10),
+        run_distance: run.distance,
+        run_moving_time: Math.round(run.moving_time),
+        expires_at: invite.expiresAt.toISOString(),
+      },
+      200,
+    );
+  } catch (err) {
+    logStravaFailure(c, err, "fetch the invited run");
+    if (err instanceof StravaApiError) {
+      // The run was deleted or hidden since the link went out. Nothing here is
+      // the reader's fault, but there is no invitation left to answer either.
+      if (err.status === 404) return c.json({ error: INVITE_NOT_FOUND }, 404);
+      return c.json({ error: err.message }, 502);
+    }
+    throw err;
+  }
+});
+
+const runInviteCandidatesRoute = createRoute({
+  method: "get",
+  path: "/api/invites/{token}/candidates",
+  operationId: "getRunInviteCandidates",
+  tags: ["Invites"],
+  summary: "My runs that could be the other half of this one",
+  description:
+    "The signed-in athlete's own runs, ranked by how much they overlap the " +
+    "invited run, best first. Ranking only orders the list — the athlete " +
+    "confirms which run was theirs, because they are the only one who knows. " +
+    "An empty list is a normal answer: they may have recorded nothing that " +
+    "day, or hidden their start times, and the client should let them say so.",
+  security: [{ sessionCookie: [] }],
+  request: { params: InviteTokenParamsSchema },
+  responses: {
+    200: {
+      description: "Candidate runs, best match first.",
+      content: { "application/json": { schema: RunInviteCandidatesSchema } },
+    },
+    401: {
+      description: "No valid session.",
+      content: { "application/json": { schema: ErrorSchema } },
+    },
+    403: {
+      description:
+        "The stored Strava token lacks the activity:read scope; sign out and back in.",
+      content: { "application/json": { schema: ErrorSchema } },
+    },
+    404: {
+      description: "No invitation with that token.",
+      content: { "application/json": { schema: ErrorSchema } },
+    },
+    409: {
+      description: "The invitation is answered, withdrawn, or expired.",
+      content: { "application/json": { schema: ErrorSchema } },
+    },
+    502: {
+      description: "Strava rejected or failed the upstream request.",
+      content: { "application/json": { schema: ErrorSchema } },
+    },
+  },
+});
+
+app.openapi(runInviteCandidatesRoute, async (c) => {
+  const session = await currentUser(c);
+  if (!session) return c.json({ error: "Not signed in" }, 401);
+
+  const { token } = c.req.valid("param");
+  const invite = await getInvite(token);
+  if (!invite) return c.json({ error: INVITE_NOT_FOUND }, 404);
+  if (!isOpen(invite)) return c.json({ error: INVITE_CLOSED }, 409);
+  if (invite.inviterUserId === session.user.id) {
+    return c.json({ error: INVITE_OWN }, 409);
+  }
+
+  const inviterToken = await stravaTokenFor(invite.inviterUserId);
+  if (!inviterToken) return c.json({ error: INVITE_NOT_FOUND }, 404);
+
+  const accessToken = await stravaAccessToken(c, session.user.id);
+  if (!accessToken) return c.json({ error: "No Strava access token" }, 401);
+
+  try {
+    const [target, mine] = await Promise.all([
+      fetchRun(inviterToken, invite.inviterActivityId),
+      fetchRuns(accessToken),
+    ]);
+    const candidates = rankCandidates(target, mine).map((match) => match.run);
+    track(
+      c,
+      "invite.candidates_listed",
+      { count: candidates.length, searched: mine.length },
+      "Listed candidate runs for an invitation",
+    );
+    return c.json({ candidates }, 200);
+  } catch (err) {
+    logStravaFailure(c, err, "list candidate runs");
+    if (err instanceof StravaApiError) {
+      if (err.status === 401 || err.status === 403) {
+        return c.json({ error: MISSING_SCOPE_ERROR }, 403);
+      }
+      return c.json({ error: err.message }, 502);
+    }
+    throw err;
+  }
+});
+
+const acceptRunInviteRoute = createRoute({
+  method: "post",
+  path: "/api/invites/{token}/accept",
+  operationId: "acceptRunInvite",
+  tags: ["Invites"],
+  summary: "Accept an invitation, naming which run was mine",
+  description:
+    "Records the consent that lets this athlete's run appear in the " +
+    "inviter's video, against the run they say was theirs. The sentence they " +
+    "were shown is stored verbatim with the row: consent has to be evidenced " +
+    "as it was worded at the time, and the catalogue will be reworded. " +
+    "Accepting twice is not an error — the second attempt reports the " +
+    "invitation as already answered.",
+  security: [{ sessionCookie: [] }],
+  request: {
+    params: InviteTokenParamsSchema,
+    body: {
+      required: true,
+      content: { "application/json": { schema: AcceptRunInviteSchema } },
+    },
+  },
+  responses: {
+    200: {
+      description: "The accepted invitation.",
+      content: { "application/json": { schema: RunInviteSchema } },
+    },
+    401: {
+      description: "No valid session.",
+      content: { "application/json": { schema: ErrorSchema } },
+    },
+    403: {
+      description:
+        "The stored Strava token lacks the activity:read scope; sign out and back in.",
+      content: { "application/json": { schema: ErrorSchema } },
+    },
+    404: {
+      description:
+        "No invitation with that token, or no such run on my account.",
+      content: { "application/json": { schema: ErrorSchema } },
+    },
+    409: {
+      description:
+        "The invitation is already answered, withdrawn or expired — or it is " +
+        "the caller's own.",
+      content: { "application/json": { schema: ErrorSchema } },
+    },
+    502: {
+      description: "Strava rejected or failed the upstream request.",
+      content: { "application/json": { schema: ErrorSchema } },
+    },
+  },
+});
+
+app.openapi(acceptRunInviteRoute, async (c) => {
+  const session = await currentUser(c);
+  if (!session) return c.json({ error: "Not signed in" }, 401);
+
+  const { token } = c.req.valid("param");
+  const { activity_id: activityId, consent_text: consentText } =
+    c.req.valid("json");
+
+  const invite = await getInvite(token);
+  if (!invite) return c.json({ error: INVITE_NOT_FOUND }, 404);
+  if (!isOpen(invite)) return c.json({ error: INVITE_CLOSED }, 409);
+  // An athlete pairing a run with themselves would put one person on both
+  // sides of a film that exists to hold two.
+  if (invite.inviterUserId === session.user.id) {
+    return c.json({ error: INVITE_OWN }, 409);
+  }
+
+  const accessToken = await stravaAccessToken(c, session.user.id);
+  if (!accessToken) return c.json({ error: "No Strava access token" }, 401);
+
+  // The named run has to be one of theirs, for the same reason the inviter's
+  // is checked: Strava serves an activity by id only to its owner, so a
+  // successful read is the proof. Consenting on behalf of a run you don't own
+  // is not consent.
+  try {
+    await fetchRun(accessToken, activityId);
+  } catch (err) {
+    logStravaFailure(c, err, "fetch the run being offered");
+    if (err instanceof StravaApiError) {
+      if (err.status === 404) {
+        return c.json({ error: "No such run on your account." }, 404);
+      }
+      if (err.status === 401 || err.status === 403) {
+        return c.json({ error: MISSING_SCOPE_ERROR }, 403);
+      }
+      return c.json({ error: err.message }, 502);
+    }
+    throw err;
+  }
+
+  const accepted = await acceptInvite({
+    token,
+    inviteeUserId: session.user.id,
+    inviteeActivityId: activityId,
+    consentText,
+  });
+  // Lost a race with another tab, or with the inviter withdrawing it.
+  if (!accepted) return c.json({ error: INVITE_CLOSED }, 409);
+
+  track(
+    c,
+    "invite.accepted",
+    { activityId, inviterActivityId: accepted.inviterActivityId },
+    "Accepted a run invitation",
+  );
+  return c.json(toRunInvite(accepted, session.user.name), 200);
+});
+
+const declineRunInviteRoute = createRoute({
+  method: "post",
+  path: "/api/invites/{token}/decline",
+  operationId: "declineRunInvite",
+  tags: ["Invites"],
+  summary: "Decline an invitation",
+  description:
+    "Closes the invitation without pairing anything. Recorded rather than " +
+    "left to lapse, so the inviter can tell a no from a link nobody opened.",
+  security: [{ sessionCookie: [] }],
+  request: { params: InviteTokenParamsSchema },
+  responses: {
+    200: {
+      description: "The declined invitation.",
+      content: { "application/json": { schema: RunInviteSchema } },
+    },
+    401: {
+      description: "No valid session.",
+      content: { "application/json": { schema: ErrorSchema } },
+    },
+    404: {
+      description: "No invitation with that token.",
+      content: { "application/json": { schema: ErrorSchema } },
+    },
+    409: {
+      description: "The invitation is already answered, withdrawn or expired.",
+      content: { "application/json": { schema: ErrorSchema } },
+    },
+  },
+});
+
+app.openapi(declineRunInviteRoute, async (c) => {
+  const session = await currentUser(c);
+  if (!session) return c.json({ error: "Not signed in" }, 401);
+
+  const { token } = c.req.valid("param");
+  const invite = await getInvite(token);
+  if (!invite) return c.json({ error: INVITE_NOT_FOUND }, 404);
+
+  const declined = await declineInvite(token, session.user.id);
+  if (!declined) return c.json({ error: INVITE_CLOSED }, 409);
+
+  track(c, "invite.declined", {}, "Declined a run invitation");
+  return c.json(toRunInvite(declined, session.user.name), 200);
+});
+
+const revokeRunInviteRoute = createRoute({
+  method: "delete",
+  path: "/api/invites/{token}",
+  operationId: "revokeRunInvite",
+  tags: ["Invites"],
+  summary: "Withdraw an invitation I sent",
+  description:
+    "Kills the link. Only the athlete who sent it may, and only while it is " +
+    "still unanswered — an accepted invitation is a consent that was given, " +
+    "and taking it back is the invitee's to do, not the inviter's.",
+  security: [{ sessionCookie: [] }],
+  request: { params: InviteTokenParamsSchema },
+  responses: {
+    200: {
+      description: "The withdrawn invitation.",
+      content: { "application/json": { schema: RunInviteSchema } },
+    },
+    401: {
+      description: "No valid session.",
+      content: { "application/json": { schema: ErrorSchema } },
+    },
+    404: {
+      description: "No invitation with that token sent by this athlete.",
+      content: { "application/json": { schema: ErrorSchema } },
+    },
+    409: {
+      description: "It has already been answered or has expired.",
+      content: { "application/json": { schema: ErrorSchema } },
+    },
+  },
+});
+
+app.openapi(revokeRunInviteRoute, async (c) => {
+  const session = await currentUser(c);
+  if (!session) return c.json({ error: "Not signed in" }, 401);
+
+  const { token } = c.req.valid("param");
+  const invite = await getInvite(token);
+  // Not found rather than forbidden for somebody else's token: whether a token
+  // exists is not a question a stranger gets an answer to.
+  if (!invite || invite.inviterUserId !== session.user.id) {
+    return c.json({ error: INVITE_NOT_FOUND }, 404);
+  }
+
+  const revoked = await revokeInvite(token, session.user.id);
+  if (!revoked) return c.json({ error: INVITE_CLOSED }, 409);
+
+  track(c, "invite.revoked", {}, "Withdrew a run invitation");
+  return c.json(toRunInvite(revoked), 200);
+});
+
 // --- Coach --------------------------------------------------------------------
 
 const ThreadIdParamsSchema = z.object({
@@ -1617,6 +2175,26 @@ async function processStravaEvent(event: StravaEvent): Promise<void> {
         { event: "webhook.deauthorized", userId },
         "Athlete revoked access",
       );
+      // An accepted invitation is a standing permission to put this athlete's
+      // run in somebody else's film. Revoking the Strava grant that made the
+      // data reachable has to revoke that permission with it, in both
+      // directions — otherwise a consent outlives the account that gave it.
+      const withdrawn = await revokeAllForUser(userId);
+      if (withdrawn.length > 0) {
+        log.warn(
+          {
+            event: "invite.revoked_on_deauthorization",
+            userId,
+            count: withdrawn.length,
+            // The returned rows are already `revoked`, so the split that is
+            // still readable is by side: how many were permissions this athlete
+            // had given, rather than ones they were waiting on.
+            asInvitee: withdrawn.filter((row) => row.inviteeUserId === userId)
+              .length,
+          },
+          "Withdrew this athlete's invitations",
+        );
+      }
     }
     return;
   }

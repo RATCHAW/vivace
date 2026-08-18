@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, ServerSentEventsResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { AcceptCoachPlanData, AcceptCoachPlanErrors, AcceptCoachPlanResponses, CoachChatData, CoachChatErrors, CoachChatResponse, CoachChatResponses, CreateCoachThreadData, CreateCoachThreadErrors, CreateCoachThreadResponses, DeleteCoachThreadData, DeleteCoachThreadErrors, DeleteCoachThreadResponses, GetCoachBriefingData, GetCoachBriefingErrors, GetCoachBriefingResponses, GetCoachThreadData, GetCoachThreadErrors, GetCoachThreadResponses, GetHealthData, GetHealthResponses, GetRunRenderData, GetRunRenderErrors, GetRunRenderResponses, GetRunsData, GetRunsErrors, GetRunsResponses, GetRunStreamsData, GetRunStreamsErrors, GetRunStreamsResponses, GetStravaAthleteData, GetStravaAthleteErrors, GetStravaAthleteResponses, ListCoachThreadsData, ListCoachThreadsErrors, ListCoachThreadsResponses, PostClientLogsData, PostClientLogsResponses, ReceiveStravaWebhookData, ReceiveStravaWebhookErrors, ReceiveStravaWebhookResponses, StartRunRenderData, StartRunRenderErrors, StartRunRenderResponses, StreamRunRenderProgressData, StreamRunRenderProgressErrors, StreamRunRenderProgressResponse, StreamRunRenderProgressResponses, UpdateCoachContextData, UpdateCoachContextErrors, UpdateCoachContextResponses, ValidateStravaWebhookData, ValidateStravaWebhookErrors, ValidateStravaWebhookResponses } from './types.gen';
+import type { AcceptCoachPlanData, AcceptCoachPlanErrors, AcceptCoachPlanResponses, AcceptRunInviteData, AcceptRunInviteErrors, AcceptRunInviteResponses, CoachChatData, CoachChatErrors, CoachChatResponse, CoachChatResponses, CreateCoachThreadData, CreateCoachThreadErrors, CreateCoachThreadResponses, CreateRunInviteData, CreateRunInviteErrors, CreateRunInviteResponses, DeclineRunInviteData, DeclineRunInviteErrors, DeclineRunInviteResponses, DeleteCoachThreadData, DeleteCoachThreadErrors, DeleteCoachThreadResponses, GetCoachBriefingData, GetCoachBriefingErrors, GetCoachBriefingResponses, GetCoachThreadData, GetCoachThreadErrors, GetCoachThreadResponses, GetHealthData, GetHealthResponses, GetRunInviteCandidatesData, GetRunInviteCandidatesErrors, GetRunInviteCandidatesResponses, GetRunInviteData, GetRunInviteErrors, GetRunInviteResponses, GetRunRenderData, GetRunRenderErrors, GetRunRenderResponses, GetRunsData, GetRunsErrors, GetRunsResponses, GetRunStreamsData, GetRunStreamsErrors, GetRunStreamsResponses, GetStravaAthleteData, GetStravaAthleteErrors, GetStravaAthleteResponses, ListCoachThreadsData, ListCoachThreadsErrors, ListCoachThreadsResponses, ListRunInvitesData, ListRunInvitesErrors, ListRunInvitesResponses, PostClientLogsData, PostClientLogsResponses, ReceiveStravaWebhookData, ReceiveStravaWebhookErrors, ReceiveStravaWebhookResponses, RevokeRunInviteData, RevokeRunInviteErrors, RevokeRunInviteResponses, StartRunRenderData, StartRunRenderErrors, StartRunRenderResponses, StreamRunRenderProgressData, StreamRunRenderProgressErrors, StreamRunRenderProgressResponse, StreamRunRenderProgressResponses, UpdateCoachContextData, UpdateCoachContextErrors, UpdateCoachContextResponses, ValidateStravaWebhookData, ValidateStravaWebhookErrors, ValidateStravaWebhookResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -114,6 +114,107 @@ export const streamRunRenderProgress = <ThrowOnError extends boolean = false>(op
             type: 'apiKey'
         }],
     url: '/api/runs/{id}/render/progress',
+    ...options
+});
+
+/**
+ * Invite someone who ran this run to appear in its video
+ *
+ * Mints a link the athlete sends themselves, through whatever they already message people with. This API never contacts the invitee: Strava's API terms forbid using its materials to initiate contact with a Strava user, and there is no address to send to anyway. A run that already has a live unanswered link returns that one rather than a second — every extra token would be another standing permission to view the run.
+ */
+export const createRunInvite = <ThrowOnError extends boolean = false>(options: Options<CreateRunInviteData, ThrowOnError>): RequestResult<CreateRunInviteResponses, CreateRunInviteErrors, ThrowOnError> => (options.client ?? client).post<CreateRunInviteResponses, CreateRunInviteErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'better-auth.session_token',
+            type: 'apiKey'
+        }],
+    url: '/api/runs/{id}/invite',
+    ...options
+});
+
+/**
+ * List the invitations sent for this run
+ *
+ * Every invitation the signed-in athlete has sent for this run, newest first — which is what lets the studio say whether anyone has answered. A link nobody answered before it lapsed reads `expired`.
+ */
+export const listRunInvites = <ThrowOnError extends boolean = false>(options: Options<ListRunInvitesData, ThrowOnError>): RequestResult<ListRunInvitesResponses, ListRunInvitesErrors, ThrowOnError> => (options.client ?? client).get<ListRunInvitesResponses, ListRunInvitesErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'better-auth.session_token',
+            type: 'apiKey'
+        }],
+    url: '/api/runs/{id}/invites',
+    ...options
+});
+
+/**
+ * Withdraw an invitation I sent
+ *
+ * Kills the link. Only the athlete who sent it may, and only while it is still unanswered — an accepted invitation is a consent that was given, and taking it back is the invitee's to do, not the inviter's.
+ */
+export const revokeRunInvite = <ThrowOnError extends boolean = false>(options: Options<RevokeRunInviteData, ThrowOnError>): RequestResult<RevokeRunInviteResponses, RevokeRunInviteErrors, ThrowOnError> => (options.client ?? client).delete<RevokeRunInviteResponses, RevokeRunInviteErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'better-auth.session_token',
+            type: 'apiKey'
+        }],
+    url: '/api/invites/{token}',
+    ...options
+});
+
+/**
+ * Preview an invitation (no session required)
+ *
+ * What the holder of a link is shown before they sign in — who is asking and which run, and nothing else. Deliberately unauthenticated: the whole point of the link is that it reaches somebody who does not have an account yet, and requiring one first would ask them to authorise us before telling them what for. The token is the credential.
+ */
+export const getRunInvite = <ThrowOnError extends boolean = false>(options: Options<GetRunInviteData, ThrowOnError>): RequestResult<GetRunInviteResponses, GetRunInviteErrors, ThrowOnError> => (options.client ?? client).get<GetRunInviteResponses, GetRunInviteErrors, ThrowOnError>({ url: '/api/invites/{token}', ...options });
+
+/**
+ * My runs that could be the other half of this one
+ *
+ * The signed-in athlete's own runs, ranked by how much they overlap the invited run, best first. Ranking only orders the list — the athlete confirms which run was theirs, because they are the only one who knows. An empty list is a normal answer: they may have recorded nothing that day, or hidden their start times, and the client should let them say so.
+ */
+export const getRunInviteCandidates = <ThrowOnError extends boolean = false>(options: Options<GetRunInviteCandidatesData, ThrowOnError>): RequestResult<GetRunInviteCandidatesResponses, GetRunInviteCandidatesErrors, ThrowOnError> => (options.client ?? client).get<GetRunInviteCandidatesResponses, GetRunInviteCandidatesErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'better-auth.session_token',
+            type: 'apiKey'
+        }],
+    url: '/api/invites/{token}/candidates',
+    ...options
+});
+
+/**
+ * Accept an invitation, naming which run was mine
+ *
+ * Records the consent that lets this athlete's run appear in the inviter's video, against the run they say was theirs. The sentence they were shown is stored verbatim with the row: consent has to be evidenced as it was worded at the time, and the catalogue will be reworded. Accepting twice is not an error — the second attempt reports the invitation as already answered.
+ */
+export const acceptRunInvite = <ThrowOnError extends boolean = false>(options: Options<AcceptRunInviteData, ThrowOnError>): RequestResult<AcceptRunInviteResponses, AcceptRunInviteErrors, ThrowOnError> => (options.client ?? client).post<AcceptRunInviteResponses, AcceptRunInviteErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'better-auth.session_token',
+            type: 'apiKey'
+        }],
+    url: '/api/invites/{token}/accept',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Decline an invitation
+ *
+ * Closes the invitation without pairing anything. Recorded rather than left to lapse, so the inviter can tell a no from a link nobody opened.
+ */
+export const declineRunInvite = <ThrowOnError extends boolean = false>(options: Options<DeclineRunInviteData, ThrowOnError>): RequestResult<DeclineRunInviteResponses, DeclineRunInviteErrors, ThrowOnError> => (options.client ?? client).post<DeclineRunInviteResponses, DeclineRunInviteErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'better-auth.session_token',
+            type: 'apiKey'
+        }],
+    url: '/api/invites/{token}/decline',
     ...options
 });
 

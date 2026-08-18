@@ -232,6 +232,92 @@ export const en = {
     },
   },
 
+  /**
+   * Inviting the person you ran with, and answering an invitation.
+   *
+   * Two audiences in one namespace, and they need different registers. `invite.*`
+   * talks to the athlete who was already here. `invite.accept.*` talks to someone
+   * who may never have heard of Vivace and has just been asked to hand over their
+   * Strava account — so it says who is asking and what will be used before it
+   * asks for anything, and the consent line is a plain sentence rather than a
+   * checkbox with terms behind it.
+   */
+  invite: {
+    action: "Add who you ran with",
+    /** The phone's icon-only action row. */
+    actionShort: "Invite",
+    creating: "Making a link…",
+    createFailed: "Could not make an invitation link",
+    linkCopied: "Invitation link copied",
+    linkCopiedBody:
+      "Send it to the person you ran with. They confirm their run, and the video has you both.",
+    shareTitle: "Be in my run video",
+    /** What the sheet says once a link exists. */
+    pendingTitle: "Waiting on your running partner",
+    pendingBody:
+      "The link is live for {{days}} days. Whoever opens it confirms which run was theirs.",
+    copyAgain: "Copy the link again",
+    revoke: "Cancel the invitation",
+    revokeFailed: "Could not cancel the invitation",
+    acceptedTitle: "{{name}} is in",
+    acceptedBody: "They confirmed their run. Nothing else to do.",
+    declinedTitle: "{{name}} said no",
+    declinedBody: "Nothing was shared. You can invite someone else.",
+    expiredTitle: "That link has expired",
+    expiredBody: "Make a new one whenever you like.",
+
+    accept: {
+      loading: "Opening the invitation…",
+      invalidTitle: "This invitation is not valid",
+      invalidBody:
+        "The link may have been withdrawn, already answered, or simply mistyped. Ask for a new one.",
+      /** The headline a signed-out reader lands on. */
+      title: "{{name}} wants you in their run video",
+      /** The run, under the headline. */
+      runLine: "{{name}} · {{date}} · {{distance}} km · {{duration}}",
+      whatHappens:
+        "Vivace makes a short video of a run. To put you in it, we need the run from your own Strava — which means signing in with Strava yourself.",
+      connect: "Continue with Strava",
+      decline: "No thanks",
+      declineFailed: "Could not decline this invitation",
+
+      pickTitle: "Which run was yours?",
+      pickBody: "Pick the run you did together.",
+      pickEmptyTitle: "No matching run found",
+      pickEmptyBody:
+        "Nothing in your Strava lines up with that day and time. If you recorded it somewhere else, there is nothing to pair here.",
+      pickFailed: "Could not read your runs",
+
+      /**
+       * The sentence stored verbatim with the acceptance. It is the record of
+       * what was agreed, so it is sent to the API as well as shown — see
+       * `consent_text` on the accept endpoint. Reword it and only new
+       * acceptances carry the new wording, which is the intent.
+       */
+      consent:
+        "I agree to my run's distance, time, pace and route appearing in {{name}}'s video.",
+      confirm: "Make the video together",
+      confirming: "Setting it up…",
+      confirmFailed: "Could not accept this invitation",
+
+      doneTitle: "You're in",
+      doneBody:
+        "{{name}} can now make the video with both your runs in it. You'll find it in your own replays too.",
+      /** Shown once they have an account of their own to go to. */
+      goToApp: "See my replays",
+
+      /** Answered by somebody else, or by this athlete already. */
+      closedTitle: "This invitation is closed",
+      closedBody: "It has already been answered, withdrawn, or has expired.",
+      ownTitle: "This is your own invitation",
+      ownBody: "Send the link to the person you ran with instead.",
+      /** Withdrawing consent after the fact — the invitee's to do, not the
+       *  inviter's. Disconnecting Strava does the same thing, everywhere. */
+      withdrawNote:
+        "Changed your mind later? Disconnecting Strava from Vivace withdraws this too.",
+    },
+  },
+
   render: {
     loadErrorTitle: "Could not load the video state",
     preparing: "Preparing your video…",

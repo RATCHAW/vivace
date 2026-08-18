@@ -3,8 +3,8 @@
 import { type DefaultError, queryOptions, type UseMutationOptions } from '@tanstack/react-query';
 
 import { client } from '../client.gen';
-import { acceptCoachPlan, createCoachThread, deleteCoachThread, getCoachBriefing, getCoachThread, getHealth, getRunRender, getRuns, getRunStreams, getStravaAthlete, listCoachThreads, type Options, postClientLogs, receiveStravaWebhook, startRunRender, updateCoachContext, validateStravaWebhook } from '../sdk.gen';
-import type { AcceptCoachPlanData, AcceptCoachPlanError, AcceptCoachPlanResponse, CreateCoachThreadData, CreateCoachThreadError, CreateCoachThreadResponse, DeleteCoachThreadData, DeleteCoachThreadError, DeleteCoachThreadResponse, GetCoachBriefingData, GetCoachBriefingError, GetCoachBriefingResponse, GetCoachThreadData, GetCoachThreadError, GetCoachThreadResponse, GetHealthData, GetHealthResponse, GetRunRenderData, GetRunRenderError, GetRunRenderResponse, GetRunsData, GetRunsError, GetRunsResponse, GetRunStreamsData, GetRunStreamsError, GetRunStreamsResponse, GetStravaAthleteData, GetStravaAthleteError, GetStravaAthleteResponse, ListCoachThreadsData, ListCoachThreadsError, ListCoachThreadsResponse, PostClientLogsData, PostClientLogsResponse, ReceiveStravaWebhookData, ReceiveStravaWebhookError, ReceiveStravaWebhookResponse, StartRunRenderData, StartRunRenderError, StartRunRenderResponse, UpdateCoachContextData, UpdateCoachContextError, UpdateCoachContextResponse, ValidateStravaWebhookData, ValidateStravaWebhookError, ValidateStravaWebhookResponse } from '../types.gen';
+import { acceptCoachPlan, acceptRunInvite, createCoachThread, createRunInvite, declineRunInvite, deleteCoachThread, getCoachBriefing, getCoachThread, getHealth, getRunInvite, getRunInviteCandidates, getRunRender, getRuns, getRunStreams, getStravaAthlete, listCoachThreads, listRunInvites, type Options, postClientLogs, receiveStravaWebhook, revokeRunInvite, startRunRender, updateCoachContext, validateStravaWebhook } from '../sdk.gen';
+import type { AcceptCoachPlanData, AcceptCoachPlanError, AcceptCoachPlanResponse, AcceptRunInviteData, AcceptRunInviteError, AcceptRunInviteResponse, CreateCoachThreadData, CreateCoachThreadError, CreateCoachThreadResponse, CreateRunInviteData, CreateRunInviteError, CreateRunInviteResponse, DeclineRunInviteData, DeclineRunInviteError, DeclineRunInviteResponse, DeleteCoachThreadData, DeleteCoachThreadError, DeleteCoachThreadResponse, GetCoachBriefingData, GetCoachBriefingError, GetCoachBriefingResponse, GetCoachThreadData, GetCoachThreadError, GetCoachThreadResponse, GetHealthData, GetHealthResponse, GetRunInviteCandidatesData, GetRunInviteCandidatesError, GetRunInviteCandidatesResponse, GetRunInviteData, GetRunInviteError, GetRunInviteResponse, GetRunRenderData, GetRunRenderError, GetRunRenderResponse, GetRunsData, GetRunsError, GetRunsResponse, GetRunStreamsData, GetRunStreamsError, GetRunStreamsResponse, GetStravaAthleteData, GetStravaAthleteError, GetStravaAthleteResponse, ListCoachThreadsData, ListCoachThreadsError, ListCoachThreadsResponse, ListRunInvitesData, ListRunInvitesError, ListRunInvitesResponse, PostClientLogsData, PostClientLogsResponse, ReceiveStravaWebhookData, ReceiveStravaWebhookError, ReceiveStravaWebhookResponse, RevokeRunInviteData, RevokeRunInviteError, RevokeRunInviteResponse, StartRunRenderData, StartRunRenderError, StartRunRenderResponse, UpdateCoachContextData, UpdateCoachContextError, UpdateCoachContextResponse, ValidateStravaWebhookData, ValidateStravaWebhookError, ValidateStravaWebhookResponse } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
@@ -146,6 +146,142 @@ export const startRunRenderMutation = (options?: Partial<Options<StartRunRenderD
     const mutationOptions: UseMutationOptions<StartRunRenderResponse, StartRunRenderError, Options<StartRunRenderData>> = {
         mutationFn: async (fnOptions) => {
             const { data } = await startRunRender({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+/**
+ * Invite someone who ran this run to appear in its video
+ *
+ * Mints a link the athlete sends themselves, through whatever they already message people with. This API never contacts the invitee: Strava's API terms forbid using its materials to initiate contact with a Strava user, and there is no address to send to anyway. A run that already has a live unanswered link returns that one rather than a second — every extra token would be another standing permission to view the run.
+ */
+export const createRunInviteMutation = (options?: Partial<Options<CreateRunInviteData>>): UseMutationOptions<CreateRunInviteResponse, CreateRunInviteError, Options<CreateRunInviteData>> => {
+    const mutationOptions: UseMutationOptions<CreateRunInviteResponse, CreateRunInviteError, Options<CreateRunInviteData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await createRunInvite({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const listRunInvitesQueryKey = (options: Options<ListRunInvitesData>) => createQueryKey('listRunInvites', options);
+
+/**
+ * List the invitations sent for this run
+ *
+ * Every invitation the signed-in athlete has sent for this run, newest first — which is what lets the studio say whether anyone has answered. A link nobody answered before it lapsed reads `expired`.
+ */
+export const listRunInvitesOptions = (options: Options<ListRunInvitesData>) => queryOptions<ListRunInvitesResponse, ListRunInvitesError, ListRunInvitesResponse, ReturnType<typeof listRunInvitesQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await listRunInvites({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: listRunInvitesQueryKey(options)
+});
+
+/**
+ * Withdraw an invitation I sent
+ *
+ * Kills the link. Only the athlete who sent it may, and only while it is still unanswered — an accepted invitation is a consent that was given, and taking it back is the invitee's to do, not the inviter's.
+ */
+export const revokeRunInviteMutation = (options?: Partial<Options<RevokeRunInviteData>>): UseMutationOptions<RevokeRunInviteResponse, RevokeRunInviteError, Options<RevokeRunInviteData>> => {
+    const mutationOptions: UseMutationOptions<RevokeRunInviteResponse, RevokeRunInviteError, Options<RevokeRunInviteData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await revokeRunInvite({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const getRunInviteQueryKey = (options: Options<GetRunInviteData>) => createQueryKey('getRunInvite', options);
+
+/**
+ * Preview an invitation (no session required)
+ *
+ * What the holder of a link is shown before they sign in — who is asking and which run, and nothing else. Deliberately unauthenticated: the whole point of the link is that it reaches somebody who does not have an account yet, and requiring one first would ask them to authorise us before telling them what for. The token is the credential.
+ */
+export const getRunInviteOptions = (options: Options<GetRunInviteData>) => queryOptions<GetRunInviteResponse, GetRunInviteError, GetRunInviteResponse, ReturnType<typeof getRunInviteQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getRunInvite({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getRunInviteQueryKey(options)
+});
+
+export const getRunInviteCandidatesQueryKey = (options: Options<GetRunInviteCandidatesData>) => createQueryKey('getRunInviteCandidates', options);
+
+/**
+ * My runs that could be the other half of this one
+ *
+ * The signed-in athlete's own runs, ranked by how much they overlap the invited run, best first. Ranking only orders the list — the athlete confirms which run was theirs, because they are the only one who knows. An empty list is a normal answer: they may have recorded nothing that day, or hidden their start times, and the client should let them say so.
+ */
+export const getRunInviteCandidatesOptions = (options: Options<GetRunInviteCandidatesData>) => queryOptions<GetRunInviteCandidatesResponse, GetRunInviteCandidatesError, GetRunInviteCandidatesResponse, ReturnType<typeof getRunInviteCandidatesQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getRunInviteCandidates({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getRunInviteCandidatesQueryKey(options)
+});
+
+/**
+ * Accept an invitation, naming which run was mine
+ *
+ * Records the consent that lets this athlete's run appear in the inviter's video, against the run they say was theirs. The sentence they were shown is stored verbatim with the row: consent has to be evidenced as it was worded at the time, and the catalogue will be reworded. Accepting twice is not an error — the second attempt reports the invitation as already answered.
+ */
+export const acceptRunInviteMutation = (options?: Partial<Options<AcceptRunInviteData>>): UseMutationOptions<AcceptRunInviteResponse, AcceptRunInviteError, Options<AcceptRunInviteData>> => {
+    const mutationOptions: UseMutationOptions<AcceptRunInviteResponse, AcceptRunInviteError, Options<AcceptRunInviteData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await acceptRunInvite({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+/**
+ * Decline an invitation
+ *
+ * Closes the invitation without pairing anything. Recorded rather than left to lapse, so the inviter can tell a no from a link nobody opened.
+ */
+export const declineRunInviteMutation = (options?: Partial<Options<DeclineRunInviteData>>): UseMutationOptions<DeclineRunInviteResponse, DeclineRunInviteError, Options<DeclineRunInviteData>> => {
+    const mutationOptions: UseMutationOptions<DeclineRunInviteResponse, DeclineRunInviteError, Options<DeclineRunInviteData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await declineRunInvite({
                 ...options,
                 ...fnOptions,
                 throwOnError: true

@@ -20,6 +20,12 @@ const Coach = lazy(() =>
   import("@/pages/Coach").then((m) => ({ default: m.Coach })),
 );
 
+// Reached by people who may have no account at all, so it is split off the
+// signed-in bundle rather than carried by everyone who opens the app.
+const Invite = lazy(() =>
+  import("@/pages/Invite").then((m) => ({ default: m.Invite })),
+);
+
 function FullPageSpinner() {
   const { t } = useTranslation();
 
@@ -118,6 +124,18 @@ export function App() {
           <Guarded signedIn={signedIn}>
             <Coach />
           </Guarded>
+        }
+      />
+      {/* Deliberately outside `Guarded`. This is the one surface built for
+          someone who has never been here: sending them to /login first would
+          ask for a Strava grant before saying what it is for, and the page's
+          own second step is that sign-in, carrying this address back. */}
+      <Route
+        path="/invite/:token"
+        element={
+          <Suspense fallback={<FullPageSpinner />}>
+            <Invite />
+          </Suspense>
         }
       />
       {/* A page, not a silent bounce to the Overview: a stale or mistyped link
