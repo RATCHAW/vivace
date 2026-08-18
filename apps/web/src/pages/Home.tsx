@@ -250,10 +250,21 @@ export function Home() {
             </div>
           </div>
 
-          {/* {component.button-primary} — the loudest pixel on the canvas */}
-          <Button render={<Link to="/replays" />}>
-            {t("home.watchYourRuns")}
-          </Button>
+          {/* The two halves of the app, side by side. The coach pill is
+              {component.button-outline} rather than a second filled one:
+              DESIGN.md allows a single loudest pixel per viewport, and it is
+              spent on the replays. Sparkles is the coach's mark everywhere on
+              this page, so the card below reads as the same destination. */}
+          <div className="flex flex-wrap items-center gap-3">
+            <Button render={<Link to="/coach" />} variant="outline">
+              <SparklesIcon data-icon="inline-start" />
+              {t("home.coachStart")}
+            </Button>
+            {/* {component.button-primary} — the loudest pixel on the canvas */}
+            <Button render={<Link to="/replays" />}>
+              {t("home.watchYourRuns")}
+            </Button>
+          </div>
         </section>
 
         <section
