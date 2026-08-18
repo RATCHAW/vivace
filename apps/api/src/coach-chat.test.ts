@@ -64,6 +64,25 @@ vi.mock("./chat-store.js", async (importOriginal) => {
   };
 });
 
+/** The variant PostHog hands back, for the test that set one. */
+let evaluated: import("./posthog.js").FeatureVariant | null = null;
+/** The `$ai_trace` the turn filed, so its attribution can be read back. */
+let traced: Record<string, unknown>[] = [];
+
+vi.mock("./posthog.js", async (importOriginal) => {
+  // The real module is already inert without POSTHOG_KEY; only the flag and the
+  // trace are replaced, so the rest of the app's capture calls stay no-ops.
+  const actual = await importOriginal<typeof import("./posthog.js")>();
+  return {
+    ...actual,
+    getFeatureVariantFor: async () => evaluated,
+    captureLlmTrace: (payload: Record<string, unknown>) => traced.push(payload),
+  };
+});
+
+/** Everything the last turn asked its model for, prompt included. */
+let lastCall: unknown = null;
+
 /** A model that says one thing, in as many chunks as it is given, and stops. */
 function mockModel(text: string[]) {
   const chunks: LanguageModelV4StreamPart[] = [
@@ -88,15 +107,29 @@ function mockModel(text: string[]) {
   ];
 
   return new MockLanguageModelV4({
-    doStream: async () => ({ stream: simulateReadableStream({ chunks }) }),
+    doStream: async (options) => {
+      lastCall = options;
+      return { stream: simulateReadableStream({ chunks }) };
+    },
   });
 }
 
 let config: { model: MockLanguageModelV4; modelId: string } | null = null;
+/** The model id the route asked for — a variant's, when one named it. */
+let requestedModel: string | undefined;
 
 vi.mock("./coach.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./coach.js")>();
-  return { ...actual, getCoachConfig: () => config };
+  return {
+    ...actual,
+    getCoachConfig: (override?: string) => {
+      // The route asks twice when a variant names a model: once to check a key
+      // exists at all, then again with the override. The second is the one that
+      // answers the turn, so the last one asked for is what matters.
+      requestedModel = override;
+      return config;
+    },
+  };
 });
 
 const { app } = await import("./app.js");
@@ -116,6 +149,10 @@ describe("POST /api/coach/chat", () => {
     accessToken = "strava-token";
     stored = [];
     title = null;
+    evaluated = null;
+    traced = [];
+    lastCall = null;
+    requestedModel = undefined;
     config = {
       model: mockModel(["Build volume ", "before speed."]),
       modelId: "mock",
@@ -350,5 +387,70 @@ describe("POST /api/coach/chat", () => {
       },
     });
     expect(res.status).toBe(401);
+  });
+
+  /** One turn, so the assertions below read the same request. */
+  async function turn() {
+    const res = await chat({
+      thread_id: THREAD_ID,
+      trigger: "submit-message",
+      message: {
+        id: "user-1",
+        role: "user",
+        parts: [{ type: "text", text: "How's my week looking?" }],
+      },
+    });
+    await res.text();
+    return res;
+  }
+
+  it("answers on the shipped pairing when no flag says otherwise", async () => {
+    expect((await turn()).status).toBe(200);
+
+    expect(requestedModel).toBeUndefined();
+    expect(JSON.stringify(lastCall)).toContain(
+      "You are Vivace's running coach",
+    );
+    expect(JSON.stringify(lastCall)).not.toContain("two sentences");
+    // Nothing to attribute: an athlete on no variant is not in an experiment.
+    expect(traced[0].properties).not.toHaveProperty("$feature/coach-model");
+  });
+
+  it("runs the turn on the variant's model and prompt, and says so on the trace", async () => {
+    evaluated = {
+      value: "sonnet-terse",
+      payload: { model: "anthropic/claude-sonnet-5", prompt: "v2-terse" },
+    };
+
+    expect((await turn()).status).toBe(200);
+
+    // The model the gateway was asked for, and the prompt that went with it —
+    // the pair, which is the whole reason one flag carries both.
+    expect(requestedModel).toBe("anthropic/claude-sonnet-5");
+    expect(JSON.stringify(lastCall)).toContain("two sentences");
+
+    // `$feature/<key>` is what PostHog's own experiment analysis reads, and
+    // `contextProperties` puts it on every generation and span under this too.
+    expect(traced[0].properties).toMatchObject({
+      "$feature/coach-model": "sonnet-terse",
+      coach_prompt: "v2-terse",
+    });
+  });
+
+  it("keeps answering on the shipped pairing when the payload is nonsense", async () => {
+    // Edited in a browser textarea with no review and no deploy: a bad one has
+    // to cost nothing but a log line.
+    evaluated = { value: "typo", payload: { model: "claude-sonnet-5" } };
+
+    expect((await turn()).status).toBe(200);
+
+    expect(requestedModel).toBeUndefined();
+    expect(JSON.stringify(lastCall)).not.toContain("two sentences");
+    // Still attributed: the athlete was in the arm, whatever it turned out to
+    // hold, and an exposure that goes missing skews the experiment.
+    expect(traced[0].properties).toMatchObject({
+      "$feature/coach-model": "typo",
+      coach_prompt: "v1",
+    });
   });
 });

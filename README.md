@@ -32,8 +32,8 @@ appear in the product as coming next, but are not implemented yet.
 
 - Node.js 22 (the version used by CI and the Docker images; Node.js ≥20.19 is
   supported) and Docker
-- pnpm 10.17 — `corepack enable` picks up the pinned version from
-  `packageManager`, or install it directly with `npm i -g pnpm@10.17.0`
+- pnpm 11.21 — `corepack enable` picks up the pinned version from
+  `packageManager`, or install it directly with `npm i -g pnpm@11.21.0`
 - A Strava API application: create one at <https://www.strava.com/settings/api>
   - Set **Authorization Callback Domain** to `localhost`
 
@@ -332,6 +332,8 @@ the rest of the app is unaffected):
 LLM_GATEWAY_API_KEY=...
 # Optional: any model the gateway routes. Defaults to deepseek/deepseek-v4-flash.
 COACH_MODEL=deepseek/deepseek-v4-pro
+# Optional: which system prompt goes with it — v1 or v2-terse. Defaults to v1.
+COACH_PROMPT=v1
 ```
 
 The model is reached through [LLM Gateway](https://llmgateway.io), which speaks
@@ -340,6 +342,12 @@ rather than one SDK package each, and `COACH_MODEL` is the whole of switching
 between them. Write it `vendor/model`: a bare id lets the gateway pick the
 vendor, and a coach whose model moves underneath it answers differently for no
 reason the athlete can see.
+
+The model and the prompt move **together**, because a prompt tuned for one model
+isn't the prompt for another. `COACH_MODEL`/`COACH_PROMPT` set the pairing for a
+deploy; the [`coach-model` PostHog flag](#the-coach-model-flag--testing-models-and-prompts-on-real-traffic)
+sets it per athlete, so two pairings can run at once and be compared on real
+traffic without one.
 
 Swapping the gateway itself out is a change to `getCoachConfig()` in
 `apps/api/src/coach.ts` and nothing else — the tools, the prompt and both ends
@@ -492,6 +500,57 @@ The key is the *project* key, which is public by design — it can only write
 events. Add `POSTHOG_HOST=https://eu.i.posthog.com` (and the matching
 `VITE_`/`NEXT_PUBLIC_` variants) for an EU or self-hosted project.
 
+### Development data, and keeping it out of production's numbers
+
+A PostHog project is one silo of data. Point a laptop at the production key and
+the athlete you are testing with is a person in the same Persons list as the
+people actually using the app — there is no built-in separation, and nothing in
+an event says where it came from unless it is put there.
+
+Both halves of the answer are set up here.
+
+**Every event carries `environment`**, and so does the person behind it:
+`production`, `staging`, or the `development` a laptop reports. It comes from
+`APP_ENV` in the API (the same value that labels the logs in Loki), from
+`VITE_APP_ENV` or Vite's mode in the browser, and from `NEXT_PUBLIC_APP_ENV` or
+`NODE_ENV` on the landing page. Nothing needs setting for `pnpm dev` or for
+production — the fallback is right for both.
+
+It is only wrong where a *production build* isn't production, which is two
+places, and both are already handled or one variable away:
+
+- `docker compose --profile app up` passes `APP_ENV` (default `docker`) to all
+  three services, so the local stack doesn't file its events under production.
+- A **Vercel preview deployment** builds exactly as production does. Set
+  `VITE_APP_ENV` / `NEXT_PUBLIC_APP_ENV` to `preview` on Vercel's Preview
+  environment if you want those told apart too.
+
+Two things read it:
+
+- **The Persons list.** Filter on the person property `environment = production`
+  to see only real athletes. Save it as a cohort and it is one click after that.
+- **Project settings → Product analytics → "Filter out internal and test
+  users".** Add `environment ∌ production` (or `= development`) and turn on
+  "apply to all new insights". Every dashboard is then production-only by
+  default. Note this filters *analysis*, not ingestion — the events are still
+  captured, and still visible in the Activity tab.
+
+Both need events that carry the property, so a filter written the day it ships
+also drops everything recorded before it. Either accept the gap or write the
+filter as "not development", which leaves the older, unlabelled events in.
+
+**A second project is stronger**, and it is [what PostHog
+recommends](https://posthog.com/docs/settings/projects#how-to-organize-projects):
+create a `development` project, put *its* key in your local `.env` files, and
+production's data is never touched at all. The cost is that flags, surveys and
+the `VITE_POSTHOG_COACH_SURVEY_ID` survey have to be recreated there before you
+can test them — which is why the `environment` property exists as well, rather
+than instead.
+
+**Or send nothing.** Leaving the PostHog keys unset locally is the default state
+of a fresh clone and of every test run; the app behaves identically without
+them.
+
 ### The `video-render` flag
 
 A Lambda render is the one click here that costs real money, so it has a kill
@@ -499,6 +558,75 @@ switch: the browser hides the button and the API refuses to start a render. It
 **defaults to on** — no PostHog, no flag, or an unreachable PostHog all mean
 "behave exactly as the app shipped". Create a `video-render` flag in PostHog and
 roll it to 0% to switch rendering off without a deploy.
+
+### The `coach-model` flag — testing models and prompts on real traffic
+
+A boolean flag can't say which coach an athlete got. `coach-model` is
+**multivariate**, and each variant carries its own JSON payload — that payload
+*is* the config:
+
+| variant | payload |
+| --- | --- |
+| `control` | `{"model": "deepseek/deepseek-v4-flash", "prompt": "v1"}` |
+| `sonnet-terse` | `{"model": "anthropic/claude-sonnet-5", "prompt": "v2-terse"}` |
+
+One flag, not two. The unit that varies is the *pair* — a prompt tuned for one
+model is not the prompt for another — and a flag per axis would let a turn land
+on a combination nobody meant to ship. A PostHog **Experiment is this same flag
+with statistics attached**, so the flag can go in on its own and be promoted
+later without a line of the app changing; a payload-only *remote config* flag
+is the same mechanism for "switch the model for everyone, no split, no deploy".
+
+- **A version key, not the prompt text.** `prompt` names an entry in
+  `SYSTEM_PROMPTS` in `apps/api/src/coach.ts`. The payload *could* hold the
+  whole prompt and be edited in PostHog — but it names the tools the code must
+  actually have, and in a flag textarea it loses review, diff and its tests.
+  Adding a variant's prompt is a pull request; choosing between them isn't.
+- **A payload nobody reviewed is a payload that gets validated.** A model id
+  that isn't `vendor/model`, or a prompt version the catalogue has never heard
+  of, falls back to the shipped pairing whole — half a variant is a combination
+  nobody meant to ship either — and logs `coach.variant_invalid`. Same for a
+  typo in `COACH_PROMPT`.
+- **The whole LLM analytics view becomes filterable by variant.** The turn
+  carries `$feature/coach-model`, and `contextProperties` spreads it onto the
+  `$ai_trace`, every `$ai_generation` and every `$ai_span` — so cost, latency,
+  stop reason and tool-call count are per-variant for free. The thumbs up/down
+  below already writes `survey sent` against the same trace, which makes it a
+  usable experiment metric on day one.
+- **The exposure fires where the athlete gets the answer.** `getFlag` is what
+  sends `$feature_flag_called`, and the route reads the flag after every guard
+  has passed — a request about to 404 was never exposed to anything.
+- **Without PostHog, `COACH_MODEL` and `COACH_PROMPT` pick the pairing**, which
+  is how you read one variant's answers locally without creating a flag.
+- Turn on `POSTHOG_LLM_CAPTURE_CONTENT=true` **in staging only** while comparing
+  prompts. With the default privacy mode, comparing answer quality across
+  variants means comparing token counts, which isn't what's being tested.
+
+#### Why the prompts are still in the repo
+
+PostHog does more of this than it used to. **Prompt management** (beta) is a real
+registry: immutable versions, movable labels like `production`, version diffs, an
+SDK that fetches a prompt at runtime, and *prompt experiments*, which build the
+flag-per-version this section builds by hand. There is a playground for comparing
+models side by side, and evals with LLM-as-a-judge and datasets. Any claim that
+PostHog is only the live half is out of date.
+
+`SYSTEM_PROMPTS` stays in `apps/api/src/coach.ts` anyway, and the reason is the
+tools. The prompt names `askAthlete`, `proposeWeek` and `setAthleteContext` and
+states the rules those tools enforce — five questions, seven days numbered from
+Monday. A prompt fetched at runtime can go on naming a tool the deploy underneath
+it just removed, and the failure is a coach promising the athlete a form it can
+no longer draw. The catalogue cannot drift from `createCoachTools`, because one
+pull request moves both.
+
+What lives in PostHog is a **mirror**, not the source — `coach-system` and
+`coach-debrief` under
+[Prompt management](https://us.posthog.com/project/555099/llm-analytics/prompts),
+with `production` pointing at what the app actually sends, so a trace can be read
+next to the words that produced it. Its version numbers are the registry's own
+and do not match the catalogue keys: `coach-system` v3 is `v1`, v4 is `v2-terse`.
+Nothing reads it back, so re-publishing after a prompt change is a manual step
+and no test fails if you skip it.
 
 ### AI observability
 
@@ -651,8 +779,8 @@ HUSKY=0 git commit       # skip them for a whole shell session
 
 ## License
 
-[CC BY-NC-SA 4.0](./LICENSE) — anyone may use, modify, and share this source code,
-**but** derivatives must stay under the same license (ShareAlike ≈ "keep it open
-source") and **commercial use is not permitted** (NonCommercial). Note this is
-therefore not an OSI-approved "open source" license, which by definition would have
-to allow commercial use.
+[GNU AGPL v3.0](./LICENSE) — anyone may use, modify, share and sell this source
+code, **but** derivatives must stay under the same license, and running a modified
+version as a network service counts as distribution: its users have to be offered
+the complete corresponding source (section 13). That network clause is what
+separates the AGPL from the plain GPL, and it is the point of choosing it here.

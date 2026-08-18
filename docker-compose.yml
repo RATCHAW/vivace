@@ -9,7 +9,11 @@ services:
       # Host port 5433 to avoid clashing with any local Postgres on 5432
       - "127.0.0.1:5433:5432"
     volumes:
-      - db-data:/var/lib/postgresql/data
+      # Postgres 18 keeps its cluster in a major-version subdirectory
+      # (/var/lib/postgresql/18/docker) and refuses to boot when anything is
+      # mounted at the old /var/lib/postgresql/data — an empty volume there
+      # reads as a stale cluster it would rather not silently ignore.
+      - db-data:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U app -d app"]
       interval: 5s
@@ -172,6 +176,9 @@ services:
         VITE_SITE_URL: http://localhost:3001
         VITE_POSTHOG_KEY: ${VITE_POSTHOG_KEY:-}
         VITE_POSTHOG_HOST: ${VITE_POSTHOG_HOST:-}
+        # This is a production Vite build of a local stack, so it would call
+        # itself `production` in PostHog. It matches the api service's APP_ENV.
+        VITE_APP_ENV: ${APP_ENV:-docker}
     ports:
       - "127.0.0.1:8080:80"
     depends_on:
@@ -187,6 +194,9 @@ services:
         NEXT_PUBLIC_APP_URL: http://localhost:8080
         NEXT_PUBLIC_POSTHOG_KEY: ${NEXT_PUBLIC_POSTHOG_KEY:-}
         NEXT_PUBLIC_POSTHOG_HOST: ${NEXT_PUBLIC_POSTHOG_HOST:-}
+        # Same reason as the web service: a production `next build` of a local
+        # stack, which shouldn't file its events under production.
+        NEXT_PUBLIC_APP_ENV: ${APP_ENV:-docker}
     ports:
       - "127.0.0.1:3001:3001"
 

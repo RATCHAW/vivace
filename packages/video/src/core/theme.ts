@@ -17,6 +17,16 @@ export interface Theme {
   description: string;
   /** The plate everything sits on. */
   canvas: string;
+  /**
+   * What something drawn *as the canvas* is painted in — a marker's punched-out
+   * centre, the gap a dot is separated from the line beneath it by.
+   *
+   * The same colour as `canvas` in all three looks, and deliberately a separate
+   * field: on the key plate the canvas is chroma green and gets cut away, so an
+   * element that borrowed it would come out as a hole in the middle of the
+   * marker rather than as a disc. See `core/greenscreen.ts`.
+   */
+  plate: string;
   /** A panel or a bar's track, one step off the canvas. */
   surface: string;
   ink: string;
@@ -52,6 +62,7 @@ export const THEMES: Record<ThemeName, Theme> = {
     description: "White type on black, cobalt illustration. The house look.",
     // {colors.canvas-dark}
     canvas: "#000000",
+    plate: "#000000",
     // {colors.surface-elevated}
     surface: "#16181a",
     // {colors.on-dark}
@@ -74,6 +85,7 @@ export const THEMES: Record<ThemeName, Theme> = {
     description: "Ink on paper. The one that looks like a print, not a screen.",
     // {colors.surface-soft} — off-white reads as stock; pure white reads as a page.
     canvas: "#f4f4f4",
+    plate: "#f4f4f4",
     // {colors.canvas-light}
     surface: "#ffffff",
     // {colors.ink}
@@ -97,6 +109,7 @@ export const THEMES: Record<ThemeName, Theme> = {
     label: "Cobalt",
     description: "The numbers in brand cobalt on black. The loud one.",
     canvas: "#000000",
+    plate: "#000000",
     surface: "#16181a",
     ink: "#ffffff",
     inkMuted: "rgba(255,255,255,0.72)",

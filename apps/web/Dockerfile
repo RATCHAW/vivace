@@ -24,6 +24,11 @@ ARG VITE_POSTHOG_KEY
 ENV VITE_POSTHOG_KEY=$VITE_POSTHOG_KEY
 ARG VITE_POSTHOG_HOST
 ENV VITE_POSTHOG_HOST=$VITE_POSTHOG_HOST
+# Which deploy the events say they came from. Vite's mode is `production` for
+# every image built here, which is right for production and wrong for a staging
+# or local stack — this is how those say so.
+ARG VITE_APP_ENV
+ENV VITE_APP_ENV=$VITE_APP_ENV
 
 RUN pnpm --filter @repo/web build
 

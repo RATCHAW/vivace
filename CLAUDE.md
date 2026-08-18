@@ -123,6 +123,19 @@ Lambda bundle all read it rather than each holding their own list.
   and `supportsTheme` on the catalogue entry are checked in the route, and the
   option is dropped before it reaches the hash — otherwise two identical films
   would hash differently and each get its own Lambda invocation.
+- **The key plate is a delivery format, not a fourth look.** `greenscreen`
+  (`core/greenscreen.ts`) renders the canvas in chroma green so the athlete can
+  cut it out and put their own footage behind the run, and it composes with the
+  theme rather than replacing it. Every template honours it — there is no
+  `supportsGreenscreen` to check, and `registry.test.ts` fails on a template
+  whose default props don't carry one. Three rules make a file keyable: the
+  canvas is one flat colour, the grain is off (noise makes the matte crawl), and
+  every ink is flattened over the canvas it was designed against, because a
+  translucent white over the plate composites to pale green and is cut away with
+  it. Anything drawn *as* the canvas — a marker's punched-out centre — uses
+  `theme.plate`, or it keys out into a hole. The replay drops its basemap when
+  the option is on: the map *is* that template's background, and replacing it is
+  what the athlete asked for.
 - **A run holds one render per template** (`run_render`'s key is user + activity
   + template), so switching template must never discard the last one's MP4.
 - The Vivace mark is copied into `packages/video/src/brand/` for the same reason

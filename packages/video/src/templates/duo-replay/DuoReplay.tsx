@@ -6,6 +6,7 @@ import {
   RUNNER_AVATAR_CLEARANCE,
   RUNNER_CLEARANCE,
 } from "../../core/marker";
+import { KEY_COLOR } from "../../core/greenscreen";
 import { RouteCanvas } from "../../core/RouteCanvas";
 import { RouteMap, type RouteLayer } from "../../core/RouteMap";
 import { clamp01, envelope } from "../../core/timing";
@@ -20,7 +21,13 @@ import {
   DUO_DRAW_TO,
   DUO_ROUTE_PADDING,
 } from "./duo";
-import { CREDIT_SIZE, DuoOverlay, StoryProgress, Watermark } from "./overlay";
+import {
+  CREDIT_SIZE,
+  duoInk,
+  DuoOverlay,
+  StoryProgress,
+  Watermark,
+} from "./overlay";
 import { DuoOutroCards } from "./outro";
 
 // A type alias, not an interface — Remotion's <Composition> needs props
@@ -37,6 +44,11 @@ export type DuoReplayProps = {
   partner: VideoPartner | null;
   /** What to call the athlete on their own bar. */
   athleteName: string;
+  /** Cut the canvas as a chroma key plate — see `core/greenscreen.ts`. As in
+   *  the replay it also takes the basemap out: tiles are somebody else's
+   *  photograph of the ground, and this cut exists to put the athletes' own
+   *  footage there instead. */
+  greenscreen?: boolean;
 };
 
 /**
@@ -61,6 +73,7 @@ export function DuoReplay({
   avatarUrl,
   partner,
   athleteName,
+  greenscreen = false,
 }: DuoReplayProps) {
   const frame = useCurrentFrame();
   const { fps, width, height, durationInFrames } = useVideoConfig();
@@ -116,7 +129,10 @@ export function DuoReplay({
   }));
 
   const hasRoute = layers.some((layer) => layer.points.length >= 2);
-  const hasMap = hasRoute && mapboxToken !== "";
+  // A keyed film never mounts the map, token or not.
+  const hasMap = hasRoute && mapboxToken !== "" && !greenscreen;
+  const plate = greenscreen ? KEY_COLOR : "#000000";
+  const ink = duoInk(greenscreen);
 
   // The type dissolves up over the opening beat rather than being there on frame
   // one; released past 1, so the closing frame still holds the final numbers.
@@ -125,7 +141,7 @@ export function DuoReplay({
   const outro = duoOutro(t);
 
   return (
-    <AbsoluteFill style={{ backgroundColor: "#000000", color: "#ffffff" }}>
+    <AbsoluteFill style={{ backgroundColor: plate, color: "#ffffff" }}>
       {/* The map plate is the film — it stays mounted and lit for every frame;
           remounting it would cost a Mapbox style load mid-video. */}
       <AbsoluteFill style={{ overflow: "hidden" }}>
@@ -160,41 +176,52 @@ export function DuoReplay({
               width={width}
               height={height}
               padding={DUO_ROUTE_PADDING}
+              plate={plate}
+              trackColor={ink.track}
             />
           ) : null}
         </AbsoluteFill>
 
         {/* Scrims keep type legible over the map without breaking the
             no-drop-shadow rule — elevation via canvas luminance only. The
-            bottom one is taller than the replay's: it has two bars to carry. */}
-        <div
-          style={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            right: 0,
-            height: 520,
-            background:
-              "linear-gradient(to bottom, rgba(0,0,0,0.88), rgba(0,0,0,0))",
-          }}
-        />
-        <div
-          style={{
-            position: "absolute",
-            bottom: 0,
-            left: 0,
-            right: 0,
-            height: 860,
-            background:
-              "linear-gradient(to top, rgba(0,0,0,0.94), rgba(0,0,0,0))",
-          }}
-        />
+            bottom one is taller than the replay's: it has two bars to carry.
+
+            There is no map on the key plate, and a gradient that fades *into*
+            the key colour is the one shape a chroma key cannot cut cleanly: it
+            would leave a dark halo across the top and bottom of the athletes'
+            own footage. */}
+        {!greenscreen && (
+          <>
+            <div
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                right: 0,
+                height: 520,
+                background:
+                  "linear-gradient(to bottom, rgba(0,0,0,0.88), rgba(0,0,0,0))",
+              }}
+            />
+            <div
+              style={{
+                position: "absolute",
+                bottom: 0,
+                left: 0,
+                right: 0,
+                height: 860,
+                background:
+                  "linear-gradient(to top, rgba(0,0,0,0.94), rgba(0,0,0,0))",
+              }}
+            />
+          </>
+        )}
 
         {/* The card's own canvas. The blur alone leaves the run legible enough
             to compete with the numbers standing in front of it. */}
         <AbsoluteFill
           style={{
-            backgroundColor: "#000000",
+            backgroundColor: plate,
             opacity: outro.veil * 0.55,
           }}
         />

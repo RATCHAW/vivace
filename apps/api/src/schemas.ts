@@ -165,6 +165,10 @@ export const RunRenderOptionsSchema = z
     /** Which of the three looks to cut it in. Ignored by a template whose
      *  `supportsTheme` is false — the replay's plate is a Mapbox style. */
     theme: VideoThemeSchema.default(DEFAULT_THEME),
+    /** Cut the canvas as a chroma key plate, so the athlete can key it away and
+     *  put their own footage behind the run. Honoured by every template — it is
+     *  a delivery format rather than a look, so it has no `supports…` flag. */
+    greenscreen: z.boolean().default(false).openapi({ example: true }),
   })
   .openapi("RunRenderOptions");
 
@@ -189,6 +193,7 @@ export const RunRenderSchema = z
      *  wrong MP4. */
     show_avatar: z.boolean(),
     theme: VideoThemeSchema,
+    greenscreen: z.boolean(),
     /** Overall Lambda render progress, 0–1. */
     progress: z.number().min(0).max(1).openapi({ example: 0.42 }),
     output_url: z.string().nullable().openapi({
@@ -440,6 +445,17 @@ export const CoachChatRequestSchema = z
      * been going" answers over the range the athlete is looking at.
      */
     range_weeks: z.number().int().min(1).max(52).default(6),
+    /**
+     * The language the athlete is reading the app in.
+     *
+     * Not a general localisation of the coach: what it writes is prose, and
+     * server-generated prose is English in both languages (see CLAUDE.md). This
+     * covers the one thing the coach puts on screen as *UI* — the questions and
+     * choices `askAthlete` draws as a form — because an English form inside a
+     * French screen is a different thing from an English sentence in a French
+     * answer.
+     */
+    language: z.enum(["en", "fr"]).default("en"),
   })
   .openapi("CoachChatRequest");
 

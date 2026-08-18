@@ -34,6 +34,11 @@ export {
   type ThemeName,
 } from "./core/theme";
 
+// The chroma key plate, which every template honours — a delivery format rather
+// than a fourth look, so it is a boolean beside the theme and not one of them.
+// The picker paints its swatch with the colour the athlete will be keying out.
+export { KEY_COLOR, videoTheme } from "./core/greenscreen";
+
 // The formatters double as the app's: a pace in the run list and a pace in the
 // video are the same string, and this is the one implementation of it.
 export {

@@ -102,6 +102,18 @@ describe("the catalogue", () => {
     }
   });
 
+  it("hands every template the key plate", () => {
+    // The greenscreen option is catalogue-wide — it is a delivery format, not a
+    // look, so there is no `supportsGreenscreen` for the compiler to ask about.
+    // This is what catches a template added without one: its film would render
+    // on black whatever the athlete chose, and they would key nothing.
+    for (const template of VIDEO_TEMPLATES) {
+      expect(TEMPLATE_DEFAULT_PROPS[template.id].greenscreen, template.id).toBe(
+        false,
+      );
+    }
+  });
+
   it("gives WebGL templates a software renderer and room to fetch tiles", () => {
     for (const template of VIDEO_TEMPLATES) {
       if (!template.usesMap) continue;

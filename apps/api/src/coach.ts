@@ -28,6 +28,7 @@ import {
   type BestEffort,
 } from "./strava.js";
 import { getContext, getPlan, saveContext } from "./coach-store.js";
+import { getFeatureVariantFor } from "./posthog.js";
 import {
   describeGoal,
   readTraining,
@@ -79,12 +80,17 @@ export interface CoachConfig {
  * Null until an API key is configured — the chat route turns that into a 503
  * with a `not_configured` reason rather than a crash, the same way the render
  * routes treat a missing Remotion Lambda deployment.
+ *
+ * `override` is the model a feature flag's variant named, and it wins over the
+ * env var: a variant exists precisely so a model can be changed without a
+ * deploy. Null still means "no API key" and nothing else — a variant can only
+ * ever change *which* model is asked for, never whether one can be.
  */
-export function getCoachConfig(): CoachConfig | null {
+export function getCoachConfig(override?: string): CoachConfig | null {
   const apiKey = process.env.LLM_GATEWAY_API_KEY;
   if (!apiKey) return null;
   // `||`, not `??`: docker-compose passes an unset variable through as "".
-  const modelId = process.env.COACH_MODEL || DEFAULT_MODEL;
+  const modelId = override || process.env.COACH_MODEL || DEFAULT_MODEL;
   const gateway = createGateway({
     apiKey,
     baseURL: process.env.LLM_GATEWAY_URL || DEFAULT_GATEWAY_URL,
@@ -211,13 +217,26 @@ Some tools draw something the athlete can see:
   same numbers. Write the read the chart cannot: what it means and what to do.
   Two or three sentences, naming at most a couple of specific figures.
 
+Asking back: when something you genuinely cannot look up would change your
+answer — which race, what hurts, which days they can run, how a session felt —
+ask it with \`askAthlete\` instead of writing the question into your reply. It
+draws the questions as a form the athlete taps through, one at a time, and their
+answers arrive as their next message. Rules: at most one form per turn, and only
+the questions the tools cannot answer for you. Every question can be skipped and
+every choice question carries its own free-text box, so list the answers you
+expect and never an "Other" — the athlete always has a way past you. Under the
+form, one short line at most: they are answering, not reading. Then act on what
+comes back — whatever belongs to their goals goes straight into
+\`setAthleteContext\`, and a question they skipped is one you do not ask again.
+
 Memory: \`getAthleteContext\` is the goal race, target time and long-run day.
 Call \`setAthleteContext\` the moment the athlete tells you any of it — a race,
 a date, a target, an injury, the days they can run — so the next thread starts
 knowing. Never ask for something the context already holds.
 
 Planning: when the athlete asks for a week, a plan or a taper, write it with
-\`proposeWeek\`. Seven days, day 0 is Monday, rest days included with 0 km. Build
+\`proposeWeek\`. Seven days numbered 0 = Monday … 6 = Sunday, never 1 to 7, rest
+days included with 0 km. Build
 it around the goal race and the load numbers, not around a template.
 
 Boundaries: you coach running, not medicine. Pain that persists, or anything
@@ -225,6 +244,73 @@ that sounds like an injury, gets one sentence pointing at a physio or doctor —
 then get back to what they can safely do meanwhile. If a tool fails or the
 athlete has no runs yet, say so instead of inventing numbers.
 `.trim();
+
+/** The languages apps/web ships in, as the chat request sends them. */
+export type CoachLanguage = "en" | "fr";
+
+const LANGUAGE_NAMES: Record<CoachLanguage, string> = {
+  en: "English",
+  fr: "French",
+};
+
+/**
+ * `v2-terse`: the same coach, told to spend fewer words.
+ *
+ * Written as an addendum rather than a second copy of the whole prompt. A
+ * variant *may* be a whole prompt — the catalogue below holds strings, not
+ * patches — but this one changes the output rules and nothing else, and forty
+ * duplicated lines would drift the first time the base prompt learned a tool.
+ */
+const TERSE_ADDENDUM = `
+Above anything said about length so far: two sentences, three at the very most.
+Lead with the instruction and leave the reasoning out unless it changes what
+they should do — the athlete is reading this on a phone, between other things.
+No greeting, no restating the question, and no closing offer to help further.
+`.trim();
+
+/**
+ * The prompts that can answer a turn, by version.
+ *
+ * A version key, not the prompt text itself, is what a flag's payload names.
+ * The payload *could* carry the whole prompt and be edited in PostHog with no
+ * deploy at all — but the prompt names the tools the code must actually have,
+ * and in a flag textarea it loses review, diff and this file's tests. The
+ * catalogue is the trade: the pairing is switchable without a deploy, the words
+ * still go through a pull request.
+ */
+const SYSTEM_PROMPTS = {
+  v1: BASE_SYSTEM_PROMPT,
+  "v2-terse": `${BASE_SYSTEM_PROMPT}\n\n${TERSE_ADDENDUM}`,
+} as const;
+
+export type CoachPromptVersion = keyof typeof SYSTEM_PROMPTS;
+
+/**
+ * Every prompt a variant may name — derived from the catalogue rather than
+ * written beside it, so a prompt added above is one the payload schema below
+ * accepts without a second edit anyone could forget.
+ */
+export const PROMPT_VERSIONS = Object.keys(SYSTEM_PROMPTS) as [
+  CoachPromptVersion,
+  ...CoachPromptVersion[],
+];
+
+/** What the coach shipped with, and what every fallback lands on. */
+export const DEFAULT_PROMPT_VERSION: CoachPromptVersion = "v1";
+
+function isPromptVersion(value: string): value is CoachPromptVersion {
+  return value in SYSTEM_PROMPTS;
+}
+
+/** What the athlete's message is folded into, when no variant says otherwise. */
+export interface CoachPromptOptions {
+  /** The run the composer's `@` picker put on the message. */
+  attached?: AttachedRun;
+  /** Which prompt in the catalogue answers this turn. */
+  prompt?: CoachPromptVersion;
+  /** The language the athlete is reading the app in. Defaults to English. */
+  language?: CoachLanguage;
+}
 
 /**
  * The system prompt with today's date and the window the athlete has selected
@@ -236,10 +322,10 @@ athlete has no runs yet, say so instead of inventing numbers.
 export function coachSystemPrompt(
   today: string,
   rangeWeeks: number,
-  attached?: AttachedRun,
+  { attached, prompt, language = "en" }: CoachPromptOptions = {},
 ): string {
   const lines = [
-    BASE_SYSTEM_PROMPT,
+    SYSTEM_PROMPTS[prompt ?? DEFAULT_PROMPT_VERSION],
     `Today is ${today}. The athlete is looking at the last ${rangeWeeks} weeks of training; prefer that window unless they ask for another.`,
   ];
   if (attached) {
@@ -247,7 +333,130 @@ export function coachSystemPrompt(
       `The athlete attached a run to this message: "${attached.name}" on ${attached.date}, Strava activity id ${attached.id}. "This run", "it" and "that session" mean that one — read it rather than asking which.`,
     );
   }
+  if (language !== "en") {
+    // Deliberately narrow. What the coach writes is prose, and this app's
+    // server-generated prose is English in both languages; `askAthlete` is the
+    // one thing it puts on screen as an interface, and an English form inside a
+    // French screen reads as a bug rather than as an accent.
+    lines.push(
+      `The athlete is reading the app in ${LANGUAGE_NAMES[language]}. \`askAthlete\` draws an interface rather than something you said, so write its questions, hints and choices in ${LANGUAGE_NAMES[language]}. Everything you write yourself stays in English.`,
+    );
+  }
   return lines.join("\n\n");
+}
+
+/**
+ * The multivariate flag that carries the model **and** the prompt.
+ *
+ * One flag, not two. The unit that varies is the *pair* — a prompt tuned for
+ * one model is not the prompt for another — and a flag per axis would let a
+ * turn land on a combination nobody meant to ship. Each variant's JSON payload
+ * is the config:
+ *
+ * ```json
+ * { "model": "anthropic/claude-sonnet-5", "prompt": "v2-terse" }
+ * ```
+ *
+ * A PostHog experiment is this same flag with statistics attached, so the flag
+ * can go in on its own and be promoted to an experiment later without a line
+ * here changing.
+ */
+export const COACH_VARIANT_FLAG = "coach-model";
+
+/**
+ * A variant's payload, as it survives being typed into a textarea.
+ *
+ * Every field is optional and every field is checked. A model id that isn't
+ * `vendor/model` hands the choice of vendor back to the gateway — the thing
+ * `DEFAULT_MODEL`'s comment above exists to prevent — and a prompt version
+ * naming nothing in the catalogue would leave the coach with no instructions at
+ * all. Either one falls back to the shipped pairing rather than shipping a
+ * broken one to whoever the flag rolled it out to.
+ */
+const variantPayloadSchema = z.object({
+  model: z
+    .string()
+    .regex(/^[\w.-]+\/[\w.:-]+$/)
+    .optional(),
+  prompt: z.enum(PROMPT_VERSIONS).optional(),
+});
+
+/** Which model and which prompt answer one athlete's turn, and under what name. */
+export interface CoachVariant {
+  /**
+   * What the flag evaluated to, for `$feature/…` attribution on the trace.
+   * Unset in the ordinary case: no flag, no PostHog, or this athlete outside
+   * the rollout — all of which are the shipped pairing.
+   */
+  variant?: string;
+  /** The model the variant named, or undefined for the env var's. */
+  modelId?: string;
+  /** The prompt that goes with it. */
+  prompt: CoachPromptVersion;
+}
+
+/**
+ * `COACH_PROMPT` picks a prompt the way `COACH_MODEL` picks a model: for a
+ * deploy, for a fresh clone that has never heard of PostHog, and for reading
+ * one variant's answers locally without creating a flag to do it.
+ */
+function envPromptVersion(
+  onInvalid: (source: "flag" | "env", value: unknown) => void,
+): CoachPromptVersion {
+  // `||`, not `??`: docker-compose passes an unset variable through as "".
+  const named = process.env.COACH_PROMPT || "";
+  if (!named) return DEFAULT_PROMPT_VERSION;
+  if (isPromptVersion(named)) return named;
+  onInvalid("env", named);
+  return DEFAULT_PROMPT_VERSION;
+}
+
+/**
+ * The model and prompt this athlete's turn runs on.
+ *
+ * Call it once, at the point the turn is actually going to happen: reading the
+ * flag is what sends `$feature_flag_called`, and an athlete whose request was
+ * about to 404 was never exposed to anything.
+ *
+ * `onInvalid` rather than a logger, for the same reason
+ * `dropUnannouncedToolInput` takes one — this is called from a handler, where
+ * the request's own child logger is what makes a line traceable. Nothing here
+ * is swallowed: a payload we refuse is a flag someone typed wrong, and it is
+ * invisible until it is said out loud.
+ */
+export async function resolveCoachVariant(
+  distinctId: string,
+  onInvalid: (source: "flag" | "env", value: unknown) => void,
+): Promise<CoachVariant> {
+  const evaluated = await getFeatureVariantFor(COACH_VARIANT_FLAG, distinctId);
+
+  // The arm an experiment splits on. A `true` value is a payload-only flag,
+  // which is one config for everyone rather than an arm — nothing to attribute.
+  let variant: string | undefined;
+  /** What the flag decided, once it has been believed. */
+  let chosen: z.infer<typeof variantPayloadSchema> = {};
+
+  if (evaluated) {
+    variant = typeof evaluated.value === "string" ? evaluated.value : undefined;
+
+    // A flag that is on and carries nothing is one someone created and hasn't
+    // filled in yet. That is the shipped pairing, not a broken payload.
+    if (evaluated.payload !== undefined && evaluated.payload !== null) {
+      const parsed = variantPayloadSchema.safeParse(evaluated.payload);
+      // Refused whole, never half: the pair is the unit that varies, so taking
+      // the good half of a bad payload would build a pairing nobody chose.
+      if (parsed.success) chosen = parsed.data;
+      else onInvalid("flag", evaluated.payload);
+    }
+  }
+
+  return {
+    variant,
+    modelId: chosen.model,
+    // Read last, and only when the flag left the question open — otherwise a
+    // typo in COACH_PROMPT would be reported on every turn that ignored it.
+    prompt: chosen.prompt ?? envPromptVersion(onInvalid),
+  };
 }
 
 /** The run the composer's `@` picker put on a message. */
@@ -444,6 +653,158 @@ export async function buildRunDebriefCard(
   };
 }
 
+// --- asking the athlete something ---------------------------------------------
+
+/**
+ * How much one questionnaire may hold.
+ *
+ * The caps are the feature, not a safety rail. Left alone a model asks a dozen
+ * things at once, and a dozen-step form in the middle of a conversation is a
+ * form nobody finishes — five questions is about as far as an athlete will tap
+ * before typing "just tell me" instead.
+ */
+const MAX_QUESTIONS = 5;
+const MAX_CHOICES = 6;
+
+/** What kind of answer a question takes, and so what the browser draws. */
+export type AnswerKind = "single" | "multi" | "text" | "number";
+
+/** One option on a `single` or `multi` question. */
+export interface AskedChoice {
+  /** Stable within the question — this is the form field's value, not its text. */
+  value: string;
+  label: string;
+  hint: string | null;
+}
+
+/**
+ * One question.
+ *
+ * There is deliberately no `required`. A question the athlete cannot get past
+ * is a conversation the coach has taken hostage, and this one stands where
+ * their text box usually does — so every question is skippable, and every
+ * choice question carries a free-text box for an answer the model didn't
+ * think of (see `coach-questionnaire.tsx`). Those two together are the way out.
+ */
+export interface AskedQuestion {
+  /** `q1`…`q5`. Assigned here, so a model can't collide two form fields. */
+  id: string;
+  question: string;
+  hint: string | null;
+  kind: AnswerKind;
+  /** Empty for `text` and `number`. */
+  choices: AskedChoice[];
+  unit: string | null;
+  placeholder: string | null;
+}
+
+export interface QuestionnaireCard {
+  card: "questionnaire";
+  intro: string | null;
+  questions: AskedQuestion[];
+}
+
+/** What the model passes in, before any of it is trusted. */
+interface ProposedQuestion {
+  question: string;
+  hint?: string | null;
+  kind: AnswerKind;
+  choices?: { label: string; hint?: string | null }[] | null;
+  unit?: string | null;
+  placeholder?: string | null;
+}
+
+/**
+ * The questionnaire as the browser can actually render it, or the reason it
+ * can't.
+ *
+ * Ids and choice values are assigned here rather than asked for: they are form
+ * field names, and two questions the model happened to call the same thing
+ * would silently merge into one answer. Everything the model wrote — the words
+ * — is kept verbatim.
+ *
+ * Pure, and exported for the tests: the shape it produces is the contract with
+ * `coach-questionnaire.tsx`, and it is the one part of the tool that can be
+ * checked without a model or a Strava token.
+ */
+export function buildQuestionnaire(
+  intro: string | null | undefined,
+  proposed: ProposedQuestion[],
+): QuestionnaireCard | { error: string } {
+  const questions: AskedQuestion[] = [];
+
+  for (const [index, item] of proposed.entries()) {
+    const picks = item.kind === "single" || item.kind === "multi";
+    // A label repeated inside one question is two options the athlete cannot
+    // tell apart; dropped rather than rejected, because the rest of the
+    // question is usually fine and a re-ask costs the athlete a round trip.
+    const labels = picks
+      ? [...new Set((item.choices ?? []).map((choice) => choice.label.trim()))]
+          .filter(Boolean)
+          .slice(0, MAX_CHOICES)
+      : [];
+
+    if (picks && labels.length < 2) {
+      return {
+        error:
+          `Question ${index + 1} is a "${item.kind}" question with fewer than ` +
+          "two distinct choices. Give it two to six, or ask it as text.",
+      };
+    }
+
+    questions.push({
+      id: `q${index + 1}`,
+      question: item.question.trim(),
+      hint: item.hint?.trim() || null,
+      kind: item.kind,
+      choices: labels.map((label, position) => ({
+        value: `c${position + 1}`,
+        label,
+        hint:
+          (item.choices ?? [])
+            .find((choice) => choice.label.trim() === label)
+            ?.hint?.trim() || null,
+      })),
+      unit: item.kind === "number" ? item.unit?.trim() || null : null,
+      // A choice question's free-text box is labelled "Other" by the browser,
+      // in the athlete's language — the model's example answer would be an
+      // English word sitting in a French form.
+      placeholder: picks ? null : item.placeholder?.trim() || null,
+    });
+  }
+
+  return { card: "questionnaire", intro: intro?.trim() || null, questions };
+}
+
+/**
+ * A proposed week's sessions as 0 = Monday … 6 = Sunday, sorted, whichever way
+ * the model numbered them.
+ *
+ * Every other place a planned day appears — `PlannedSessionSchema`, the accept
+ * route, the weekday stamps the card indexes by — counts from 0, and a model
+ * asked for "seven days, Monday first" writes 1…7 often enough that rejecting
+ * it costs the athlete the whole turn: the input never validates, so the tool
+ * never runs and `streamText` fails mid-answer.
+ *
+ * A week that reaches 7 without a 0 is that week, off by one, and shifting the
+ * whole of it is unambiguous. A week holding both a 0 and a 7 is a model that
+ * lost count, and shifting there would move six right days to fix one wrong
+ * one — so only the 7 moves, to the Sunday it means under either numbering.
+ * Either way nothing leaves 0…6, which is what the accept route validates
+ * against and what the card's weekday stamps are indexed by.
+ */
+export function mondayFirst<T extends { day: number }>(sessions: T[]): T[] {
+  const days = sessions.map((session) => session.day);
+  const shift = days.includes(7) && !days.includes(0);
+
+  return sessions
+    .map((session) => ({
+      ...session,
+      day: shift ? session.day - 1 : Math.min(session.day, 6),
+    }))
+    .sort((a, b) => a.day - b.day);
+}
+
 /** The context to bind a set of tools to one athlete and one turn. */
 export interface CoachToolContext {
   accessToken: string;
@@ -545,6 +906,78 @@ export function createCoachTools(ctx: CoachToolContext): ToolSet {
         const context = await saveContext(userId, patch);
         return { saved: true, context, summary: describeGoal(context, today) };
       },
+    }),
+
+    askAthlete: tool({
+      description:
+        "Ask the athlete something the tools cannot tell you — which race, " +
+        "what hurts, which days they can run, how a session felt. Draws the " +
+        "questions as a form they tap through one at a time instead of typing " +
+        "prose, and their answers come back as their next message. Use it " +
+        "rather than writing the questions into your reply. One form per turn, " +
+        "up to five questions, and never for anything a tool can look up.",
+      inputSchema: z.object({
+        intro: z
+          .string()
+          .max(160)
+          .optional()
+          .describe(
+            "One line saying why you are asking. Omit it when the questions " +
+              "speak for themselves.",
+          ),
+        questions: z
+          .array(
+            z.object({
+              question: z
+                .string()
+                .max(140)
+                .describe("The question itself, one sentence."),
+              hint: z
+                .string()
+                .max(160)
+                .optional()
+                .describe("A clarifying line under the question."),
+              kind: z
+                .enum(["single", "multi", "text", "number"])
+                .describe(
+                  "single = pick one choice, multi = pick any number of " +
+                    "them, text = type a short answer, number = type a " +
+                    "number. Prefer choices: a tap beats a sentence.",
+                ),
+              choices: z
+                .array(
+                  z.object({
+                    label: z.string().max(60),
+                    hint: z.string().max(80).optional(),
+                  }),
+                )
+                .max(MAX_CHOICES)
+                .optional()
+                .describe(
+                  "Two to six options, for single and multi only. Every " +
+                    "choice question is also drawn with a free-text box for " +
+                    "an answer you did not list, so never add 'Other', " +
+                    "'Something else' or 'None of these' yourself — list only " +
+                    "the answers you actually expect.",
+                ),
+              unit: z
+                .string()
+                .max(20)
+                .optional()
+                .describe("What a number is in: 'km', 'days a week', 'kg'."),
+              placeholder: z
+                .string()
+                .max(60)
+                .optional()
+                .describe("An example answer, for text and number."),
+            }),
+          )
+          .min(1)
+          .max(MAX_QUESTIONS)
+          .describe("The questions, in the order they should be asked."),
+      }),
+      execute: async ({ intro, questions }) =>
+        buildQuestionnaire(intro, questions),
     }),
 
     listRuns: tool({
@@ -796,7 +1229,10 @@ export function createCoachTools(ctx: CoachToolContext): ToolSet {
           .string()
           .regex(/^\d{4}-\d{2}-\d{2}$/)
           .optional()
-          .describe("The Monday the week starts on. Defaults to this week."),
+          .describe(
+            "A date in the week being written. Defaults to this week; it is " +
+              "snapped to that week's Monday.",
+          ),
         label: z
           .string()
           .max(60)
@@ -805,7 +1241,14 @@ export function createCoachTools(ctx: CoachToolContext): ToolSet {
         sessions: z
           .array(
             z.object({
-              day: z.number().int().min(0).max(6).describe("0 = Monday."),
+              // 7 is accepted, not asked for: a model that numbers the week
+              // 1…7 is normalised by `mondayFirst` rather than rejected.
+              day: z
+                .number()
+                .int()
+                .min(0)
+                .max(7)
+                .describe("0 = Monday … 6 = Sunday."),
               type: z
                 .string()
                 .max(40)
@@ -830,16 +1273,21 @@ export function createCoachTools(ctx: CoachToolContext): ToolSet {
           .describe("Seven days, Monday first."),
       }),
       execute: async ({ week_starting, label, sessions }) => {
-        const week = week_starting ?? weekStart(today);
+        // Snapped, not trusted: a week is keyed on its Monday everywhere it is
+        // read back — `getPlan` here, the accept route, the briefing's
+        // `weekStart(today)` — so a mid-week date the model wrote would store a
+        // plan nothing ever looks for again.
+        const week = weekStart(week_starting ?? today);
         const accepted = await getPlan(userId, week);
-        const total = sessions.reduce((sum, session) => sum + session.km, 0);
+        const planned = mondayFirst(sessions);
+        const total = planned.reduce((sum, session) => sum + session.km, 0);
         return {
           card: "week-plan" as const,
           week_starting: week,
           label: label ?? null,
-          sessions: [...sessions].sort((a, b) => a.day - b.day),
+          sessions: planned,
           total_km: Number(total.toFixed(1)),
-          quality: sessions.filter((session) => session.key).length,
+          quality: planned.filter((session) => session.key).length,
           /** True when this exact week has already been accepted. */
           accepted: accepted !== null,
         };

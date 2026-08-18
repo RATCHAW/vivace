@@ -74,6 +74,13 @@ export const TEMPLATE_DEFAULT_PROPS: Record<
     streams: {},
     mapboxToken: "",
     avatarUrl: "",
+    greenscreen: false,
+  },
+  "split-rush": {
+    activity: placeholderRun,
+    streams: {},
+    theme: DEFAULT_THEME,
+    greenscreen: false,
   },
   // No partner: Studio has no invitation to read, and the composition draws the
   // second bar dimmed and empty rather than refusing to open.
@@ -84,17 +91,19 @@ export const TEMPLATE_DEFAULT_PROPS: Record<
     avatarUrl: "",
     partner: null,
     athleteName: "You",
+    greenscreen: false,
   },
-  "split-rush": { activity: placeholderRun, streams: {}, theme: DEFAULT_THEME },
   "living-poster": {
     activity: placeholderRun,
     streams: {},
     theme: DEFAULT_THEME,
+    greenscreen: false,
   },
   "minimal-numbers": {
     activity: placeholderRun,
     streams: {},
     theme: DEFAULT_THEME,
+    greenscreen: false,
   },
 };
 

@@ -7,6 +7,7 @@ import {
   formatPace,
   formatStartDate,
 } from "../../core/format";
+import { flattenOver } from "../../core/greenscreen";
 import {
   FONT_MONO,
   FONT_SANS,
@@ -49,6 +50,38 @@ const ON_DARK_MUTE = "rgba(255,255,255,0.72)";
 export const ON_DARK_FAINT = "rgba(255,255,255,0.64)";
 /** The unfilled part of a runner's bar. {colors.hairline-dark}, one step up. */
 export const TRACK = "rgba(255,255,255,0.18)";
+
+/**
+ * The same inks, over the key plate.
+ *
+ * Every translucent one was mixed against the black under the map, so on the
+ * key plate it is flattened over that same black rather than restyled: a
+ * 72%-white label over chroma green composites to pale green and the key eats
+ * it along with the background. Flattened, it is the grey it always looked
+ * like — and it survives the cut. Same reasoning as `overlayInk` in the
+ * replay's own overlay; the two templates keep their own type ramps, so they
+ * keep their own inks.
+ */
+export interface DuoInk {
+  mute: string;
+  faint: string;
+  track: string;
+}
+
+const OVER_MAP: DuoInk = {
+  mute: ON_DARK_MUTE,
+  faint: ON_DARK_FAINT,
+  track: TRACK,
+};
+
+const OVER_KEY: DuoInk = {
+  mute: flattenOver(ON_DARK_MUTE, "#000000"),
+  faint: flattenOver(ON_DARK_FAINT, "#000000"),
+  track: flattenOver(TRACK, "#000000"),
+};
+
+export const duoInk = (greenscreen: boolean): DuoInk =>
+  greenscreen ? OVER_KEY : OVER_MAP;
 
 /** Type ramp for this template. Smaller than the replay's hero, because there
  *  are two of everything and both have to be read at a glance. */

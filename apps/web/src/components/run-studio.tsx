@@ -109,9 +109,10 @@ function toVideoPartner(
  * go over the picture (Remotion's own) and everything else collapses into one
  * row of four icons. See `FilmChrome`.
  *
- * The state that survives picking another run — template, theme, avatar — is the
- * page's, because on a phone this component unmounts every time the athlete goes
- * back to the list, and a choice that resets itself is worse than no choice.
+ * The state that survives picking another run — template, theme, avatar, key
+ * plate — is the page's, because on a phone this component unmounts every time
+ * the athlete goes back to the list, and a choice that resets itself is worse
+ * than no choice.
  */
 export function RunStudio({
   run,
@@ -122,6 +123,8 @@ export function RunStudio({
   onThemeChange,
   showAvatar,
   onShowAvatarChange,
+  greenscreen,
+  onGreenscreenChange,
   narrow,
   expanded,
   onToggleExpanded,
@@ -136,6 +139,8 @@ export function RunStudio({
   onThemeChange: (next: ThemeName) => void;
   showAvatar: boolean;
   onShowAvatarChange: (next: boolean) => void;
+  greenscreen: boolean;
+  onGreenscreenChange: (next: boolean) => void;
   /** Below the breakpoint this is a screen of its own, over the list. */
   narrow: boolean;
   expanded: boolean;
@@ -239,13 +244,6 @@ export function RunStudio({
   // because there the invitation is behind an icon rather than in view. See
   // `InviteHint`.
   const secondLaneEmpty = missingPartner && !awaitingPartnerData;
-  const hasOptions = entry.supportsTheme || avatarSupported;
-  // What the phone's Options tile opens: the switches, and the invitation on a
-  // cut that takes two runners — a template that honours neither and asks
-  // nobody along has nothing behind that tile, so it is drawn greyed rather
-  // than dropped. A row of actions that changes length as you click down the
-  // catalogue reads as a bug.
-  const hasSheet = hasOptions || takesPartner;
   // The avatar switch is one switch: both faces on the map, or neither. A film
   // with one runner wearing a photo and the other a plain dot reads as a bug
   // rather than as a choice.
@@ -309,6 +307,7 @@ export function RunStudio({
         athleteName={athlete?.firstname ?? t("videoOptions.you")}
         partner={filmPartner}
         theme={filmTheme}
+        greenscreen={greenscreen}
         fit={fit}
         chrome={narrow ? "player" : "studio"}
         frameRef={frameRef}
@@ -328,7 +327,9 @@ export function RunStudio({
     </p>
   );
 
-  const options = hasOptions && (
+  // Always something to open: every template in the catalogue can be cut on the
+  // key plate, whatever else it does or doesn't honour.
+  const options = (
     <VideoOptions
       template={template}
       theme={theme}
@@ -340,6 +341,8 @@ export function RunStudio({
       failed={athleteError != null}
       showAvatar={showAvatar}
       onShowAvatarChange={onShowAvatarChange}
+      greenscreen={greenscreen}
+      onGreenscreenChange={onGreenscreenChange}
     />
   );
 
@@ -366,6 +369,7 @@ export function RunStudio({
       template={template}
       showAvatar={showAvatar && avatarSupported}
       theme={filmTheme}
+      greenscreen={greenscreen}
       layout={layout}
       blocked={missingPartner ? t("video.eligibility.needs-partner") : null}
     />
@@ -468,7 +472,6 @@ export function RunStudio({
                 variant="subtle"
                 aria-label={t("videoOptions.section")}
                 aria-expanded={optionsOpen}
-                disabled={!hasSheet}
                 onClick={() => setOptionsOpen(true)}
               >
                 <span className="relative">

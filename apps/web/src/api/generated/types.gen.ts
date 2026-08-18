@@ -84,6 +84,7 @@ export type RunRender = {
     status: 'rendering' | 'done' | 'error';
     show_avatar: boolean;
     theme: VideoTheme;
+    greenscreen: boolean;
     progress: number;
     output_url: string | null;
     error: string | null;
@@ -99,6 +100,7 @@ export type RunRenderOptions = {
     template?: VideoTemplate;
     show_avatar?: boolean;
     theme?: VideoTheme;
+    greenscreen?: boolean;
 };
 
 export type RunInvite = {
@@ -250,6 +252,7 @@ export type CoachChatRequest = {
     message?: CoachMessage;
     message_id?: string;
     range_weeks?: number;
+    language?: 'en' | 'fr';
 };
 
 export type StravaEvent = {

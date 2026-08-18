@@ -34,6 +34,9 @@ export interface RenderTarget {
 export interface RenderOptions {
   showAvatar: boolean;
   theme: ThemeName;
+  /** Cut the film's canvas as a chroma key plate, so the athlete can drop their
+   *  own footage in behind it. Every template honours this one. */
+  greenscreen: boolean;
 }
 
 const DEFAULT_REGION = "us-east-1";
@@ -98,6 +101,9 @@ export function renderPropsHash(
     // rendered before themes existed still hashes to what it hashed to then —
     // adding the option didn't mark a single athlete's finished film stale.
     ...(options.theme === DEFAULT_THEME ? {} : { theme: options.theme }),
+    // Same trick, and the same reason: a film nobody asked to key hashes
+    // exactly as it did before the option existed.
+    ...(options.greenscreen ? { greenscreen: true } : {}),
     ...(partnerActivityId == null ? {} : { partner: partnerActivityId }),
   });
   return createHash("sha256").update(canonical).digest("hex").slice(0, 32);
@@ -120,6 +126,8 @@ export interface RenderInput {
   athleteName: string;
   /** The look to cut it in; a template that isn't themed ignores it. */
   theme?: ThemeName;
+  /** Cut it on the chroma key plate. Every template honours this one. */
+  greenscreen?: boolean;
   /** The other runner, on a template that draws two. Null everywhere else. */
   partner?: RunPartner | null;
 }
@@ -134,6 +142,7 @@ export async function startLambdaRender(
     showAvatar = avatarUrl !== "",
     athleteName,
     theme = DEFAULT_THEME,
+    greenscreen = false,
     partner = null,
   }: RenderInput,
 ): Promise<{ renderId: string; bucketName: string }> {
@@ -154,6 +163,7 @@ export async function startLambdaRender(
       mapboxToken: template.usesMap ? (process.env.MAPBOX_TOKEN ?? "") : "",
       avatarUrl,
       theme,
+      greenscreen,
       athleteName,
       // The props contract is camelCase — `VideoPartner` in @repo/video — and
       // the API's own is snake_case, so the crossing happens here rather than

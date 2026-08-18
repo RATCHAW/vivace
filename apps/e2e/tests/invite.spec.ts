@@ -134,7 +134,13 @@ test("an athlete invites the person they ran with, who accepts", async ({
     // selectable, which is the acceptance arriving in the picker too.
     await ayoub.reload();
     await ayoub.getByRole("combobox", { name: "Video template" }).click();
-    await ayoub.getByRole("option", { name: /^Duo replay$/ }).click();
+    // Anchored, because that is the assertion: an *ineligible* duo row carries
+    // its reason in the same accessible name ("…Needs someone you ran with to
+    // accept"), so a name that ends here is the acceptance having reached the
+    // picker. `New` is optional rather than absent — the badge on the row is
+    // part of the name a screen reader reads out, deliberately, and a test that
+    // demanded its absence would be asking for it to be hidden from them.
+    await ayoub.getByRole("option", { name: /^Duo replay(?: New)?$/ }).click();
     await expect(
       ayoub.getByText(`${ATHLETES.sam.firstname} is in`),
     ).toBeVisible();

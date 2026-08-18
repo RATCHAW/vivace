@@ -43,6 +43,7 @@ function rendering(progress = 0.42): RunRenderState {
       status: "rendering",
       show_avatar: false,
       theme: "charcoal",
+      greenscreen: false,
       progress,
       output_url: null,
       error: null,
@@ -83,6 +84,7 @@ function renderControls(
         template="run-video"
         showAvatar={false}
         theme="charcoal"
+        greenscreen={false}
         layout="tile"
         blocked={blocked}
       />

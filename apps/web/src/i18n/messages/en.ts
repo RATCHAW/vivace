@@ -181,6 +181,13 @@ export const en = {
      *  them. The other bar always has a name — an invitation was accepted by
      *  somebody. */
     you: "You",
+    greenscreen: "Green screen",
+    greenscreenHint:
+      "Renders the background in key green, so you can cut it out and put your own video behind the run.",
+    /** A template whose background is a basemap trades it for the plate, and
+     *  the athlete should read that before they throw the switch. */
+    greenscreenMap:
+      "Drops the map for key green, so you can cut it out and run the route over your own video.",
   },
 
   /**
@@ -399,6 +406,9 @@ export const en = {
     feedbackSend: "Send",
     feedbackThanks: "Thanks — that helps.",
     sources: "From",
+    /** The row that stands in for a finished turn's working — see coach-steps.tsx. */
+    steps_one: "{{count}} step",
+    steps_other: "{{count}} steps",
     toolFailed: "{{title}} failed",
     workingReading: "Reading your Strava history",
     workingWriting: "Writing",
@@ -436,6 +446,7 @@ export const en = {
       getTrainingSignals: "Measuring your training",
       predictRaces: "Reading your best efforts",
       proposeWeek: "Writing your week",
+      askAthlete: "Asking you something",
     },
   },
 
@@ -516,6 +527,31 @@ export const en = {
     askSwapDay: "Swap {{day}} for something else",
     longRunTo: "Long run → {{day}}",
     askMoveLongRun: "Move the long run to {{day}}",
+
+    /**
+     * The form the coach asks with, which stands where the composer usually
+     * does. Everything here is the chrome around the questions — the questions
+     * themselves are written by the model, in the language this app is being
+     * read in (see `coachSystemPrompt`).
+     *
+     * `questionnaireAnswers` is the first line of the message that carries the
+     * answers to the coach, which is why it reads as something the athlete
+     * would say rather than as a label.
+     */
+    questionnaire: "Questions",
+    questionnaireStep: "{{current}} of {{total}}",
+    questionnairePrevious: "Back",
+    questionnaireSkip: "Skip",
+    questionnaireNext: "Next",
+    questionnaireSend: "Send",
+    /** The free-text box under every choice question — the answer the coach
+     *  didn't think to offer. Its own words, never the model's. */
+    questionnaireOther: "Something else…",
+    questionnaireAnswerOrSkip: "Answer this one, or skip it.",
+    questionnaireAwaiting: "Awaiting your answer",
+    questionnaireAnswered: "Answered",
+    questionnaireAnswers: "Here are my answers:",
+    questionnaireSkipped: "skipped",
   },
 
   rail: {

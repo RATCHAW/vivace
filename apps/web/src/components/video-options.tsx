@@ -1,6 +1,7 @@
 import { useTranslation } from "react-i18next";
 import {
   getTemplate,
+  KEY_COLOR,
   THEMES,
   THEME_NAMES,
   type TemplateId,
@@ -40,6 +41,8 @@ export function VideoOptions({
   failed,
   showAvatar,
   onShowAvatarChange,
+  greenscreen,
+  onGreenscreenChange,
 }: {
   /** Which cut is playing — it decides which of these options it honours. */
   template: TemplateId;
@@ -53,16 +56,22 @@ export function VideoOptions({
   failed: boolean;
   showAvatar: boolean;
   onShowAvatarChange: (next: boolean) => void;
+  greenscreen: boolean;
+  onGreenscreenChange: (next: boolean) => void;
 }) {
   const { t } = useTranslation();
-  const themeSupported = getTemplate(template).supportsTheme;
-  // A template that honours neither option has no panel — the picker above the
-  // player is the whole of its configuration.
-  if (!themeSupported && !avatarSupported) return null;
+  const entry = getTemplate(template);
+  const themeSupported = entry.supportsTheme;
 
   return (
     <div className="flex flex-col gap-4">
-      {themeSupported && <ThemePicker theme={theme} onChange={onThemeChange} />}
+      {themeSupported && (
+        <ThemePicker
+          theme={theme}
+          onChange={onThemeChange}
+          greenscreen={greenscreen}
+        />
+      )}
 
       {avatarSupported && (
         // DESIGN.md: a hairline and a surface, no elevation shadow.
@@ -101,6 +110,43 @@ export function VideoOptions({
           />
         </div>
       )}
+
+      {/* Last, and on every template: this one doesn't change what the film
+          says, it changes what can be done with the file afterwards. */}
+      <div className="bg-muted/40 flex items-center gap-3 rounded-md border px-4 py-3.5">
+        {/* The one swatch in the app painted in a colour nobody chose for its
+            looks — it is the colour the athlete will be keying away, so it is
+            the colour it has to be. */}
+        <span
+          aria-hidden
+          className="size-8 shrink-0 rounded-full border"
+          style={{ backgroundColor: KEY_COLOR, borderColor: KEY_COLOR }}
+        />
+
+        <Label
+          htmlFor="greenscreen"
+          className="flex min-w-0 flex-col items-start gap-1"
+        >
+          <span className="text-body-sm font-semibold">
+            {t("videoOptions.greenscreen")}
+          </span>
+          <span className="text-caption text-muted-foreground font-normal">
+            {/* A template built on a basemap is giving something up for this,
+                and the athlete should read that before they throw the switch —
+                not discover it in the player. */}
+            {entry.usesMap
+              ? t("videoOptions.greenscreenMap")
+              : t("videoOptions.greenscreenHint")}
+          </span>
+        </Label>
+
+        <Switch
+          id="greenscreen"
+          className="ml-auto shrink-0"
+          checked={greenscreen}
+          onCheckedChange={onGreenscreenChange}
+        />
+      </div>
     </div>
   );
 }
@@ -113,9 +159,15 @@ export function VideoOptions({
 function ThemePicker({
   theme,
   onChange,
+  greenscreen,
 }: {
   theme: ThemeName;
   onChange: (next: ThemeName) => void;
+  /** The look still applies on the key plate — it is the ink and the
+   *  illustration, not the background — but every swatch's canvas is the key
+   *  colour then, and a swatch that showed black would be describing a film
+   *  that isn't being made. */
+  greenscreen: boolean;
 }) {
   const { t } = useTranslation();
   const labels = useVideoLabels();
@@ -147,7 +199,7 @@ function ThemePicker({
               aria-hidden
               className="size-5 shrink-0 rounded-full border"
               style={{
-                backgroundColor: THEMES[name].canvas,
+                backgroundColor: greenscreen ? KEY_COLOR : THEMES[name].canvas,
                 borderColor: THEMES[name].accent,
               }}
             />

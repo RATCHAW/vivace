@@ -56,6 +56,9 @@ export interface VideoProps extends Record<string, unknown> {
   partner: unknown;
   /** What to call the athlete on their own bar in a two-runner film. */
   athleteName: string;
+  /** Cut the canvas as a chroma key plate. Every template honours this one —
+   *  see `core/greenscreen.ts`. */
+  greenscreen: boolean;
 }
 
 export const VIDEO_COMPONENTS: Record<TemplateId, ComponentType<VideoProps>> = {

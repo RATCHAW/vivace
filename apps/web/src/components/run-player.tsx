@@ -80,6 +80,7 @@ export function RunPlayer({
   athleteName,
   partner = null,
   theme,
+  greenscreen,
   fit = "width",
   chrome = "studio",
   frameRef,
@@ -102,6 +103,10 @@ export function RunPlayer({
   partner?: VideoPartner | null;
   /** Which of the three looks to cut it in. */
   theme: ThemeName;
+  /** Cut the canvas as a chroma key plate. Every template honours it, and the
+   *  player shows it as it will be exported — green and all, because what the
+   *  athlete is judging is whether the type still reads once it is keyed. */
+  greenscreen: boolean;
   /** Whether the frame is measured off its column or off the space left in the
    *  column. See `filmFrame`. */
   fit?: FilmFit;
@@ -182,6 +187,7 @@ export function RunPlayer({
           theme,
           athleteName,
           partner,
+          greenscreen,
         }}
         durationInFrames={durationInFrames}
         fps={fps}

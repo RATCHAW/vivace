@@ -26,7 +26,8 @@ import {
 } from "../../core/numerals";
 import { hashSeed } from "../../core/seed";
 import { MetricLabel, Rule, Stage } from "../../core/Stage";
-import { getTheme, type Theme } from "../../core/theme";
+import { videoTheme } from "../../core/greenscreen";
+import type { Theme } from "../../core/theme";
 import {
   beatProgress,
   easeOutCubic,
@@ -52,6 +53,8 @@ export type SplitRushProps = {
   streams: VideoStreams;
   /** One of `THEME_NAMES`; anything else falls back to the default. */
   theme: string;
+  /** Cut the canvas as a chroma key plate — see `core/greenscreen.ts`. */
+  greenscreen?: boolean;
 };
 
 /**
@@ -65,10 +68,11 @@ export function SplitRush({
   activity,
   streams,
   theme: themeName,
+  greenscreen,
 }: SplitRushProps) {
   const frame = useCurrentFrame();
   const { fps, durationInFrames } = useVideoConfig();
-  const theme = getTheme(themeName);
+  const theme = videoTheme(themeName, greenscreen);
   const plan = useMemo(
     () => splitRushPlan(activity, streams, fps, durationInFrames),
     [activity, streams, fps, durationInFrames],

@@ -12,7 +12,7 @@
 import "dotenv/config";
 import { captureAiGeneration } from "@posthog/ai";
 import { PostHog } from "posthog-node";
-import { logger } from "./logger.js";
+import { appEnv, logger } from "./logger.js";
 
 /** Tests must not open a batching HTTP client or talk to a real project. */
 const isTest = process.env.NODE_ENV === "test" || Boolean(process.env.VITEST);
@@ -51,6 +51,34 @@ const client = createClient();
 /** Whether anything below will actually leave the process. */
 export const posthogEnabled = client !== null;
 
+/**
+ * `environment` on every event, and on the person behind it.
+ *
+ * A PostHog project is one silo of data, so a laptop pointed at a real key
+ * writes its test athletes into the same Persons list as production's. Nothing
+ * in an event says where it came from unless we put it there — this is that
+ * property, and it is what "Filter out internal and test users" and a
+ * `environment = production` filter on the Persons list both read.
+ *
+ * `$set` rather than `$set_once`: an athlete's environment is wherever they
+ * were last seen, so a real person who is also the one testing locally is not
+ * stuck as `development` forever.
+ *
+ * A separate PostHog project for development is stronger than a property — the
+ * data never arrives at all — and this doesn't replace it. It is what keeps the
+ * project honest for everyone who hasn't set one up. See the README.
+ */
+function withEnvironment(
+  properties: Record<string, unknown> | undefined,
+  { person = false }: { person?: boolean } = {},
+): Record<string, unknown> {
+  return {
+    ...properties,
+    environment: appEnv,
+    ...(person ? { $set: { environment: appEnv } } : {}),
+  };
+}
+
 interface UserEvent {
   /** The better-auth user id — the same value `userId` carries in the logs. */
   distinctId: string;
@@ -67,7 +95,13 @@ export function captureUserEvent({
   event,
   properties,
 }: UserEvent): void {
-  client?.capture({ distinctId, event, properties });
+  client?.capture({
+    distinctId,
+    event,
+    // An athlete doing something is the one place a person definitely exists,
+    // so it is where the person's own `environment` is written.
+    properties: withEnvironment(properties, { person: true }),
+  });
 }
 
 /**
@@ -82,11 +116,15 @@ export function captureServerException(
   distinctId: string | undefined,
   properties?: Record<string, unknown>,
 ): void {
-  client?.captureException(error, distinctId ?? "server", {
-    ...properties,
-    // Separates API faults from the browser's in the same project.
-    source: "api",
-  });
+  client?.captureException(
+    error,
+    distinctId ?? "server",
+    withEnvironment({
+      ...properties,
+      // Separates API faults from the browser's in the same project.
+      source: "api",
+    }),
+  );
 }
 
 /**
@@ -115,6 +153,59 @@ export async function isFeatureEnabledFor(
       "Could not read a flag",
     );
     return fallback;
+  }
+}
+
+/** A multivariate flag's answer for one athlete: which arm, and its config. */
+export interface FeatureVariant {
+  /**
+   * What the flag evaluated to — the variant key for a multivariate flag
+   * (`control`, `sonnet-terse`), or `true` for a plain boolean one that exists
+   * only to carry a payload, which is PostHog's remote config.
+   */
+  value: string | true;
+  /**
+   * The variant's JSON payload, exactly as it was typed into PostHog.
+   *
+   * Deliberately `unknown`: a payload is edited in a browser textarea by
+   * whoever has access to the project, with no review and no deploy. The caller
+   * parses it and falls back on anything it doesn't recognise.
+   */
+  payload: unknown;
+}
+
+/**
+ * Evaluates a flag for one athlete and hands back the payload that says what
+ * the variant actually *is* — the built-in way to vary more than a boolean
+ * without inventing a config mechanism.
+ *
+ * `null` — PostHog off, unreachable, no such flag, or this athlete outside the
+ * rollout — means the shipped behaviour, exactly as `isFeatureEnabledFor`'s
+ * fallback does. That is what makes deleting the flag a safe act.
+ *
+ * `getFlag` is called before `getFlagPayload` on purpose: only the first counts
+ * as an access, and an access is what sends `$feature_flag_called`. That event
+ * is the exposure an experiment computes its statistics from, so it has to fire
+ * where the athlete actually receives the variant and nowhere else.
+ */
+export async function getFeatureVariantFor(
+  flag: string,
+  distinctId: string,
+): Promise<FeatureVariant | null> {
+  if (!client) return null;
+  try {
+    const flags = await client.evaluateFlags(distinctId);
+    const value = flags.getFlag(flag);
+    // `false` is the athlete in the holdout, `undefined` the flag not existing.
+    // Neither is a variant, and both mean what the app shipped with.
+    if (value === undefined || value === false) return null;
+    return { value, payload: flags.getFlagPayload(flag) };
+  } catch (err) {
+    logger.warn(
+      { event: "posthog.flag_failed", flag, err },
+      "Could not read a flag",
+    );
+    return null;
   }
 }
 
@@ -157,7 +248,7 @@ interface LlmEventContext {
 
 /** The `$ai_*` properties every event in a trace carries. */
 function contextProperties(context: LlmEventContext): Record<string, unknown> {
-  return {
+  return withEnvironment({
     $ai_trace_id: context.traceId,
     ...(context.spanId ? { $ai_span_id: context.spanId } : {}),
     ...(context.parentId ? { $ai_parent_id: context.parentId } : {}),
@@ -171,7 +262,7 @@ function contextProperties(context: LlmEventContext): Record<string, unknown> {
       ? { $session_id: context.replaySessionId }
       : {}),
     ...context.properties,
-  };
+  });
 }
 
 /** `$ai_is_error` / `$ai_error`, in the shape `@posthog/ai` writes them. */

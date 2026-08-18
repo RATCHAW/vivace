@@ -21,11 +21,24 @@ export function RouteCanvas({
   width,
   height,
   padding,
+  plate = "#000000",
+  trackColor = "rgba(255,255,255,0.22)",
 }: {
   layers: RouteLayer[];
   width: number;
   height: number;
   padding: RoutePadding;
+  /** What the routes are drawn on: canvas-dark, or the chroma key colour. */
+  plate?: string;
+  /**
+   * The unrun part of each route.
+   *
+   * A prop rather than the constant it used to be, because it has to be opaque
+   * on the key plate: 22% white over chroma green composites to pale green and
+   * is cut away with the background, taking the route the athlete has not
+   * reached yet with it. See `overlayInk` in `core/greenscreen.ts`.
+   */
+  trackColor?: string;
 }) {
   const projected = useMemo(() => {
     const all = projectRoute(
@@ -47,7 +60,7 @@ export function RouteCanvas({
   if (projected.every((points) => points.length < 2)) return null;
 
   return (
-    <AbsoluteFill style={{ backgroundColor: "#000000" }}>
+    <AbsoluteFill style={{ backgroundColor: plate }}>
       <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
         {projected.map((points, index) =>
           points.length < 2 ? null : (
@@ -55,7 +68,7 @@ export function RouteCanvas({
               key={layers[index].key}
               points={toSvgPoints(points)}
               fill="none"
-              stroke="rgba(255,255,255,0.22)"
+              stroke={trackColor}
               strokeWidth={5}
               strokeLinecap="round"
               strokeLinejoin="round"
