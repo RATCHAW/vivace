@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { AbsoluteFill, getRemotionEnvironment, useDelayRender } from "remotion";
-import mapboxgl, { type GeoJSONSource, type Map as MapboxMap } from "mapbox-gl";
+import mapboxgl, {
+  type GeoJSONSource,
+  type Map as MapboxMap,
+  type MapOptions,
+} from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { projectPoint, type Camera } from "./camera";
 import type { LatLng } from "./geo";
@@ -24,6 +28,48 @@ export interface RouteLayer {
   color: string;
   /** The picture riding that head, in place of the dot. Empty keeps the dot. */
   avatarUrl: string;
+}
+
+/**
+ * A map whose canvas is sized in composition pixels rather than device ones.
+ *
+ * Mapbox multiplies the element it is given by `window.devicePixelRatio`, and
+ * in v3 there is no option to cap it — `_resizeCanvas` reads the window every
+ * time. The number it multiplies is not the size of the picture: this plate is
+ * laid out at the *composition*'s size, 1080×1920, because that is what the
+ * film is, while the athlete watches it in a box a few hundred pixels wide. So
+ * a phone at ratio 3 allocates a 3240×5760 drawing buffer — 71MB — and
+ * `preserveDrawingBuffer` keeps a second one the same size. That is the largest
+ * allocation anything in this package makes, it is nine times more than the
+ * screen can show, and the duo replay is the template that then puts a
+ * full-frame `blur()` over it for the last quarter of every loop. A phone
+ * answers that by killing the tab, which reads to the athlete as the page
+ * reloading itself the moment they pick the cut.
+ *
+ * Pinned to 1, the canvas is 1080×1920 — the resolution of the MP4 being
+ * previewed, which is the most a preview of it can honestly show, and still
+ * more pixels than any film box on any display. `trackResize` goes with it: a
+ * resize has Mapbox read the real ratio again and hand the buffer straight
+ * back, and the container is a fixed 1080×1920 that never resizes anyway.
+ *
+ * The patch spans one synchronous constructor call and is put back in a
+ * `finally`. A headless render never takes this path — there the canvas *is*
+ * the frame, and its ratio is the render's own.
+ */
+function buildPlate(options: MapOptions, capPixelRatio: boolean): MapboxMap {
+  if (!capPixelRatio) return new mapboxgl.Map(options);
+
+  const own = Object.getOwnPropertyDescriptor(window, "devicePixelRatio");
+  Object.defineProperty(window, "devicePixelRatio", {
+    configurable: true,
+    get: () => 1,
+  });
+  try {
+    return new mapboxgl.Map(options);
+  } finally {
+    if (own) Object.defineProperty(window, "devicePixelRatio", own);
+    else delete (window as { devicePixelRatio?: number }).devicePixelRatio;
+  }
 }
 
 const toLngLat = ([lat, lng]: LatLng): [number, number] => [lng, lat];
@@ -85,6 +131,22 @@ function plateOf(layers: RouteLayer[]): string {
 }
 
 /**
+ * What a frame actually asks the plate to draw.
+ *
+ * The props are a new object on every frame of a film, but what is *in* them
+ * stops changing well before the film does: `RouteLayer.drawn` is what selects
+ * the trace and the marker, and the camera is read off a track. Two frames that
+ * agree on both are the same picture, and pushing it a second time is work with
+ * nothing to show for it — see the effect below.
+ */
+function frameOf(layers: RouteLayer[], camera: Camera | null): string {
+  const shot = camera
+    ? `${camera.center[0]},${camera.center[1]},${camera.zoom}`
+    : "";
+  return `${layers.map((layer) => `${layer.key}:${layer.drawn}`).join("|")}@${shot}`;
+}
+
+/**
  * The plate, remounted when the runners on it change.
  *
  * `RouteMapPlate` builds its Mapbox sources once, from the frame it opens on,
@@ -135,6 +197,9 @@ function RouteMapPlate({
   // is the *opening* frame it builds from, not whichever one it happened to run
   // on.
   const [opening] = useState(() => ({ layers, camera }));
+  // The last picture actually pushed into the map — see `frameOf` and the
+  // per-frame effect below. Not state: nothing is drawn from it.
+  const drawnFrame = useRef<string | null>(null);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -142,18 +207,27 @@ function RouteMapPlate({
     let disposed = false;
     const first = opening.layers.find((layer) => layer.points.length > 0);
 
-    const mapInstance = new mapboxgl.Map({
-      accessToken: token,
-      container: containerRef.current,
-      style: "mapbox://styles/mapbox/dark-v11",
-      center: opening.camera?.center ?? toLngLat(first?.points[0] ?? [0, 0]),
-      zoom: opening.camera?.zoom ?? 13,
-      interactive: false,
-      // Attribution is rendered by the composition as story-legible text.
-      attributionControl: false,
-      fadeDuration: 0,
-      preserveDrawingBuffer: true,
-    });
+    const mapInstance = buildPlate(
+      {
+        accessToken: token,
+        container: containerRef.current,
+        style: "mapbox://styles/mapbox/dark-v11",
+        center: opening.camera?.center ?? toLngLat(first?.points[0] ?? [0, 0]),
+        zoom: opening.camera?.zoom ?? 13,
+        interactive: false,
+        // Attribution is rendered by the composition as story-legible text.
+        attributionControl: false,
+        fadeDuration: 0,
+        // Not only for the headless screenshot. The plate paints on demand
+        // rather than continuously, and a drawing buffer the browser is allowed
+        // to discard composites black between paints — so the map disappears
+        // wherever a frame asks for a picture it already has. See the per-frame
+        // effect below, which is what makes that a frequent case.
+        preserveDrawingBuffer: true,
+        trackResize: isRendering,
+      },
+      !isRendering,
+    );
 
     mapInstance.on("load", () => {
       // A style can finish loading after the player has already switched to a
@@ -286,6 +360,24 @@ function RouteMapPlate({
 
   useEffect(() => {
     if (!map) return;
+
+    // A film's last movement is not a moving picture. Every template's draw
+    // finishes before its film does — the duo replay's ends at `DUO_DRAW_TO`,
+    // 0.74, and spends the remaining quarter rebuilding itself into a card over
+    // a plate that has stopped — so a run of frames arrives asking for the shot
+    // that is already on screen. Pushing it again re-tessellates both traces,
+    // jumps the camera to where it is and repaints the canvas, thirty times a
+    // second; and because the duo's card is a `blur()` over that canvas, each of
+    // those repaints also has the compositor blur 1080×1920 again for a picture
+    // that did not move. That is the most expensive quarter of the most
+    // expensive template, and none of it is visible.
+    //
+    // A headless render is exempt and repaints unconditionally: it screenshots
+    // whatever is on the canvas when the frame is taken, so a skipped paint
+    // there is a black frame rather than a saved one.
+    const frame = frameOf(layers, camera);
+    if (!isRendering && frame === drawnFrame.current) return;
+    drawnFrame.current = frame;
 
     for (const layer of layers) {
       if (layer.points.length === 0) continue;
