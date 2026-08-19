@@ -22,6 +22,8 @@ ARG NEXT_PUBLIC_POSTHOG_KEY
 ENV NEXT_PUBLIC_POSTHOG_KEY=$NEXT_PUBLIC_POSTHOG_KEY
 ARG NEXT_PUBLIC_POSTHOG_HOST
 ENV NEXT_PUBLIC_POSTHOG_HOST=$NEXT_PUBLIC_POSTHOG_HOST
+ARG NEXT_PUBLIC_POSTHOG_UI_HOST
+ENV NEXT_PUBLIC_POSTHOG_UI_HOST=$NEXT_PUBLIC_POSTHOG_UI_HOST
 # Which deploy the events say they came from. `next build` reports `production`
 # for every image built here, which is right for production and wrong for a
 # staging or local stack — this is how those say so.

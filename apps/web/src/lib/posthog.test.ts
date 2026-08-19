@@ -120,6 +120,38 @@ describe("with a project key", () => {
   });
 
   /**
+   * Production sends events through a reverse proxy on our own domain, because
+   * an ad blocker drops a request to PostHog's host before the browser makes
+   * it. `ui_host` is the half that is easy to forget: it is what the toolbar
+   * authenticates against and what "view recording" links to, and a proxy can
+   * answer neither.
+   */
+  it("sends events through the configured proxy, but points the UI at PostHog", async () => {
+    vi.stubEnv("VITE_POSTHOG_KEY", "phc_test");
+    vi.stubEnv("VITE_POSTHOG_HOST", "https://cadence.vivace.run");
+    vi.resetModules();
+
+    const posthogJs = (await import("posthog-js")).default;
+    const init = vi
+      .spyOn(posthogJs, "init")
+      .mockImplementation(() => posthogJs);
+    const { initPostHog } = await import("@/lib/posthog");
+
+    initPostHog();
+
+    expect(init).toHaveBeenCalledWith(
+      "phc_test",
+      expect.objectContaining({
+        api_host: "https://cadence.vivace.run",
+        ui_host: "https://us.posthog.com",
+      }),
+    );
+
+    vi.unstubAllEnvs();
+    vi.resetModules();
+  });
+
+  /**
    * The one thing that tells a laptop's test athletes apart from the people
    * actually using the app — they share a PostHog project, and nothing else in
    * an event says which deploy it came from.
