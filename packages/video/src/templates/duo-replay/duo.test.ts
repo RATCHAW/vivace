@@ -4,8 +4,13 @@ import {
   cameraAtProgress,
   projectPoint,
 } from "../../core/camera";
-import { PAGE_INSET, withinSafeArea } from "../../core/layout";
-import { RUNNER_CLEARANCE } from "../../core/marker";
+import { PAGE_INSET, SAFE_TOP, withinSafeArea } from "../../core/layout";
+import {
+  runnerLabelClearance,
+  RUNNER_AVATAR_SIZE,
+  RUNNER_DOT_RADIUS,
+  RUNNER_LABEL,
+} from "../../core/marker";
 import {
   asPartner,
   FIXTURE_A,
@@ -63,15 +68,18 @@ const pair = (name = "Marianne") =>
   );
 
 describe("the two runners", () => {
-  it("gives each of them their own ink, and the athlete the replay's", () => {
-    const [you, partner] = pair();
-    expect(you.color).toBe(DUO_INK.you);
-    expect(partner.color).toBe(DUO_INK.partner);
+  it("draws both of them in the one house ink", () => {
     // The single-runner replay draws in cobalt; an athlete's own line looks the
     // same in both cuts, which is what stops the duo film reading as a
-    // different app's.
-    expect(you.color).toBe("#494fdf");
-    expect(you.color).not.toBe(partner.color);
+    // different app's. A second hue for the partner was what broke that, and the
+    // job it was doing — saying which line is whose — is the names' now.
+    expect(DUO_INK).toBe("#494fdf");
+  });
+
+  it("carries each of their names, which is who-is-who in this film", () => {
+    const [you, partner] = pair();
+    expect(you.name).toBe("Ayoub");
+    expect(partner.name).toBe("Marianne");
   });
 
   it("takes each route off its own streams", () => {
@@ -261,11 +269,14 @@ describe("the shot", () => {
   const runners = pair();
   const clock = duoClock(runners);
   const viewport = { width, height, padding: DUO_ROUTE_PADDING };
+  // The fixtures carry no pictures, so this is the dot's own berth plus the name
+  // plate hanging under it — what the composition asks for on the same pair.
+  const clearance = runnerLabelClearance(false);
   const track = buildRoutesCameraTrack(
     runners.map((runner) => runner.points),
     (progress) => duoDrawnAt(runners, clock, progress),
     viewport,
-    { clearance: RUNNER_CLEARANCE },
+    { clearance },
   );
   const safeBox = {
     left: DUO_ROUTE_PADDING.left,
@@ -310,10 +321,10 @@ describe("the shot", () => {
         const head = runner.points[drawn[r] - 1];
         const [x, y] = projectPoint(head, camera, { width, height });
         if (
-          x < safeBox.left + RUNNER_CLEARANCE - 1 ||
-          x > safeBox.right - RUNNER_CLEARANCE + 1 ||
-          y < safeBox.top + RUNNER_CLEARANCE - 1 ||
-          y > safeBox.bottom - RUNNER_CLEARANCE + 1
+          x < safeBox.left + clearance - 1 ||
+          x > safeBox.right - clearance + 1 ||
+          y < safeBox.top + clearance - 1 ||
+          y > safeBox.bottom - clearance + 1
         ) {
           grazed.push(`${runner.key}@${index}`);
         }
@@ -326,6 +337,54 @@ describe("the shot", () => {
     expect(
       track.filter((camera, i) => i > 0 && camera.zoom > track[i - 1].zoom),
     ).toEqual([]);
+  });
+
+  it.each([
+    ["the plain dot", false],
+    ["a face riding the head", true],
+  ])("keeps each runner's name plate off the numbers, with %s", (_, avatar) => {
+    // The name is what says which line is whose, so a plate rides each head on
+    // every frame of the draw. The athlete's hangs above their marker and their
+    // partner's below — level runners would otherwise cover each other — and the
+    // band under the map is where the two rows of numbers are. Either side has
+    // to stay clear of both: a name on top of the numbers it points at is worse
+    // than no name.
+    const berth = runnerLabelClearance(avatar);
+    const shot = buildRoutesCameraTrack(
+      runners.map((runner) => runner.points),
+      (progress) => duoDrawnAt(runners, clock, progress),
+      viewport,
+      { clearance: berth },
+    );
+    const reach = avatar ? RUNNER_AVATAR_SIZE / 2 : RUNNER_DOT_RADIUS;
+
+    shot.forEach((camera, index) => {
+      const drawn = duoDrawnAt(runners, clock, index / (shot.length - 1));
+      runners.forEach((runner, r) => {
+        if (drawn[r] < 1) return;
+        const [x, y] = projectPoint(runner.points[drawn[r] - 1], camera, {
+          width,
+          height,
+        });
+        const under = y + reach + RUNNER_LABEL.gap;
+        const over = y - reach - RUNNER_LABEL.gap - RUNNER_LABEL.height;
+        expect(under + RUNNER_LABEL.height, runner.key).toBeLessThanOrEqual(
+          DUO_ROW_TOPS[0],
+        );
+        // The upper plate has the title band above it, which the map's own
+        // padding already holds it clear of.
+        expect(over, runner.key).toBeGreaterThanOrEqual(SAFE_TOP);
+        // And the widest a name is allowed to get still lands on the frame:
+        // the plate is centred on the head, so half of it is the reach.
+        expect(
+          x - RUNNER_LABEL.maxWidth / 2,
+          runner.key,
+        ).toBeGreaterThanOrEqual(0);
+        expect(x + RUNNER_LABEL.maxWidth / 2, runner.key).toBeLessThanOrEqual(
+          width,
+        );
+      });
+    });
   });
 
   it("frames both start lines before either of them has set off", () => {

@@ -1,8 +1,9 @@
-import { useMemo } from "react";
+import { Fragment, useMemo } from "react";
 import { AbsoluteFill } from "remotion";
 import { projectRoute, type RoutePadding } from "./geo";
 import type { RouteLayer } from "./RouteMap";
 import { RunnerAvatar } from "./RunnerAvatar";
+import { RunnerLabel, RUNNER_LABEL_PLATE } from "./RunnerLabel";
 
 const toSvgPoints = (points: [number, number][]) =>
   points.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
@@ -23,6 +24,7 @@ export function RouteCanvas({
   padding,
   plate = "#000000",
   trackColor = "rgba(255,255,255,0.22)",
+  labelPlate = RUNNER_LABEL_PLATE,
 }: {
   layers: RouteLayer[];
   width: number;
@@ -39,6 +41,9 @@ export function RouteCanvas({
    * reached yet with it. See `overlayInk` in `core/greenscreen.ts`.
    */
   trackColor?: string;
+  /** The plate a runner's name sits on, for the same reason and flattened the
+   *  same way. Only drawn for a layer that carries a name. */
+  labelPlate?: string;
 }) {
   const projected = useMemo(() => {
     const all = projectRoute(
@@ -120,21 +125,34 @@ export function RouteCanvas({
           );
         })}
       </svg>
-      {/* Over the SVG rather than in a <foreignObject>: the puck is a plain DOM
-          image, and the route here is already projected into the same
-          composition pixels it is positioned in. */}
+      {/* Over the SVG rather than in a <foreignObject>: the puck and the name
+          plate are plain DOM, and the route here is already projected into the
+          same composition pixels they are positioned in. */}
       {projected.map((points, index) => {
         const layer = layers[index];
         const head = runnerAt(points, layer.drawn);
-        if (!head || !layer.avatarUrl) return null;
+        if (!head) return null;
         return (
-          <RunnerAvatar
-            key={layer.key}
-            src={layer.avatarUrl}
-            x={head[0]}
-            y={head[1]}
-            ring={layer.color}
-          />
+          <Fragment key={layer.key}>
+            {layer.avatarUrl !== "" && (
+              <RunnerAvatar
+                src={layer.avatarUrl}
+                x={head[0]}
+                y={head[1]}
+                ring={layer.color}
+              />
+            )}
+            {layer.label !== undefined && (
+              <RunnerLabel
+                name={layer.label}
+                x={head[0]}
+                y={head[1]}
+                avatar={layer.avatarUrl !== ""}
+                above={layer.labelAbove}
+                plate={labelPlate}
+              />
+            )}
+          </Fragment>
         );
       })}
     </AbsoluteFill>

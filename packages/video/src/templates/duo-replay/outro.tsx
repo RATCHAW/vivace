@@ -6,6 +6,7 @@ import { clamp01 } from "../../core/timing";
 import {
   duoOutroColumnCentre,
   duoOutroMetric,
+  DUO_INK,
   DUO_OUTRO_AVATAR_RING,
   DUO_OUTRO_AVATAR_SIZE,
   DUO_OUTRO_AVATAR_TOP,
@@ -148,7 +149,7 @@ function OutroFace({
           inset: 0,
           borderRadius: "50%",
           backgroundColor: "#0a0a0a",
-          border: `${DUO_OUTRO_AVATAR_RING}px solid ${runner.color}`,
+          border: `${DUO_OUTRO_AVATAR_RING}px solid ${DUO_INK}`,
           boxSizing: "border-box",
           display: "flex",
           alignItems: "center",
@@ -156,7 +157,7 @@ function OutroFace({
           fontSize: 84,
           fontWeight: 600,
           lineHeight: 1,
-          color: runner.color,
+          color: DUO_INK,
         }}
       >
         {runner.name.trim().slice(0, 1).toUpperCase()}
@@ -166,7 +167,7 @@ function OutroFace({
           src={runner.avatarUrl}
           x={DUO_OUTRO_AVATAR_SIZE / 2}
           y={DUO_OUTRO_AVATAR_SIZE / 2}
-          ring={runner.color}
+          ring={DUO_INK}
           size={DUO_OUTRO_AVATAR_SIZE}
           ringWidth={DUO_OUTRO_AVATAR_RING}
         />

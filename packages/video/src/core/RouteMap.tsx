@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { AbsoluteFill, getRemotionEnvironment, useDelayRender } from "remotion";
 import mapboxgl, {
   type GeoJSONSource,
@@ -9,6 +9,7 @@ import "mapbox-gl/dist/mapbox-gl.css";
 import { projectPoint, type Camera } from "./camera";
 import type { LatLng } from "./geo";
 import { RunnerAvatar } from "./RunnerAvatar";
+import { RunnerLabel } from "./RunnerLabel";
 
 /** One runner's line on the plate. */
 export interface RouteLayer {
@@ -28,6 +29,18 @@ export interface RouteLayer {
   color: string;
   /** The picture riding that head, in place of the dot. Empty keeps the dot. */
   avatarUrl: string;
+  /**
+   * Whose trace this is, on a plate hanging off the marker.
+   *
+   * Undefined on a single-runner film, where the question does not arise. A duo
+   * draws both traces in the one house ink, so this is the only thing on the map
+   * tying a line to the bar of numbers under it — and the camera owes it a
+   * berth, which is `runnerLabelClearance`.
+   */
+  label?: string;
+  /** Which side of the marker that plate hangs on. Two runners level with each
+   *  other take a side each, or their names cover each other. */
+  labelAbove?: boolean;
 }
 
 /**
@@ -412,20 +425,33 @@ function RouteMapPlate({
       <div ref={containerRef} style={{ width, height, position: "absolute" }} />
       {camera &&
         layers.map((layer) => {
-          const head = layer.avatarUrl ? headPoint(layer) : null;
+          const marked = layer.avatarUrl !== "" || layer.label !== undefined;
+          const head = marked ? headPoint(layer) : null;
           if (!head) return null;
           // The camera the frame is being drawn with projects the runner onto
           // the plate — the same maths the track was built with, so the puck
           // lands exactly where the dot it replaces would have.
           const [x, y] = projectPoint(head, camera, { width, height });
           return (
-            <RunnerAvatar
-              key={layer.key}
-              src={layer.avatarUrl}
-              x={x}
-              y={y}
-              ring={layer.color}
-            />
+            <Fragment key={layer.key}>
+              {layer.avatarUrl !== "" && (
+                <RunnerAvatar
+                  src={layer.avatarUrl}
+                  x={x}
+                  y={y}
+                  ring={layer.color}
+                />
+              )}
+              {layer.label !== undefined && (
+                <RunnerLabel
+                  name={layer.label}
+                  x={x}
+                  y={y}
+                  avatar={layer.avatarUrl !== ""}
+                  above={layer.labelAbove}
+                />
+              )}
+            </Fragment>
           );
         })}
     </AbsoluteFill>

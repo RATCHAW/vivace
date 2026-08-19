@@ -233,6 +233,41 @@ describe("RouteMap when the cast changes", () => {
   });
 });
 
+describe("RouteMap's name plates", () => {
+  it("says whose line is whose, now that both are drawn in one ink", () => {
+    // The duo cut used to give the partner a second hue and let the colour do
+    // it. Both traces are cobalt now, so the plate on the head of each line is
+    // the only thing tying it to the bar of numbers underneath.
+    const { container } = render(
+      plate([
+        { ...layer("you", YOU), label: "Ayoub" },
+        { ...layer("partner", THEM), label: "Marianne" },
+      ]),
+    );
+
+    expect(container.textContent).toContain("Ayoub");
+    expect(container.textContent).toContain("Marianne");
+  });
+
+  it("leaves a single-runner film exactly as it was", () => {
+    // `label` is undefined everywhere but the duo: on a film with one athlete
+    // in it the question never arises, and a tag over their own route is furniture
+    // for nothing.
+    const { container } = render(plate([layer("run", YOU)]));
+    expect(container.textContent).toBe("");
+  });
+
+  it("gives no plate to a runner who has not set off", () => {
+    // Their start marker is on the map from frame one, but they are not on it
+    // yet — a name hanging over the start line would read as somebody standing
+    // there for the first two seconds of the film.
+    const { container } = render(
+      plate([{ ...layer("partner", THEM), drawn: 0, label: "Marianne" }]),
+    );
+    expect(container.textContent).toBe("");
+  });
+});
+
 describe("RouteMap in the browser", () => {
   it("sizes its canvas in composition pixels, whatever the screen is", () => {
     // The plate is laid out at the film's own size — 1080×1920 — and Mapbox

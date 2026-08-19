@@ -199,7 +199,7 @@ export const fr: Translated<Messages> = {
       "duo-replay": {
         label: "Replay à deux",
         description:
-          "Vos deux tracés se dessinent en même temps sur une seule carte, chacun dans sa couleur, avec une barre de données en direct pour chacun en dessous. Nécessite que quelqu’un ait accepté l’invitation sur cette sortie.",
+          "Vos deux tracés se dessinent en même temps sur une seule carte, chaque prénom accroché à son tracé, avec une barre de données en direct pour chacun en dessous. Nécessite que quelqu’un ait accepté l’invitation sur cette sortie.",
       },
       "split-rush": {
         label: "Rush des splits",

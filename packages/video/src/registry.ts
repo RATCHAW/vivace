@@ -123,9 +123,9 @@ export const VIDEO_TEMPLATES = [
     compositionId: "duo-replay",
     label: "Duo replay",
     description:
-      "The two of you drawing at once on one map, each in your own colour, " +
-      "with a bar of live numbers each underneath. Needs somebody to have " +
-      "accepted the invitation on this run.",
+      "The two of you drawing at once on one map, each name riding its own " +
+      "trace, with a bar of live numbers each underneath. Needs somebody to " +
+      "have accepted the invitation on this run.",
     profile: "map",
     width: 1080,
     height: 1920,
