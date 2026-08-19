@@ -1,4 +1,4 @@
-import { useLayoutEffect, useState } from "react";
+import { useLayoutEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Trans, useTranslation } from "react-i18next";
@@ -19,9 +19,18 @@ import {
   type TemplateId,
   type TemplateInput,
   type ThemeName,
+  type VideoPartner,
 } from "@repo/video";
-import { getRunStreamsOptions, getStravaAthleteOptions, type Run } from "@/api";
+import {
+  getRunPartnerOptions,
+  getRunStreamsOptions,
+  getStravaAthleteOptions,
+  type Run,
+  type RunPartner,
+} from "@/api";
 import { useFormatters } from "@/i18n/format";
+import { InviteControls } from "@/components/invite-controls";
+import { InviteHint } from "@/components/invite-hint";
 import { MonoLabel } from "@/components/mono";
 import { RenderControls } from "@/components/render-controls";
 import { filmFrame, RunPlayer } from "@/components/run-player";
@@ -62,6 +71,25 @@ import { cn } from "@/lib/utils";
  */
 const STAGE = "max-w-[clamp(380px,calc((100svh_-_15rem)*9/16),560px)]";
 const STAGE_THEATRE = "max-w-[clamp(420px,calc((100svh_-_11rem)*9/16),640px)]";
+
+/**
+ * The other runner as a composition takes them.
+ *
+ * The API's contract is snake_case and the props contract is camelCase, so the
+ * crossing happens once, here — a template that had to know about both would be
+ * a template that could be handed either.
+ */
+function toVideoPartner(
+  partner: RunPartner | null | undefined,
+): VideoPartner | null {
+  if (!partner) return null;
+  return {
+    name: partner.name,
+    activity: partner.activity,
+    streams: partner.streams,
+    avatarUrl: avatarSource(partner.avatar_url),
+  };
+}
 
 /**
  * One run's film, and everything that shapes it.
@@ -142,6 +170,12 @@ export function RunStudio({
   const { data: athlete, error: athleteError } = useQuery(
     getStravaAthleteOptions(),
   );
+  // Whoever accepted an invitation to this run, if anybody has. Their run comes
+  // with them — the film draws it, and the browser cannot read it from Strava
+  // itself. Null is the normal case and is not an error: most runs are solo.
+  const { data: partnerState, error: partnerError } = useQuery(
+    getRunPartnerOptions({ path: { id: String(run.id) } }),
+  );
   const avatarUrl = avatarSource(athlete?.profile);
 
   // The narrow studio covers the page rather than replacing it, so the list is
@@ -165,14 +199,29 @@ export function RunStudio({
   // What decides which templates this run can be cut with. Null until the
   // streams are here: a treadmill run and a run whose streams are still loading
   // look identical, and only one of them should lose the route replay.
+  // Memoised because the composition builds a camera track from it: a fresh
+  // object on every re-render of this page would rebuild a few hundred
+  // keyframes over both routes for nothing.
+  const partner = useMemo(
+    () => toVideoPartner(partnerState?.partner),
+    [partnerState?.partner],
+  );
   const input: TemplateInput | null = streams
-    ? { activity: run, streams }
+    ? { activity: run, streams, partner }
     : null;
-  // The athlete's choice, unless this run can't have it — clicking a treadmill
-  // run in the list must not leave the route replay selected and empty. Derived
-  // rather than stored, so their choice comes back the moment a run can serve it.
+  const verdict = input ? templateEligibility(chosen, input) : null;
+  // Waiting on somebody is not the same kind of no as a treadmill run. It is
+  // the only verdict the athlete can overturn from this screen, and picking the
+  // cut is how they reach the invitation — so their choice stands: the picker
+  // keeps saying Duo replay and the film draws with the second lane empty,
+  // which is also the clearest possible statement of what is missing.
+  const awaitingPartner = verdict?.reasonKey === "needs-partner";
+  // Otherwise the athlete's choice, unless this run can't have it — clicking a
+  // treadmill run in the list must not leave the route replay selected and
+  // empty. Derived rather than stored, so their choice comes back the moment a
+  // run can serve it.
   const template =
-    input && !templateEligibility(chosen, input).eligible
+    input && !verdict?.eligible && !awaitingPartner
       ? recommendTemplate(input)
       : chosen;
   // A template that draws no runner has nothing for the avatar switch to do,
@@ -181,6 +230,38 @@ export function RunStudio({
   const entry = getTemplate(template);
   const avatarSupported = entry.supportsAvatar;
   const filmTheme = entry.supportsTheme ? theme : DEFAULT_THEME;
+  // Bringing the person you ran with is only a question a cut with a second
+  // lane can ask — `needsPartner` on the catalogue entry, which today is the
+  // duo replay and nothing else. On every other template the run's invitations
+  // are neither shown nor fetched: there is nowhere in the film to put them.
+  const takesPartner = entry.needsPartner;
+  // And that cut with the other lane still empty is a render the API refuses
+  // with a 409, so the download says what is missing rather than sending the
+  // athlete to Lambda for an error.
+  const missingPartner = takesPartner && !partner;
+  // And a cut that draws two must not *open* on one it is about to be given.
+  // The map plate builds its Mapbox sources from the frame it opens on, so a
+  // partner landing a moment after the streams costs a remount and a visible
+  // reload of the tiles — where waiting costs one spinner. Only until the
+  // question is answered: a partner who is genuinely null, or a request that
+  // failed, opens the film with the lane empty, which is what it draws anyway.
+  const awaitingPartnerData =
+    takesPartner && partnerState === undefined && !partnerError;
+  // The same emptiness the download refuses, once the answer is actually in
+  // rather than in flight — which is what the phone marks on its Options tile,
+  // because there the invitation is behind an icon rather than in view. See
+  // `InviteHint`.
+  const secondLaneEmpty = missingPartner && !awaitingPartnerData;
+  // The avatar switch is one switch: both faces on the map, or neither. A film
+  // with one runner wearing a photo and the other a plain dot reads as a bug
+  // rather than as a choice.
+  const filmPartner = useMemo(
+    () =>
+      partner && showAvatar && avatarSupported
+        ? partner
+        : partner && { ...partner, avatarUrl: "" },
+    [partner, showAvatar, avatarSupported],
+  );
   const fit = narrow ? "height" : "width";
   // Both the loading placeholder and the film it stands in for answer this, so
   // the picker is the right width from the first paint rather than after one.
@@ -200,7 +281,7 @@ export function RunStudio({
   );
 
   const stage =
-    !streams && !streamsError ? (
+    (!streams && !streamsError) || awaitingPartnerData ? (
       <div
         ref={frameRef}
         className={cn(
@@ -231,6 +312,8 @@ export function RunStudio({
         streams={streams ?? {}}
         mapboxToken={mapboxToken}
         avatarUrl={showAvatar && avatarSupported ? avatarUrl : ""}
+        athleteName={athlete?.firstname ?? t("videoOptions.you")}
+        partner={filmPartner}
         theme={filmTheme}
         greenscreen={greenscreen}
         fit={fit}
@@ -271,6 +354,19 @@ export function RunStudio({
     />
   );
 
+  // Only on a cut that has somewhere to put a second runner, and the same stack
+  // in both layouts: the wide card and the phone's sheet are the two places the
+  // studio keeps everything that shapes the film, and waiting on somebody is a
+  // state with four things to say, not an icon.
+  const invite = (
+    <InviteControls
+      key={`invite:${run.id}`}
+      activityId={run.id}
+      runName={run.name}
+      supported={takesPartner}
+    />
+  );
+
   // Rendering happens on Lambda from the API's copy of the run, so it stands
   // even when the browser could not load the streams.
   const render = (layout: "panel" | "tile") => (
@@ -283,6 +379,7 @@ export function RunStudio({
       theme={filmTheme}
       greenscreen={greenscreen}
       layout={layout}
+      blocked={missingPartner ? t("video.eligibility.needs-partner") : null}
     />
   );
 
@@ -371,15 +468,36 @@ export function RunStudio({
               <SparklesIcon />
             </Button>
 
-            <Button
-              size="icon-fill"
-              variant="subtle"
-              aria-label={t("videoOptions.section")}
-              aria-expanded={optionsOpen}
-              onClick={() => setOptionsOpen(true)}
+            {/* Behind the sheet, not beside Share. An invitation had a cell of
+                its own here while it was one tap — mint a link, hand it to the
+                share sheet — and stopped fitting the moment the athlete could
+                also be waiting on an answer, ask for it, or take somebody back
+                out. Those are states with sentences, and the sheet is where the
+                phone keeps everything that has one.
+
+                Which leaves a sliders icon standing for the only way to fill a
+                lane the athlete can see is empty, so it carries a dot while it
+                does — and says why once, on arrival. The dot outlives the
+                sentence: it is the state, where the callout is the moment. */}
+            <InviteHint
+              show={secondLaneEmpty && !optionsOpen}
+              activityId={run.id}
             >
-              <SlidersHorizontalIcon />
-            </Button>
+              <Button
+                size="icon-fill"
+                variant="subtle"
+                aria-label={t("videoOptions.section")}
+                aria-expanded={optionsOpen}
+                onClick={() => setOptionsOpen(true)}
+              >
+                <span className="relative">
+                  <SlidersHorizontalIcon />
+                  {secondLaneEmpty && (
+                    <span className="bg-brand animate-in fade-in zoom-in-75 absolute -top-1 -right-1.5 size-1.5 rounded-full" />
+                  )}
+                </span>
+              </Button>
+            </InviteHint>
 
             {render("tile")}
           </div>
@@ -400,8 +518,9 @@ export function RunStudio({
             <SheetHeader>
               <SheetTitle>{t("videoOptions.section")}</SheetTitle>
             </SheetHeader>
-            <SheetBody className="pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
+            <SheetBody className="flex flex-col gap-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
               {options}
+              {invite}
             </SheetBody>
           </SheetContent>
         </Sheet>
@@ -435,6 +554,7 @@ export function RunStudio({
         <MonoLabel>{t("videoOptions.section")}</MonoLabel>
         {options}
         {render("panel")}
+        {invite}
       </aside>
     </div>
   );

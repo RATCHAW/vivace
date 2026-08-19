@@ -73,6 +73,24 @@ Lambda bundle all read it rather than each holding their own list.
   the picker: a treadmill run sees the route replay greyed with four words
   saying why. `minimal-numbers` must stay eligible for everything — it is what
   renders when a run has nothing.
+- **A second runner is `needsPartner` on the catalogue entry, and nothing else.**
+  That flag is what makes apps/api resolve the run's accepted invitation, read
+  the other athlete's run with *their* Strava token (`loadRunPartner`), fold
+  their activity id into `renderPropsHash` and refuse the render with a 409 when
+  nobody has said yes. The eligibility rule tells the athlete so first, and
+  `GET /api/runs/{id}/partner` is what the browser plays the film from — the
+  `<Player>` cannot go to Strava for somebody else's run. The props contract is
+  `VideoPartner`; the API's is snake_case `RunPartner`, and the crossing happens
+  in `render.ts` and in `run-studio.tsx`, never in a composition.
+- **The invitation is offered on the cuts that have a lane for it, and nowhere
+  else.** Same flag: `InviteControls` is drawn only where `needsPartner` is
+  true, so the studio stops asking a solo film to bring somebody. That makes the
+  duo cut the only door to the invitation, which is why the picker keeps a
+  template selectable when its only verdict is `needs-partner` — it plays with
+  the second lane empty until somebody accepts, and the download is stopped with
+  that same sentence rather than left to come back a 409. It also fixes the
+  order of the duo rule: the route is checked *before* the partner, so
+  `needs-partner` can only ever mean everything else about the run is fine.
 - **Determinism is a feature, not a nicety.** Same input and options must give a
   byte-identical file, because `renderPropsHash` promises the athlete the stored
   MP4 *is* the film they just watched. Anything that wants to look random takes

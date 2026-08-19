@@ -1,45 +1,19 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { AbsoluteFill, getRemotionEnvironment, useDelayRender } from "remotion";
-import mapboxgl, { type GeoJSONSource, type Map as MapboxMap } from "mapbox-gl";
-import "mapbox-gl/dist/mapbox-gl.css";
+import { useMemo } from "react";
+import { RouteMap } from "../../core/RouteMap";
 import {
   buildCameraTrack,
   cameraAtProgress,
-  projectPoint,
+  ROUTE_COLOR,
   ROUTE_PADDING,
   RUNNER_AVATAR_CLEARANCE,
   RUNNER_CLEARANCE,
   sampleIndex,
   type LatLng,
 } from "./data";
-import { RunnerAvatar } from "./RunnerAvatar";
 
-// DESIGN.md {colors.primary} — the cobalt stamp, used here as illustration ink.
-const ROUTE_COLOR = "#494fdf";
-
-const toLngLat = ([lat, lng]: LatLng): [number, number] => [lng, lat];
-
-const lineString = (coordinates: [number, number][]) =>
-  ({
-    type: "Feature",
-    properties: {},
-    geometry: { type: "LineString", coordinates },
-  }) as const;
-
-const point = (coordinates: [number, number]) =>
-  ({
-    type: "Feature",
-    properties: {},
-    geometry: { type: "Point", coordinates },
-  }) as const;
-
-/** Deterministic Mapbox plate: the full route sits faint under a cobalt trace
- *  that draws with `progress`, while the camera follows the head of that trace
- *  — see `buildCameraTrack` for how it stays framed.
- *
- *  `avatarUrl` swaps the dot at that head for the athlete's picture. The puck is
- *  a DOM layer over the plate rather than a Mapbox symbol: the image never has
- *  to be decoded into the GL context, and the frame can be held on its load. */
+/** The replay's plate: one route, drawing under a camera that follows the head
+ *  of it. Everything about the map itself lives in `core/RouteMap` — this is the
+ *  single-runner shot, and the duo cut builds the same plate with two layers. */
 export function RunMap({
   points,
   progress,
@@ -55,15 +29,6 @@ export function RunMap({
   height: number;
   avatarUrl: string;
 }) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const { delayRender, continueRender } = useDelayRender();
-  const [map, setMap] = useState<MapboxMap | null>(null);
-  const [loadingHandle] = useState(() => delayRender("Loading Mapbox map"));
-  // A headless render and the <Player> want opposite things from this map — see
-  // the two effects below. Everything that differs hangs off this one flag.
-  const { isRendering } = getRemotionEnvironment();
-
-  const coords = points.map(toLngLat);
   // Pure geometry — the path exists before the first tile does, so the map can
   // open on the right shot instead of easing into one once the style lands. The
   // avatar is the wider marker, so it is also the wider shot.
@@ -78,171 +43,21 @@ export function RunMap({
     [points, width, height, clearance],
   );
 
-  useEffect(() => {
-    if (!containerRef.current) return;
-
-    let disposed = false;
-    const opening = cameraAtProgress(track, progress);
-
-    const mapInstance = new mapboxgl.Map({
-      accessToken: token,
-      container: containerRef.current,
-      style: "mapbox://styles/mapbox/dark-v11",
-      center: opening?.center ?? coords[0],
-      zoom: opening?.zoom ?? 13,
-      interactive: false,
-      // Attribution is rendered by the composition as story-legible text.
-      attributionControl: false,
-      fadeDuration: 0,
-      preserveDrawingBuffer: true,
-    });
-
-    mapInstance.on("load", () => {
-      // A style can finish loading after the player has already switched to a
-      // different template. The cleanup below removes the map, but Mapbox may
-      // still deliver this queued callback; touching the removed style then
-      // throws outside React and takes the whole replay page with it. Mobile is
-      // where the race is easiest to hit because style and tile loads are
-      // slower. The idle callback already had this guard, and the load callback
-      // needs the same one before its first mutation.
-      if (disposed) return;
-
-      mapInstance.addSource("route-full", {
-        type: "geojson",
-        data: lineString(coords),
-      });
-      mapInstance.addLayer({
-        id: "route-full-line",
-        type: "line",
-        source: "route-full",
-        layout: { "line-cap": "round", "line-join": "round" },
-        paint: {
-          "line-color": "#ffffff",
-          "line-opacity": 0.25,
-          "line-width": 5,
-        },
-      });
-
-      mapInstance.addSource("route-trace", {
-        type: "geojson",
-        data: lineString(coords.slice(0, 2)),
-      });
-      mapInstance.addLayer({
-        id: "route-trace-line",
-        type: "line",
-        source: "route-trace",
-        layout: { "line-cap": "round", "line-join": "round" },
-        paint: { "line-color": ROUTE_COLOR, "line-width": 10 },
-      });
-
-      mapInstance.addSource("start-marker", {
-        type: "geojson",
-        data: point(coords[0]),
-      });
-      mapInstance.addLayer({
-        id: "start-marker-dot",
-        type: "circle",
-        source: "start-marker",
-        paint: {
-          "circle-color": "#000000",
-          "circle-radius": 9,
-          "circle-stroke-color": "#ffffff",
-          "circle-stroke-width": 4,
-        },
-      });
-
-      mapInstance.addSource("runner-marker", {
-        type: "geojson",
-        data: point(coords[0]),
-      });
-      mapInstance.addLayer({
-        id: "runner-marker-dot",
-        type: "circle",
-        source: "runner-marker",
-        paint: {
-          "circle-color": "#ffffff",
-          "circle-radius": 13,
-          "circle-stroke-color": ROUTE_COLOR,
-          "circle-stroke-width": 7,
-        },
-      });
-
-      mapInstance.once("idle", () => {
-        if (disposed) return;
-        setMap(mapInstance);
-        continueRender(loadingHandle);
-      });
-    });
-
-    return () => {
-      // Remotion keeps the tree mounted for the whole of a headless render, so
-      // this only fires under the <Player> — and there an undisposed map is a
-      // leaked WebGL context per run plus, under StrictMode's double-mount, a
-      // second map stacked in the same container. Both maps load in parallel,
-      // whichever idled last won `setMap`, and when that was the hidden one the
-      // runner dot sat frozen while the player played.
-      if (isRendering) return;
-      disposed = true;
-      mapInstance.remove();
-    };
-    // The map is built once per mount; RunMap is keyed by activity upstream.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [continueRender, isRendering, loadingHandle, token]);
-
-  // Its own effect, not a branch in the map builder: the option is toggled from
-  // the player's panel, where the map is already mounted and must stay that way.
-  useEffect(() => {
-    if (!map) return;
-    map.setLayoutProperty(
-      "runner-marker-dot",
-      "visibility",
-      avatarUrl ? "none" : "visible",
-    );
-  }, [map, avatarUrl]);
-
-  useEffect(() => {
-    if (!map) return;
-
-    const idx = sampleIndex(coords.length, progress);
-    const trace = map.getSource("route-trace") as GeoJSONSource | undefined;
-    const runner = map.getSource("runner-marker") as GeoJSONSource | undefined;
-    trace?.setData(lineString(coords.slice(0, Math.max(idx + 1, 2))));
-    runner?.setData(point(coords[idx]));
-
-    // The camera is framed on the same drawn prefix, so the dot it is tracking
-    // cannot walk off the plate.
-    const camera = cameraAtProgress(track, progress);
-    if (camera) map.jumpTo(camera);
-
-    // Holding the frame until the map settles is what makes a headless render
-    // deterministic. The <Player> can't wait — delayRender() is inert there and
-    // playback runs on regardless — and a moving camera keeps requesting tiles,
-    // so one `once("idle")` per frame queues up faster than Mapbox drains it.
-    // Push the frame and let the next one land instead.
-    if (isRendering) {
-      const handle = delayRender("Rendering Mapbox frame");
-      map.once("idle", () => continueRender(handle));
-    }
-    // Force a repaint even when the camera is unchanged between frames.
-    map.triggerRepaint();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [continueRender, delayRender, isRendering, map, progress, track]);
-
-  // The camera the frame is being drawn with projects the runner onto the plate
-  // — the same maths `buildCameraTrack` framed the shot with, so the puck lands
-  // exactly where the dot it replaces would have.
-  const camera = avatarUrl ? cameraAtProgress(track, progress) : null;
-  const head = camera
-    ? projectPoint(points[sampleIndex(points.length, progress)], camera, {
-        width,
-        height,
-      })
-    : null;
-
   return (
-    <AbsoluteFill>
-      <div ref={containerRef} style={{ width, height, position: "absolute" }} />
-      {head && <RunnerAvatar src={avatarUrl} x={head[0]} y={head[1]} />}
-    </AbsoluteFill>
+    <RouteMap
+      layers={[
+        {
+          key: "run",
+          points,
+          drawn: sampleIndex(points.length, progress) + 1,
+          color: ROUTE_COLOR,
+          avatarUrl,
+        },
+      ]}
+      camera={cameraAtProgress(track, progress)}
+      token={token}
+      width={width}
+      height={height}
+    />
   );
 }

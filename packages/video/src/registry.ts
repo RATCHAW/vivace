@@ -87,6 +87,16 @@ export interface VideoTemplate {
    *  re-tint — the replay's plate is a Mapbox style, and a cream video over a
    *  dark map is not a theme, it is a different template. */
   supportsTheme: boolean;
+  /**
+   * Needs a second runner: the film cannot be cut without an accepted
+   * invitation on the run.
+   *
+   * The API reads this to decide whether to go and fetch the partner's run
+   * before starting a render — with their own Strava token, which is the whole
+   * reason the invitation exists — and to refuse the render when nobody has
+   * accepted. `eligibility.ts` is what tells the athlete so first.
+   */
+  needsPartner: boolean;
 }
 
 const FPS = 30;
@@ -106,6 +116,25 @@ export const VIDEO_TEMPLATES = [
     usesMap: true,
     supportsAvatar: true,
     supportsTheme: false,
+    needsPartner: false,
+  },
+  {
+    id: "duo-replay",
+    compositionId: "duo-replay",
+    label: "Duo replay",
+    description:
+      "The two of you drawing at once on one map, each in your own colour, " +
+      "with a bar of live numbers each underneath. Needs somebody to have " +
+      "accepted the invitation on this run.",
+    profile: "map",
+    width: 1080,
+    height: 1920,
+    fps: FPS,
+    durationInFrames: 15 * FPS,
+    usesMap: true,
+    supportsAvatar: true,
+    supportsTheme: false,
+    needsPartner: true,
   },
   {
     id: "split-rush",
@@ -125,6 +154,7 @@ export const VIDEO_TEMPLATES = [
     usesMap: false,
     supportsAvatar: false,
     supportsTheme: true,
+    needsPartner: false,
   },
   {
     id: "living-poster",
@@ -141,6 +171,7 @@ export const VIDEO_TEMPLATES = [
     usesMap: false,
     supportsAvatar: false,
     supportsTheme: true,
+    needsPartner: false,
   },
   {
     id: "minimal-numbers",
@@ -157,6 +188,7 @@ export const VIDEO_TEMPLATES = [
     usesMap: false,
     supportsAvatar: false,
     supportsTheme: true,
+    needsPartner: false,
   },
 ] as const satisfies readonly VideoTemplate[];
 

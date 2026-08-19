@@ -61,6 +61,7 @@ export const en = {
   },
 
   soon: "Soon",
+  new: "New",
 
   login: {
     titleLine1: "Every run,",
@@ -176,6 +177,10 @@ export const en = {
     avatarPending: "Checking your Strava profile…",
     avatarFailed: "Your Strava profile could not be read.",
     avatarMissing: "Add a photo on Strava to use this.",
+    /** What the athlete's own bar is labelled when Strava has no first name for
+     *  them. The other bar always has a name — an invitation was accepted by
+     *  somebody. */
+    you: "You",
     greenscreen: "Green screen",
     greenscreenHint:
       "Renders the background in key green, so you can cut it out and put your own video behind the run.",
@@ -199,6 +204,11 @@ export const en = {
         label: "Route replay",
         description:
           "The route drawing under live metrics, camera following the runner. One shot, 9:16.",
+      },
+      "duo-replay": {
+        label: "Duo replay",
+        description:
+          "The two of you drawing at once on one map, each in your own colour, with a bar of live numbers each underneath. Needs somebody to have accepted the invitation on this run.",
       },
       "split-rush": {
         label: "Split rush",
@@ -236,6 +246,105 @@ export const en = {
       "needs-route": "Needs a GPS route — this run has none",
       "needs-two-km": "Needs at least 2 km",
       "needs-distance-time": "Needs distance and time from the watch",
+      "needs-partner": "Needs someone you ran with to accept",
+    },
+  },
+
+  /**
+   * Inviting the person you ran with, and answering an invitation.
+   *
+   * Two audiences in one namespace, and they need different registers. `invite.*`
+   * talks to the athlete who was already here. `invite.accept.*` talks to someone
+   * who may never have heard of Vivace and has just been asked to hand over their
+   * Strava account — so it says who is asking and what will be used before it
+   * asks for anything, and the consent line is a plain sentence rather than a
+   * checkbox with terms behind it.
+   */
+  invite: {
+    action: "Add who you ran with",
+    creating: "Making a link…",
+    createFailed: "Could not make an invitation link",
+    linkCopied: "Invitation link copied",
+    linkCopiedBody:
+      "Send it to the person you ran with. They confirm their run, and the video has you both.",
+    shareTitle: "Be in my run video",
+    /** The phone's callout on the Options tile, where the invitation lives.
+     *  One line: it is a tooltip on a 9:16 screen, and the tile it points at is
+     *  a quarter of the film's width. */
+    hint: "Add who you ran with in here",
+    /** What the sheet says once a link exists. */
+    pendingTitle: "Waiting on your running partner",
+    pendingBody:
+      "The link is live for {{days}} days. Whoever opens it confirms which run was theirs.",
+    /** Short because it shares a 208px row with the check beside it. */
+    copyAgain: "Copy link",
+    /** The icon beside it: an acceptance happens on somebody else's phone. */
+    check: "Check for an answer",
+    checkPending: "No answer yet",
+    revoke: "Cancel the invitation",
+    revokeFailed: "Could not cancel the invitation",
+    acceptedTitle: "{{name}} is in",
+    acceptedBody: "They confirmed their run, and the video has you both.",
+    /** Taking the second runner back out, to give the film to someone else. */
+    remove: "Remove {{name}}",
+    removed: "{{name}} is no longer in this video",
+    removedBody:
+      "Invite whoever you ran with instead — they confirm a run of their own, same as before.",
+    removeFailed: "Could not remove {{name}}",
+    declinedTitle: "{{name}} said no",
+    declinedBody: "Nothing was shared. You can invite someone else.",
+    expiredTitle: "That link has expired",
+    expiredBody: "Make a new one whenever you like.",
+
+    accept: {
+      loading: "Opening the invitation…",
+      invalidTitle: "This invitation is not valid",
+      invalidBody:
+        "The link may have been withdrawn, already answered, or simply mistyped. Ask for a new one.",
+      /** The headline a signed-out reader lands on. */
+      title: "{{name}} wants you in their run video",
+      /** The run, under the headline. */
+      runLine: "{{name}} · {{date}} · {{distance}} km · {{duration}}",
+      whatHappens:
+        "Vivace makes a short video of a run. To put you in it, we need the run from your own Strava — which means signing in with Strava yourself.",
+      connect: "Continue with Strava",
+      decline: "No thanks",
+      declineFailed: "Could not decline this invitation",
+
+      pickTitle: "Which run was yours?",
+      pickBody: "Pick the run you did together.",
+      pickEmptyTitle: "No matching run found",
+      pickEmptyBody:
+        "Nothing in your Strava lines up with that day and time. If you recorded it somewhere else, there is nothing to pair here.",
+      pickFailed: "Could not read your runs",
+
+      /**
+       * The sentence stored verbatim with the acceptance. It is the record of
+       * what was agreed, so it is sent to the API as well as shown — see
+       * `consent_text` on the accept endpoint. Reword it and only new
+       * acceptances carry the new wording, which is the intent.
+       */
+      consent:
+        "I agree to my run's distance, time, pace and route appearing in {{name}}'s video.",
+      confirm: "Make the video together",
+      confirming: "Setting it up…",
+      confirmFailed: "Could not accept this invitation",
+
+      doneTitle: "You're in",
+      doneBody:
+        "{{name}} can now make the video with both your runs in it. You'll find it in your own replays too.",
+      /** Shown once they have an account of their own to go to. */
+      goToApp: "See my replays",
+
+      /** Answered by somebody else, or by this athlete already. */
+      closedTitle: "This invitation is closed",
+      closedBody: "It has already been answered, withdrawn, or has expired.",
+      ownTitle: "This is your own invitation",
+      ownBody: "Send the link to the person you ran with instead.",
+      /** Withdrawing consent after the fact — the invitee's to do, not the
+       *  inviter's. Disconnecting Strava does the same thing, everywhere. */
+      withdrawNote:
+        "Changed your mind later? Disconnecting Strava from Vivace withdraws this too.",
     },
   },
 

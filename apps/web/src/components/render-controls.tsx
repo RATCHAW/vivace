@@ -75,6 +75,7 @@ export function RenderControls({
   theme,
   greenscreen,
   layout = "panel",
+  blocked = null,
 }: {
   run: Run;
   template: TemplateId;
@@ -82,6 +83,15 @@ export function RenderControls({
   theme: ThemeName;
   greenscreen: boolean;
   layout?: RenderLayout;
+  /**
+   * Why no new render can be started, in the athlete's own words — the duo cut
+   * with nobody in the other lane, which the API refuses with a 409. Said here
+   * rather than let the click go and come back a failure. It reads exactly like
+   * the kill switch below, because from where the athlete is sitting it is the
+   * same thing: the button is not available, and a film already on disk is
+   * still theirs to download.
+   */
+  blocked?: string | null;
 }) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
@@ -135,8 +145,11 @@ export function RenderControls({
     render?.status === "done" && !stale ? render.output_url : null;
   const failure =
     start.error?.error ?? (render?.status === "error" ? render.error : null);
+  // Why nothing new may be rendered, if anything says so — the film's own
+  // missing pieces first, then our kill switch.
+  const halt = blocked ?? (renderEnabled ? null : t("render.paused"));
   // Already-rendered videos keep their download; only new renders stop.
-  const paused = !renderEnabled && download == null;
+  const paused = halt != null && download == null;
   // A finished render should fulfil the click that started it. Observing an
   // in-flight render arms the automatic download too, so a page reload while
   // Lambda is working still completes without asking for a second tap. A video
@@ -252,7 +265,7 @@ export function RenderControls({
               percent: Math.round(progress * 100),
             })
           : paused
-            ? t("render.paused")
+            ? (halt ?? t("render.paused"))
             : retry
               ? t("render.retry")
               : t("render.downloadVideo");
@@ -357,7 +370,7 @@ export function RenderControls({
   if (paused) {
     return (
       <p className="text-caption text-muted-foreground text-center">
-        {t("render.paused")}
+        {halt ?? t("render.paused")}
       </p>
     );
   }

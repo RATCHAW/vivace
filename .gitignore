@@ -44,3 +44,10 @@ next-env.d.ts
 
 # Scratch output of `pnpm --filter @repo/api auth:generate` — read, never applied.
 apps/api/.better-auth-schema.ts
+
+# Playwright's own output: the HTML report, and the traces, videos and
+# screenshots it keeps from a failed run.
+apps/e2e/playwright-report/
+apps/e2e/test-results/
+apps/e2e/blob-report/
+apps/e2e/.playwright/

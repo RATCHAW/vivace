@@ -138,6 +138,18 @@ describe("renderPropsHash", () => {
     );
   });
 
+  it("separates who else is in the film, and leaves a solo one out of the hash", () => {
+    // Two different partners is two different films, whatever else matched.
+    expect(renderPropsHash("duo-replay", cut(), 111)).not.toBe(
+      renderPropsHash("duo-replay", cut(), 222),
+    );
+    // …and a template that draws one runner hashes exactly as it did before a
+    // second one was possible, so no finished video was marked stale.
+    expect(renderPropsHash(TEMPLATE, cut())).toBe(
+      renderPropsHash(TEMPLATE, cut(), null),
+    );
+  });
+
   it("separates the key plate, and leaves a film nobody keys where it was", () => {
     // A greenscreen cut is a different file from the same run on black.
     expect(renderPropsHash(TEMPLATE, cut({ greenscreen: true }))).not.toBe(

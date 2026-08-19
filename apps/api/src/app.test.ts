@@ -110,6 +110,76 @@ describe("api", () => {
     expect(await res.json()).toEqual({ error: "Invalid request" });
   });
 
+  it("rejects reading a run's other runner without a session", async () => {
+    // The partner is a whole run of somebody else's, readable only because they
+    // accepted an invitation from *this* athlete — so the session is what says
+    // which athlete is asking, and there is no answer without one.
+    const res = await app.request("/api/runs/123/partner");
+    expect(res.status).toBe(401);
+  });
+
+  it("rejects the invite endpoints that act on somebody's behalf", async () => {
+    // Everything that mints, answers or withdraws an invitation is a signed-in
+    // action — the preview below is the one deliberate exception.
+    const token = "a".repeat(43);
+    for (const [method, path] of [
+      ["POST", "/api/runs/123/invite"],
+      ["GET", "/api/runs/123/invites"],
+      ["GET", `/api/invites/${token}/candidates`],
+      ["POST", `/api/invites/${token}/decline`],
+      ["DELETE", `/api/invites/${token}`],
+    ] as const) {
+      const res = await app.request(path, { method });
+      expect(res.status, `${method} ${path}`).toBe(401);
+    }
+
+    // Accept validates its body first, so it needs one to reach the session
+    // check at all.
+    const accept = await app.request(`/api/invites/${token}/accept`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ activity_id: 1, consent_text: "I agree." }),
+    });
+    expect(accept.status).toBe(401);
+  });
+
+  it("refuses an acceptance with no record of what was agreed to", async () => {
+    // `consent_text` is what the row stores as evidence, so an acceptance
+    // without one is rejected by the validator rather than written empty.
+    const res = await app.request(`/api/invites/${"a".repeat(43)}/accept`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ activity_id: 1, consent_text: "" }),
+    });
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "Invalid request" });
+  });
+
+  it("previews an invitation without a session, refusing a malformed token", async () => {
+    // Two things at once, and the second is why the first is testable here.
+    //
+    // The preview is deliberately unauthenticated — the whole point of the link
+    // is that it reaches somebody who has no account yet — so reaching the
+    // *validator* is the proof: a 400 can only come from a request that got
+    // past every gate in front of it, and a 401 would mean this endpoint had
+    // grown one. The token's shape is that gate: too short, or not base64url,
+    // and it never becomes a database lookup.
+    //
+    // A well-formed unknown token is not asserted here on purpose. It reaches
+    // `getInvite`, and this suite has no database behind it.
+    for (const token of [
+      "short",
+      "has spaces here and is long enough",
+      "a/b",
+    ]) {
+      const res = await app.request(
+        `/api/invites/${encodeURIComponent(token)}`,
+      );
+      expect(res.status, token).toBe(400);
+    }
+  });
+
   it("rejects the coach endpoints without a session", async () => {
     for (const [method, path] of [
       ["GET", "/api/coach/threads"],

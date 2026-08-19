@@ -31,6 +31,10 @@ export const TEMPLATE_COMPONENTS: Record<
     import("./templates/run-video/RunVideo").then((module) => ({
       default: module.RunVideo as AnyVideo,
     })),
+  "duo-replay": () =>
+    import("./templates/duo-replay/DuoReplay").then((module) => ({
+      default: module.DuoReplay as AnyVideo,
+    })),
   "split-rush": () =>
     import("./templates/split-rush/SplitRush").then((module) => ({
       default: module.SplitRush as AnyVideo,
@@ -76,6 +80,17 @@ export const TEMPLATE_DEFAULT_PROPS: Record<
     activity: placeholderRun,
     streams: {},
     theme: DEFAULT_THEME,
+    greenscreen: false,
+  },
+  // No partner: Studio has no invitation to read, and the composition draws the
+  // second bar dimmed and empty rather than refusing to open.
+  "duo-replay": {
+    activity: placeholderRun,
+    streams: {},
+    mapboxToken: "",
+    avatarUrl: "",
+    partner: null,
+    athleteName: "You",
     greenscreen: false,
   },
   "living-poster": {
