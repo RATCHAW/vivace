@@ -662,9 +662,41 @@ export async function buildRunDebriefCard(
  * things at once, and a dozen-step form in the middle of a conversation is a
  * form nobody finishes — five questions is about as far as an athlete will tap
  * before typing "just tell me" instead.
+ *
+ * Choices stop at seven because a week has seven days. "Which days can you
+ * run?" is the question this whole tool exists for — the system prompt asks
+ * the coach to find it out, and `setAthleteContext` has a field waiting for
+ * the answer — and a six-choice ceiling made it the one question that could
+ * not be asked.
  */
 const MAX_QUESTIONS = 5;
-const MAX_CHOICES = 6;
+const MAX_CHOICES = 7;
+
+/** How long each piece of writing may be before the form stops fitting. */
+const MAX_LENGTH = {
+  intro: 160,
+  question: 140,
+  hint: 160,
+  label: 60,
+  choiceHint: 80,
+  unit: 20,
+  placeholder: 60,
+} as const;
+
+/**
+ * One trimmed string, cut to length rather than rejected, and null when there
+ * is nothing left.
+ *
+ * These lengths are what keeps a choice on one line and the form on one
+ * screen. They are enforced here rather than on the input schema for the same
+ * reason the two counts are: a model writing a sentence four characters too
+ * long should cost the athlete four characters, not the answer.
+ */
+function clamp(value: string | null | undefined, limit: number): string | null {
+  const trimmed = value?.trim();
+  if (!trimmed) return null;
+  return trimmed.length > limit ? `${trimmed.slice(0, limit - 1)}…` : trimmed;
+}
 
 /** What kind of answer a question takes, and so what the browser draws. */
 export type AnswerKind = "single" | "multi" | "text" | "number";
@@ -702,6 +734,14 @@ export interface QuestionnaireCard {
   card: "questionnaire";
   intro: string | null;
   questions: AskedQuestion[];
+  /**
+   * What was trimmed to fit, addressed to the model and never drawn.
+   *
+   * The browser renders `questions` and ignores everything else, so this says
+   * to the coach what a validation error would have said — except the turn is
+   * still alive to hear it.
+   */
+  note?: string;
 }
 
 /** What the model passes in, before any of it is trusted. */
@@ -723,6 +763,13 @@ interface ProposedQuestion {
  * would silently merge into one answer. Everything the model wrote — the words
  * — is kept verbatim.
  *
+ * The two counts are enforced *here* and only described in the input schema,
+ * for the reason spelled out in `mondayFirst`: a `.max()` on the schema is
+ * checked before `execute` runs, so an eighth choice doesn't cost the athlete
+ * a question — it fails the tool call, and `streamText` with it, mid-answer.
+ * Trimming the tail keeps the turn, and the model is told what it asked for
+ * was cut so it can ask the rest next time.
+ *
  * Pure, and exported for the tests: the shape it produces is the contract with
  * `coach-questionnaire.tsx`, and it is the one part of the tool that can be
  * checked without a model or a Strava token.
@@ -732,48 +779,74 @@ export function buildQuestionnaire(
   proposed: ProposedQuestion[],
 ): QuestionnaireCard | { error: string } {
   const questions: AskedQuestion[] = [];
+  const dropped: string[] = [];
 
-  for (const [index, item] of proposed.entries()) {
+  if (proposed.length > MAX_QUESTIONS) {
+    dropped.push(
+      `Only the first ${MAX_QUESTIONS} of your ${proposed.length} questions ` +
+        "were asked; a longer form is one nobody finishes.",
+    );
+  }
+
+  for (const [index, item] of proposed.slice(0, MAX_QUESTIONS).entries()) {
     const picks = item.kind === "single" || item.kind === "multi";
     // A label repeated inside one question is two options the athlete cannot
     // tell apart; dropped rather than rejected, because the rest of the
     // question is usually fine and a re-ask costs the athlete a round trip.
-    const labels = picks
-      ? [...new Set((item.choices ?? []).map((choice) => choice.label.trim()))]
-          .filter(Boolean)
-          .slice(0, MAX_CHOICES)
-      : [];
+    // Deduplicated *after* clamping, because two labels that differ only past
+    // the limit are one option by the time the athlete reads them.
+    const seen = new Map<string, string | null>();
+    if (picks) {
+      for (const choice of item.choices ?? []) {
+        const label = clamp(choice.label, MAX_LENGTH.label);
+        if (label && !seen.has(label)) {
+          seen.set(label, clamp(choice.hint, MAX_LENGTH.choiceHint));
+        }
+      }
+    }
+    const choices = [...seen].slice(0, MAX_CHOICES);
 
-    if (picks && labels.length < 2) {
+    if (picks && choices.length < 2) {
       return {
         error:
           `Question ${index + 1} is a "${item.kind}" question with fewer than ` +
-          "two distinct choices. Give it two to six, or ask it as text.",
+          `two distinct choices. Give it two to ${MAX_CHOICES}, or ask it as ` +
+          "text.",
       };
+    }
+
+    if (seen.size > choices.length) {
+      dropped.push(
+        `Question ${index + 1} was cut to its first ${MAX_CHOICES} choices.`,
+      );
     }
 
     questions.push({
       id: `q${index + 1}`,
-      question: item.question.trim(),
-      hint: item.hint?.trim() || null,
+      question: clamp(item.question, MAX_LENGTH.question) ?? "",
+      hint: clamp(item.hint, MAX_LENGTH.hint),
       kind: item.kind,
-      choices: labels.map((label, position) => ({
+      choices: choices.map(([label, hint], position) => ({
         value: `c${position + 1}`,
         label,
-        hint:
-          (item.choices ?? [])
-            .find((choice) => choice.label.trim() === label)
-            ?.hint?.trim() || null,
+        hint,
       })),
-      unit: item.kind === "number" ? item.unit?.trim() || null : null,
+      unit: item.kind === "number" ? clamp(item.unit, MAX_LENGTH.unit) : null,
       // A choice question's free-text box is labelled "Other" by the browser,
       // in the athlete's language — the model's example answer would be an
       // English word sitting in a French form.
-      placeholder: picks ? null : item.placeholder?.trim() || null,
+      placeholder: picks
+        ? null
+        : clamp(item.placeholder, MAX_LENGTH.placeholder),
     });
   }
 
-  return { card: "questionnaire", intro: intro?.trim() || null, questions };
+  return {
+    card: "questionnaire",
+    intro: clamp(intro, MAX_LENGTH.intro),
+    questions,
+    ...(dropped.length > 0 ? { note: dropped.join(" ") } : {}),
+  };
 }
 
 /**
@@ -916,25 +989,27 @@ export function createCoachTools(ctx: CoachToolContext): ToolSet {
         "prose, and their answers come back as their next message. Use it " +
         "rather than writing the questions into your reply. One form per turn, " +
         "up to five questions, and never for anything a tool can look up.",
+      // Deliberately without a `.max()` on either count. The AI SDK validates
+      // tool input before `execute`, and a rejection there is not a retry —
+      // it throws out of `streamText` and the athlete's turn dies mid-answer,
+      // which is what a seventh weekday used to do. The limits are described
+      // to the model and enforced by `buildQuestionnaire`, which trims.
       inputSchema: z.object({
         intro: z
           .string()
-          .max(160)
           .optional()
           .describe(
-            "One line saying why you are asking. Omit it when the questions " +
-              "speak for themselves.",
+            "One line saying why you are asking, at most 160 characters. " +
+              "Omit it when the questions speak for themselves.",
           ),
         questions: z
           .array(
             z.object({
               question: z
                 .string()
-                .max(140)
                 .describe("The question itself, one sentence."),
               hint: z
                 .string()
-                .max(160)
                 .optional()
                 .describe("A clarifying line under the question."),
               kind: z
@@ -947,34 +1022,34 @@ export function createCoachTools(ctx: CoachToolContext): ToolSet {
               choices: z
                 .array(
                   z.object({
-                    label: z.string().max(60),
-                    hint: z.string().max(80).optional(),
+                    label: z.string(),
+                    hint: z.string().optional(),
                   }),
                 )
-                .max(MAX_CHOICES)
                 .optional()
                 .describe(
-                  "Two to six options, for single and multi only. Every " +
-                    "choice question is also drawn with a free-text box for " +
-                    "an answer you did not list, so never add 'Other', " +
-                    "'Something else' or 'None of these' yourself — list only " +
-                    "the answers you actually expect.",
+                  `Two to ${MAX_CHOICES} options, for single and multi only — ` +
+                    "seven so a whole week fits. Every choice question is " +
+                    "also drawn with a free-text box for an answer you did " +
+                    "not list, so never add 'Other', 'Something else' or " +
+                    "'None of these' yourself — list only the answers you " +
+                    "actually expect.",
                 ),
               unit: z
                 .string()
-                .max(20)
                 .optional()
                 .describe("What a number is in: 'km', 'days a week', 'kg'."),
               placeholder: z
                 .string()
-                .max(60)
                 .optional()
                 .describe("An example answer, for text and number."),
             }),
           )
           .min(1)
-          .max(MAX_QUESTIONS)
-          .describe("The questions, in the order they should be asked."),
+          .describe(
+            `The questions, in the order they should be asked. At most ` +
+              `${MAX_QUESTIONS} — a longer form is one nobody finishes.`,
+          ),
       }),
       execute: async ({ intro, questions }) =>
         buildQuestionnaire(intro, questions),

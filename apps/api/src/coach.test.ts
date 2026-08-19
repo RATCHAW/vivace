@@ -21,6 +21,7 @@ import {
   coachSystemPrompt,
   dropUnannouncedToolInput,
   mondayFirst,
+  type QuestionnaireCard,
 } from "./coach.js";
 import { titleFrom } from "./chat-store.js";
 import type { BestEffort } from "./strava.js";
@@ -622,6 +623,83 @@ describe("buildQuestionnaire", () => {
     expect(
       buildQuestionnaire(null, [{ ...pick, choices: [{ label: "Half" }] }]),
     ).toMatchObject({ error: expect.stringContaining("Question 1") });
+  });
+
+  it("asks a whole week, which is the question the tool exists for", () => {
+    // Seven weekdays used to be one choice over the cap, and the cap was on
+    // the input schema — so the tool call never validated and the athlete's
+    // turn died mid-answer instead of drawing the form.
+    const card = buildQuestionnaire(null, [
+      {
+        question: "What days can you typically run this week?",
+        kind: "multi",
+        choices: [
+          { label: "Monday" },
+          { label: "Tuesday" },
+          { label: "Wednesday" },
+          { label: "Thursday" },
+          { label: "Friday" },
+          { label: "Saturday" },
+          { label: "Sunday" },
+        ],
+      },
+    ]);
+
+    expect(card).not.toHaveProperty("error");
+    expect((card as QuestionnaireCard).questions[0].choices).toHaveLength(7);
+    expect(card).not.toHaveProperty("note");
+  });
+
+  it("trims what overflows instead of failing the turn", () => {
+    const card = buildQuestionnaire(null, [
+      { ...pick, choices: "12345678".split("").map((n) => ({ label: n })) },
+      pick,
+      pick,
+      pick,
+      pick,
+      pick,
+    ]) as QuestionnaireCard;
+
+    expect(card.questions).toHaveLength(5);
+    expect(card.questions[0].choices).toHaveLength(7);
+    // The model is told what was cut — that is the sentence a rejected input
+    // would have carried, delivered without killing the answer it was part of.
+    expect(card.note).toContain("6 questions");
+    expect(card.note).toContain("Question 1");
+  });
+
+  it("cuts writing to what the form can lay out", () => {
+    const card = buildQuestionnaire("i".repeat(200), [
+      {
+        question: "q".repeat(200),
+        hint: "h".repeat(200),
+        kind: "single",
+        choices: [{ label: "a".repeat(80) }, { label: "b" }],
+      },
+    ]) as QuestionnaireCard;
+
+    expect(card.intro).toHaveLength(160);
+    expect(card.questions[0].question).toHaveLength(140);
+    expect(card.questions[0].hint).toHaveLength(160);
+    expect(card.questions[0].choices[0].label).toHaveLength(60);
+    expect(card.intro?.endsWith("…")).toBe(true);
+  });
+
+  it("reads two labels that differ past the cut as one option", () => {
+    // Clamped first, then deduplicated: the athlete sees the same 60
+    // characters twice, whatever the model wrote after them.
+    const card = buildQuestionnaire(null, [
+      {
+        ...pick,
+        choices: [
+          { label: `${"a".repeat(60)} morning` },
+          { label: `${"a".repeat(60)} evening` },
+          { label: "Half" },
+        ],
+      },
+    ]) as QuestionnaireCard;
+
+    expect(card.questions[0].choices).toHaveLength(2);
   });
 
   it("drops a unit and a placeholder a choice question cannot use", () => {
