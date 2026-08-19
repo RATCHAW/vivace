@@ -577,11 +577,22 @@ export const en = {
     noWeek:
       "No week accepted yet. Ask for one and it lands here as sessions, not a paragraph.",
     planMyWeek: "Plan my week",
-    weekProgress: "{{actual}} of {{planned}} km · ",
-    weekComplete: "week complete",
+    adjust: "Adjust",
+    askAdjustWeek: "Adjust this week for me",
+    weekProgress: "{{actual}} of {{planned}} km",
+    weekComplete: "Week complete",
     sessionsLeft_one: "{{count}} session left",
     sessionsLeft_other: "{{count}} sessions left",
-    dayTooltip: "{{day}} · {{type}} · {{actual}} of {{planned}} km",
+    nextSession: "next {{day}}, {{type}}, {{planned}} km",
+    /** What the two marks mean — the card is otherwise a shape with no key. */
+    weekLegend:
+      "Filled is what you ran; the outline is what the week still asks for.",
+    today: "Today",
+    /** Read out per day, because a bar has nothing a screen reader can say. */
+    dayRest: "{{day}} · rest day",
+    dayDone: "{{day}} · {{type}} · ran {{actual}} of {{planned}} km",
+    dayTodo: "{{day}} · {{type}} · {{planned}} km still to run",
+    dayMissed: "{{day}} · {{type}} · {{planned}} km not run",
     signals: "Signals",
     tapSignal: "Tap a signal to ask about it.",
     queue: "Coach queue",

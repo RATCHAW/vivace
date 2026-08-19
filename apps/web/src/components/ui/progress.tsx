@@ -1,13 +1,28 @@
 import { Progress as ProgressPrimitive } from "@base-ui/react/progress";
+import { cva, type VariantProps } from "class-variance-authority";
 
 import { cn } from "@/lib/utils";
+
+const progressIndicatorVariants = cva("h-full transition-all", {
+  variants: {
+    variant: {
+      /** A control's own progress — DESIGN.md's `button-primary` ink. */
+      default: "bg-primary",
+      /** A measurement of the athlete, not of the UI: the cobalt stamp. */
+      brand: "bg-brand",
+    },
+  },
+  defaultVariants: { variant: "default" },
+});
 
 function Progress({
   className,
   children,
   value,
+  variant,
   ...props
-}: ProgressPrimitive.Root.Props) {
+}: ProgressPrimitive.Root.Props &
+  VariantProps<typeof progressIndicatorVariants>) {
   return (
     <ProgressPrimitive.Root
       value={value}
@@ -17,7 +32,7 @@ function Progress({
     >
       {children}
       <ProgressTrack>
-        <ProgressIndicator />
+        <ProgressIndicator className={progressIndicatorVariants({ variant })} />
       </ProgressTrack>
     </ProgressPrimitive.Root>
   );
@@ -43,7 +58,7 @@ function ProgressIndicator({
   return (
     <ProgressPrimitive.Indicator
       data-slot="progress-indicator"
-      className={cn("h-full bg-primary transition-all", className)}
+      className={cn(progressIndicatorVariants(), className)}
       {...props}
     />
   );
