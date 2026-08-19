@@ -125,8 +125,26 @@ jobs:
 
       # Chromium only — the suite has one project, and pulling three browsers
       # would cost more than the tests do.
+      #
+      # And deliberately without `--with-deps`. On `ubuntu-latest` every library
+      # Chromium links against is already on the image — the run that finally
+      # made this obvious reported all twenty of them "already the newest
+      # version" and then installed nine *font* packages, none of which this
+      # suite reads: Japanese, Thai, Chinese, Cyrillic and the X11 bitmap
+      # plumbing behind them. The assertions here are `getByRole` and
+      # `getByText` against the accessibility tree, and Latin coverage comes
+      # with the Chrome that ships on the runner.
+      #
+      # The nine cost 78 seconds on a good day, against 27 for the tests
+      # themselves, because they come from the Ubuntu mirror rather than
+      # Playwright's CDN — and on a bad one the mirror simply stops answering
+      # and the job burns its whole twenty minutes there. The browser is 300 MB
+      # from a CDN that serves it in ten seconds; the fonts were the fragile
+      # part, so they are gone. The timeout is what keeps a slow download from
+      # ever again looking like a hung suite.
       - name: Install Chromium
-        run: pnpm --filter @repo/e2e exec playwright install --with-deps chromium
+        timeout-minutes: 5
+        run: pnpm --filter @repo/e2e exec playwright install chromium
 
       - name: Run the end-to-end suite
         run: pnpm e2e
