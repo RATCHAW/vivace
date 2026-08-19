@@ -14,6 +14,13 @@ import { useEffect } from "react";
 // runtime variable — same as NEXT_PUBLIC_APP_URL in lib/site.ts.
 const key = process.env.NEXT_PUBLIC_POSTHOG_KEY;
 const host = process.env.NEXT_PUBLIC_POSTHOG_HOST || "https://us.i.posthog.com";
+// In production `host` above is a reverse proxy on our own domain, because an
+// ad blocker's list is a list of hosts and this page is the top of the sign-up
+// funnel — the visitors it drops are exactly the ones worth counting. `ui_host`
+// is where PostHog itself lives, which the SDK needs for the toolbar and for
+// the links it builds back into the app; unset, both follow the proxy.
+const uiHost =
+  process.env.NEXT_PUBLIC_POSTHOG_UI_HOST || "https://us.posthog.com";
 
 // Which deploy these events came from, so `next dev` on a laptop can be told
 // apart from the live page in the one project both write to — the same
@@ -39,6 +46,7 @@ export function Analytics() {
 
       posthog.init(key, {
         api_host: host,
+        ui_host: uiHost,
         // Visitors here are anonymous by definition — they become a person
         // when they reach the app and sign in, and PostHog stitches the two.
         person_profiles: "identified_only",

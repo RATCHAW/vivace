@@ -11,8 +11,31 @@ import posthog from "posthog-js";
 
 const key = import.meta.env.VITE_POSTHOG_KEY;
 
-/** US cloud unless the project lives in the EU or on a self-hosted instance. */
+/**
+ * Where events are sent.
+ *
+ * US cloud unless the project lives in the EU or on a self-hosted instance —
+ * or unless this deploy sends them through a reverse proxy on our own domain,
+ * which is what production does (`cadence.vivace.run`). An ad blocker's list is
+ * a list of *hosts*, so a request to `us.i.posthog.com` is dropped in the
+ * browser before it is made, taking the athlete, their session replay and their
+ * feature flags with it. See the README.
+ */
 const host = import.meta.env.VITE_POSTHOG_HOST || "https://us.i.posthog.com";
+
+/**
+ * Where PostHog itself lives, which is not the same question once `host` is a
+ * proxy.
+ *
+ * The SDK builds links to the app out of this — "view recording", and the
+ * toolbar's own authentication handshake, which asks the *project* for
+ * permission and cannot get it from a host that only forwards ingestion. Both
+ * silently point at the proxy when it is left unset.
+ *
+ * Its value with no proxy in front is exactly what the SDK would derive from
+ * `host` anyway, so it is safe to pass unconditionally.
+ */
+const uiHost = import.meta.env.VITE_POSTHOG_UI_HOST || "https://us.posthog.com";
 
 /**
  * Which deploy these events came from — `production`, `staging`, or the
@@ -56,6 +79,7 @@ export function initPostHog(): void {
 
   posthog.init(key, {
     api_host: host,
+    ui_host: uiHost,
     // Only build a person profile once someone signs in. Anonymous events
     // still power web analytics; they just don't each create a person.
     person_profiles: "identified_only",

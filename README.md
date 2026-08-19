@@ -500,6 +500,46 @@ The key is the *project* key, which is public by design — it can only write
 events. Add `POSTHOG_HOST=https://eu.i.posthog.com` (and the matching
 `VITE_`/`NEXT_PUBLIC_` variants) for an EU or self-hosted project.
 
+### The reverse proxy — why production doesn't send events to posthog.com
+
+An ad blocker's list is a list of *hosts*. A request to `us.i.posthog.com` is
+dropped in the browser before it is made, and what goes with it is not just a
+`$pageview`: session replay, error tracking, surveys and **feature flags** all
+travel the same road, so a blocked athlete silently gets every flag's fallback.
+On a running app whose funnel starts on a public marketing page, that is a large
+and non-random slice of the people worth measuring.
+
+So the two browser apps send their events to a subdomain of our own domain,
+which PostHog itself hosts and forwards — a
+[managed reverse proxy](https://posthog.com/docs/advanced/proxy/managed-reverse-proxy),
+free on Cloud, no request of ours in the path:
+
+```sh
+# apps/web/.env, apps/landing/.env  (VITE_ / NEXT_PUBLIC_ prefixes)
+POSTHOG_HOST=https://cadence.vivace.run
+POSTHOG_UI_HOST=https://us.posthog.com
+```
+
+Things worth knowing about it:
+
+- **`ui_host` is not optional.** It is where PostHog *itself* lives, and the SDK
+  needs it for the toolbar's authentication handshake and for the "view
+  recording" links it builds. Left unset, both point at the proxy, which only
+  forwards ingestion and can answer neither. Its value with no proxy in front is
+  what the SDK would derive anyway, so it is passed unconditionally.
+- **The subdomain is deliberately unrecognisable.** `analytics`, `tracking`,
+  `telemetry`, `ph` and `posthog` are all on the same blocklists as the host we
+  are routing around, which would make the whole exercise pointless.
+- **The DNS record is a CNAME with proxying off.** `cadence` → the target
+  PostHog issued, grey cloud if it ever moves behind Cloudflare — an orange one
+  breaks certificate issuance.
+- **`apps/api` is not proxied, and shouldn't be.** `posthog-node` runs on our
+  server, where no ad blocker exists. `POSTHOG_HOST` there stays PostHog's own
+  host — one less hop in front of the coach's LLM traces.
+- **Nothing here is required.** Leave the hosts unset and both apps talk to
+  `us.i.posthog.com` exactly as they did; the proxy is a production deploy
+  setting, not a dependency.
+
 ### Development data, and keeping it out of production's numbers
 
 A PostHog project is one silo of data. Point a laptop at the production key and

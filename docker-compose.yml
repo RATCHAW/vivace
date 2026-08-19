@@ -176,6 +176,7 @@ services:
         VITE_SITE_URL: http://localhost:3001
         VITE_POSTHOG_KEY: ${VITE_POSTHOG_KEY:-}
         VITE_POSTHOG_HOST: ${VITE_POSTHOG_HOST:-}
+        VITE_POSTHOG_UI_HOST: ${VITE_POSTHOG_UI_HOST:-}
         # This is a production Vite build of a local stack, so it would call
         # itself `production` in PostHog. It matches the api service's APP_ENV.
         VITE_APP_ENV: ${APP_ENV:-docker}
@@ -194,6 +195,7 @@ services:
         NEXT_PUBLIC_APP_URL: http://localhost:8080
         NEXT_PUBLIC_POSTHOG_KEY: ${NEXT_PUBLIC_POSTHOG_KEY:-}
         NEXT_PUBLIC_POSTHOG_HOST: ${NEXT_PUBLIC_POSTHOG_HOST:-}
+        NEXT_PUBLIC_POSTHOG_UI_HOST: ${NEXT_PUBLIC_POSTHOG_UI_HOST:-}
         # Same reason as the web service: a production `next build` of a local
         # stack, which shouldn't file its events under production.
         NEXT_PUBLIC_APP_ENV: ${APP_ENV:-docker}
