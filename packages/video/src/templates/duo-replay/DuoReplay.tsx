@@ -1,11 +1,7 @@
 import { useMemo } from "react";
 import { AbsoluteFill, useCurrentFrame, useVideoConfig } from "remotion";
 import { buildRoutesCameraTrack, cameraAtProgress } from "../../core/camera";
-import {
-  avatarSource,
-  RUNNER_AVATAR_CLEARANCE,
-  RUNNER_CLEARANCE,
-} from "../../core/marker";
+import { avatarSource, runnerLabelClearance } from "../../core/marker";
 import { KEY_COLOR } from "../../core/greenscreen";
 import { RouteCanvas } from "../../core/RouteCanvas";
 import { RouteMap, type RouteLayer } from "../../core/RouteMap";
@@ -19,6 +15,7 @@ import {
   duoRunners,
   DUO_DRAW_FROM,
   DUO_DRAW_TO,
+  DUO_INK,
   DUO_ROUTE_PADDING,
 } from "./duo";
 import {
@@ -104,11 +101,12 @@ export function DuoReplay({
   const frames = duoFrame(runners, clock, drawProgress, fps, drawFrames);
 
   // Pure geometry, so the map can open on the right shot instead of easing into
-  // one once the style lands. The avatars are the wider markers, so they are
-  // also the wider shot — and one of them being on is enough to owe the berth.
-  const clearance = runners.some((runner) => runner.avatarUrl)
-    ? RUNNER_AVATAR_CLEARANCE
-    : RUNNER_CLEARANCE;
+  // one once the style lands. Every head here carries a name plate under it, and
+  // an avatar puts a face above that — the taller marker is the wider shot, and
+  // one of them being on is enough to owe the berth.
+  const clearance = runnerLabelClearance(
+    runners.some((runner) => runner.avatarUrl !== ""),
+  );
   const track = useMemo(
     () =>
       buildRoutesCameraTrack(
@@ -120,12 +118,21 @@ export function DuoReplay({
     [runners, clock, width, height, clearance],
   );
 
-  const layers: RouteLayer[] = frames.map((state) => ({
+  // Both lines in the one house ink, and each one's name on the head of it —
+  // which is the whole of who-is-who in this film. See `DUO_INK`.
+  //
+  // A side each for the two names: two people who ran together are level for
+  // most of the film, and both plates hanging the same way would cover each
+  // other for all of it. The athlete's own goes above, which is the order their
+  // bars are in.
+  const layers: RouteLayer[] = frames.map((state, index) => ({
     key: state.runner.key,
     points: state.runner.points,
     drawn: state.drawn,
-    color: state.runner.color,
+    color: DUO_INK,
     avatarUrl: state.runner.avatarUrl,
+    label: state.runner.name,
+    labelAbove: index === 0,
   }));
 
   const hasRoute = layers.some((layer) => layer.points.length >= 2);
@@ -178,6 +185,7 @@ export function DuoReplay({
               padding={DUO_ROUTE_PADDING}
               plate={plate}
               trackColor={ink.track}
+              labelPlate={ink.label}
             />
           ) : null}
         </AbsoluteFill>

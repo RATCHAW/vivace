@@ -14,6 +14,7 @@ import {
   LABEL_TRACKING,
   PAGE_INSET,
 } from "../../core/layout";
+import { RUNNER_LABEL_PLATE } from "../../core/RunnerLabel";
 import { mix } from "../../core/timing";
 import type { VideoActivity } from "../../types";
 import {
@@ -22,6 +23,7 @@ import {
   duoHeadlineBox,
   duoNumbersWidth,
   DUO_BAR_HEIGHT,
+  DUO_INK,
   DUO_ROW_HEAD_HEIGHT,
   DUO_ROW_METRIC,
   DUO_ROW_TOPS,
@@ -66,18 +68,22 @@ export interface DuoInk {
   mute: string;
   faint: string;
   track: string;
+  /** The plate a runner's name rides on, over their trace. */
+  label: string;
 }
 
 const OVER_MAP: DuoInk = {
   mute: ON_DARK_MUTE,
   faint: ON_DARK_FAINT,
   track: TRACK,
+  label: RUNNER_LABEL_PLATE,
 };
 
 const OVER_KEY: DuoInk = {
   mute: flattenOver(ON_DARK_MUTE, "#000000"),
   faint: flattenOver(ON_DARK_FAINT, "#000000"),
   track: flattenOver(TRACK, "#000000"),
+  label: flattenOver(RUNNER_LABEL_PLATE, "#000000"),
 };
 
 export const duoInk = (greenscreen: boolean): DuoInk =>
@@ -89,6 +95,7 @@ const TYPE = {
   label: 30,
   title: 72,
   name: 34,
+  nameLine: 46,
   watermark: 40,
   credit: 22,
 } as const;
@@ -105,23 +112,6 @@ const TYPE = {
  */
 function Spacer({ grow }: { grow: number }) {
   return <div style={{ flexGrow: grow, flexBasis: 0, minWidth: 0 }} />;
-}
-
-/** The colour chip that ties a bar to a trace. The only thing on screen saying
- *  which line on the map is whose, so it is drawn at name size, not as a dot in
- *  a legend. */
-function InkChip({ color }: { color: string }) {
-  return (
-    <span
-      style={{
-        width: 22,
-        height: 22,
-        borderRadius: "50%",
-        backgroundColor: color,
-        flexShrink: 0,
-      }}
-    />
-  );
 }
 
 function Metric({
@@ -228,7 +218,12 @@ function RunnerNumbers({
 }
 
 /**
- * Who this row belongs to — the chip in their ink and their name.
+ * Who this row belongs to: their name, and nothing else.
+ *
+ * It used to be their name behind a chip in their own ink, which was the film
+ * asking the athlete to hold a legend in their head. Both traces are cobalt now
+ * and the map carries the same name on the head of each line, so the name here
+ * and the name up there are the tie — see `DUO_INK`.
  *
  * Travels: it starts at the left of a full-width row and ends centred under
  * their face, on their own column. A runner who hasn't set off yet keeps their
@@ -264,14 +259,15 @@ function RunnerHeadline({
       }}
     >
       <Spacer grow={move} />
+      {/* A block, not a flex row: with the chip gone the name is the whole of
+          it, and `text-overflow` only clips text it owns directly. */}
       <span
         style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 14,
           fontSize: TYPE.name,
           fontWeight: 600,
-          lineHeight: 1,
+          // Enough leading that `overflow: hidden` clips the ellipsis rather
+          // than the descender of a name with a "y" in it.
+          lineHeight: `${TYPE.nameLine}px`,
           letterSpacing: "-0.01em",
           color: ON_DARK,
           minWidth: 0,
@@ -280,7 +276,6 @@ function RunnerHeadline({
           textOverflow: "ellipsis",
         }}
       >
-        <InkChip color={runner.color} />
         {runner.name}
       </span>
       <Spacer grow={1} />
@@ -328,7 +323,7 @@ function RunnerFill({
         style={{
           height: DUO_BAR_HEIGHT,
           width: `${fill * 100}%`,
-          backgroundColor: frame.runner.color,
+          backgroundColor: DUO_INK,
           borderRadius: 9999,
         }}
       />

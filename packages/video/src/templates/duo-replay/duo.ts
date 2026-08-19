@@ -43,31 +43,29 @@ import type { VideoActivity, VideoPartner, VideoStreams } from "../../types";
 export type DuoKey = "you" | "partner";
 
 /**
- * The two inks.
+ * The one ink — {colors.primary}, cobalt.
  *
- * Cobalt is the athlete whose film this is — the same ink the single-runner
- * replay draws in, so their own line looks the same in both cuts. Teal is
- * DESIGN.md's `{colors.accent-teal}`, an illustration colour and never a button
- * surface, which is exactly what a route trace is. The pair is chosen to stay
- * two colours under red–green colour blindness, where a second cobalt at a
- * different lightness would not.
+ * Both runners are drawn in it. A second hue was how the film used to say which
+ * trace was whose, and it was the wrong instrument for the job: it cost the cut
+ * the house look every other template shares, and it asked the athlete to
+ * remember a legend. Who is who is now what it should always have been — their
+ * name, riding the head of their own line (`core/RunnerLabel`), with their face
+ * on it when the avatar option is on.
+ *
+ * The same ink the single-runner replay draws in, so an athlete's line looks the
+ * same in both cuts.
  */
-export const DUO_INK: Record<DuoKey, string> = {
-  // {colors.primary}
-  you: "#494fdf",
-  // {colors.accent-teal}
-  partner: "#00a87e",
-};
+export const DUO_INK = "#494fdf";
 
 export interface DuoRunner {
   key: DuoKey;
-  /** Shown on their bar. Empty falls back to the key's own word upstream. */
+  /** Shown on their bar, on their card, and on the plate riding their trace —
+   *  the only thing that says which of the two lines is theirs. */
   name: string;
   activity: VideoActivity;
   streams: VideoStreams;
   /** Their picture when the avatar option is on, else "" for the plain dot. */
   avatarUrl: string;
-  color: string;
   points: LatLng[];
 }
 
@@ -87,7 +85,6 @@ export function duoRunners(
       activity,
       streams,
       avatarUrl,
-      color: DUO_INK.you,
       points: streams.latlng?.data ?? [],
     },
     {
@@ -96,7 +93,6 @@ export function duoRunners(
       activity: partner.activity,
       streams: partner.streams,
       avatarUrl: partner.avatarUrl,
-      color: DUO_INK.partner,
       points: partner.streams.latlng?.data ?? [],
     },
   ];

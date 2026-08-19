@@ -7,8 +7,9 @@ import { RUNNER_AVATAR_RING, RUNNER_AVATAR_SIZE } from "./marker";
  *  on the plate, and the puck is centred on them.
  *
  *  `ring` is the trace's own ink, so the marker reads as part of the line rather
- *  than a badge on top of it — and in a film with two runners in it, the ring is
- *  the only thing on the map saying which face is which.
+ *  than a badge on top of it. In a film with two runners in it that ink is the
+ *  same for both of them — the face, and the name on the plate under it
+ *  (`RunnerLabel`), are what say which is which.
  *
  *  The frame is held until the picture has loaded — a headless render would
  *  otherwise screenshot an empty ring — and released again if it never does, so

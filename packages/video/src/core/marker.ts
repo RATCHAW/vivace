@@ -17,9 +17,32 @@ export const RUNNER_DOT_RADIUS = 20;
  *  width, which is what keeps it riding the route rather than covering it. */
 export const RUNNER_AVATAR_SIZE = 120;
 
-/** The ring around the picture, drawn in the same ink as the trace it heads —
- *  which in a two-runner film is also the only thing saying who it is. */
+/** The ring around the picture, drawn in the same ink as the trace it heads. */
 export const RUNNER_AVATAR_RING = 8;
+
+/**
+ * The name plate hanging under a marker.
+ *
+ * A two-runner film draws both traces in the one house ink, so the line itself
+ * says nothing about whose it is — this does. Sized as furniture rather than as
+ * a headline: it is read at a glance and must not compete with the numbers in
+ * the band below it.
+ */
+export const RUNNER_LABEL = {
+  fontSize: 28,
+  height: 46,
+  paddingX: 20,
+  /** Between the marker's edge and the top of the plate. */
+  gap: 12,
+  /**
+   * Longest a plate may get before the name is cut.
+   *
+   * Bounded on purpose. Half of it is berth the camera owes the head, so an
+   * unbounded name would be an unbounded zoom-out — and a name wide enough to
+   * need two lines would cover the road the athlete has just run.
+   */
+  maxWidth: 260,
+} as const;
 
 /** Room between the marker's edge and the safe box. */
 const RUNNER_MARGIN = 28;
@@ -32,6 +55,22 @@ export const RUNNER_CLEARANCE = RUNNER_DOT_RADIUS + RUNNER_MARGIN;
 /** The same, for the avatar puck: three times the dot needs its own berth, or
  *  the shot the dot fitted crops the athlete's face at the frame's edge. */
 export const RUNNER_AVATAR_CLEARANCE = RUNNER_AVATAR_SIZE / 2 + RUNNER_MARGIN;
+
+/**
+ * The berth a head carrying a name plate is owed, with or without a face on it.
+ *
+ * The marker's own reach *plus* the plate, because the plate hangs off the
+ * marker rather than replacing it — and covering both directions, since two
+ * runners level with each other take a side each. Downward is the direction
+ * worth naming: what sits under the safe box is the runners' own rows, so a
+ * plate that overhung it would land on the numbers rather than merely near the
+ * frame's edge.
+ */
+export const runnerLabelClearance = (avatar: boolean): number =>
+  (avatar ? RUNNER_AVATAR_SIZE / 2 : RUNNER_DOT_RADIUS) +
+  RUNNER_LABEL.gap +
+  RUNNER_LABEL.height +
+  RUNNER_MARGIN;
 
 /** Strava hands back a bare `"avatar/athlete/large.png"` — a sprite name, not a
  *  URL — for athletes who never set a picture, and an empty string is how a
