@@ -219,3 +219,55 @@
     }
   }
 }
+
+/* The film band's four chapter cards, revealed as they come up the page.
+ *
+ * A scroll-driven animation rather than an observer in a client component: the
+ * sections are Server Components and have to stay prerenderable, and a reveal
+ * that needed a boundary would drag this band's copy into the client bundle
+ * for nothing. There is no animation library in this workspace either —
+ * apps/web has tw-animate-css, this one deliberately has nothing.
+ *
+ * Three details are load-bearing. `linear`, because the timeline is scroll
+ * position and not time, so any curve would make the reveal lag the finger.
+ * The stagger is a shifted `animation-range` rather than a delay, because a
+ * delay is a duration and means nothing on a scroll timeline. And `both`, so a
+ * card sits at its start state before its range and at its end state after it
+ * — without it, a card paints fully visible and then pops to transparent the
+ * moment it enters range.
+ *
+ * The @supports guard is not optional: Firefox has no scroll timelines, and
+ * without it `animation-name` would still apply and play once against the
+ * document timeline. Guarded, those browsers get exactly the static page they
+ * get today. */
+@keyframes reveal-card {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .reveal-stagger > * {
+      animation: reveal-card linear both;
+      animation-timeline: view();
+    }
+    .reveal-stagger > *:nth-child(1) {
+      animation-range: entry 10% cover 22%;
+    }
+    .reveal-stagger > *:nth-child(2) {
+      animation-range: entry 16% cover 28%;
+    }
+    .reveal-stagger > *:nth-child(3) {
+      animation-range: entry 22% cover 34%;
+    }
+    .reveal-stagger > *:nth-child(4) {
+      animation-range: entry 28% cover 40%;
+    }
+  }
+}
