@@ -11,10 +11,11 @@ import type {
   CoachTone,
   PlanProgress,
 } from "@/api";
-import { useMessages } from "@/i18n";
+import { useMessages, type TranslationKey } from "@/i18n";
 import { useFormatters } from "@/i18n/format";
 import { MonoLabel } from "@/components/mono";
 import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatClock } from "@repo/video";
 import { cn } from "@/lib/utils";
@@ -38,6 +39,53 @@ function weeksAway(raceDate: string | null): number | null {
       86_400_000,
   );
   return days < 0 ? null : Math.ceil(days / 7);
+}
+
+/** One row of the accepted week, as the briefing sends it. */
+type PlanDay = NonNullable<PlanProgress>["days"][number];
+
+/**
+ * What the athlete should read off a day's mark.
+ *
+ * `missed` only exists once the day is behind them — a Tuesday with nothing on
+ * it is still `todo` on Tuesday morning, and the chart must not say otherwise.
+ */
+export type PlanDayState = "rest" | "done" | "missed" | "todo";
+
+export function planDayState(day: PlanDay, today: number | null): PlanDayState {
+  if (day.actual_km > 0) return "done";
+  if (day.planned_km === 0) return "rest";
+  if (today !== null && day.day < today) return "missed";
+  return "todo";
+}
+
+/** The sentence a screen reader gets for a day, since a bar has none. */
+const DAY_READOUT: Record<PlanDayState, TranslationKey> = {
+  rest: "rail.dayRest",
+  done: "rail.dayDone",
+  missed: "rail.dayMissed",
+  todo: "rail.dayTodo",
+};
+
+/**
+ * Which column is today, or `null` when the week on screen isn't the one being
+ * lived. Read off the browser's calendar rather than UTC: at 23:30 in Paris the
+ * two disagree, and "which day am I on" is the whole point of the marker.
+ */
+export function todayIndex(
+  weekStarting: string,
+  now = new Date(),
+): number | null {
+  const start = Date.parse(`${weekStarting}T00:00:00Z`);
+  if (Number.isNaN(start)) return null;
+  const today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+  const offset = Math.round((today - start) / 86_400_000);
+  return offset >= 0 && offset <= 6 ? offset : null;
+}
+
+/** `8`, `8.5` — never `8.0`, which reads as a precision the plan doesn't have. */
+function km(value: number): string {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }
 
 function RailSection({
@@ -186,60 +234,160 @@ function ThisWeek({
     );
   }
 
+  const today = todayIndex(plan.week_starting);
+  const cells = plan.days.map((day) => ({
+    day,
+    state: planDayState(day, today),
+  }));
   const peak = Math.max(
     ...plan.days.map((day) => Math.max(day.planned_km, day.actual_km)),
     1,
   );
+  const done =
+    plan.planned_km > 0
+      ? Math.min(100, Math.round((plan.actual_km / plan.planned_km) * 100))
+      : 0;
+  // The session the athlete owes next — today's if it is still unrun, else the
+  // first one after it. `remaining` counts them; this one names one.
+  const next =
+    today === null
+      ? undefined
+      : cells.find(({ day, state }) => day.day >= today && state === "todo")
+          ?.day;
+  const total = t("rail.weekProgress", {
+    actual: plan.actual_km,
+    planned: plan.planned_km,
+  });
 
   return (
-    <RailSection title={t("rail.thisWeek")}>
-      <div className="border-border flex flex-col gap-4 rounded-md border p-5">
-        <div className="flex h-[92px] items-end gap-2">
-          {plan.days.map((day) => (
-            <div
-              className="flex h-full flex-1 flex-col gap-1.5"
-              key={day.day}
-              title={t("rail.dayTooltip", {
-                day: messages.days.short[day.day],
-                type: day.type,
-                actual: day.actual_km,
-                planned: day.planned_km,
-              })}
-            >
-              {/* The planned bar is the track; the actual run fills it. Both
-                  are absolute inside a flexible plot area — as a flex sibling
-                  of the day letter the track would shrink to fit instead. */}
-              <div className="relative min-h-0 flex-1">
-                <span
-                  className="bg-muted-foreground/15 absolute inset-x-0 bottom-0 rounded-[4px]"
-                  style={{
-                    height: `${Math.round(6 + 94 * (Math.max(day.planned_km, day.actual_km) / peak))}%`,
-                  }}
+    <RailSection
+      title={t("rail.thisWeek")}
+      action={
+        <Button
+          className="h-auto px-0 font-semibold"
+          onClick={() => onAsk(t("rail.askAdjustWeek"))}
+          size="xs"
+          variant="ghost"
+        >
+          {t("rail.adjust")}
+        </Button>
+      }
+    >
+      <div className="border-border flex flex-col gap-5 rounded-md border p-5">
+        {/* The number first. It used to be a footnote under the chart, and it
+            was the only thing on the card a reader could act on. */}
+        <div className="flex flex-col gap-2.5">
+          <div className="flex flex-col gap-1.5">
+            {/* The coach names its weeks, and the names run long — "Rebuild 1
+                of 10 · Easy re-entry". An eyebrow above the number rather than
+                a neighbour beside it, or the number is the thing that wraps. */}
+            {plan.label ? (
+              <MonoLabel className="text-mono-badge">{plan.label}</MonoLabel>
+            ) : null}
+            <span className="text-heading-sm font-semibold whitespace-nowrap tabular-nums">
+              {total}
+            </span>
+          </div>
+          <Progress aria-label={total} value={done} variant="brand" />
+        </div>
+
+        <div className="flex flex-col">
+          <div className="flex h-[72px] items-end gap-1.5">
+            {cells.map(({ day, state }) => {
+              // A rest day keeps its place in the row and puts nothing in it:
+              // five of these is the normal mid-week state, and five marks
+              // saying "nothing happened" is what the card used to spend its
+              // width on.
+              if (state === "rest")
+                return (
+                  <div className="flex-1" data-day={day.day} key={day.day} />
+                );
+              const top = Math.max(day.planned_km, day.actual_km);
+              return (
+                // The plan is the outline; only what was run is filled in. The
+                // tallest solid mark on the card is therefore always an
+                // achievement — which is what a bar already promises a reader.
+                <div
+                  className={cn(
+                    "bg-muted/50 relative flex-1 overflow-hidden rounded-[4px] border transition-[height] duration-300 ease-out motion-reduce:transition-none",
+                    // Dashed is the plan's outline, and it is only worth
+                    // drawing while there is something left inside it: a day
+                    // run in full is one solid mark, not a bar in a box.
+                    day.actual_km >= top
+                      ? "border-brand"
+                      : "border-muted-foreground/55 border-dashed",
+                    state === "missed" && "border-chart-5/70 bg-chart-5/10",
+                  )}
+                  data-day={day.day}
+                  data-state={state}
+                  key={day.day}
+                  style={{ height: `${Math.round(18 + 82 * (top / peak))}%` }}
                 >
                   <span
-                    className="bg-brand absolute inset-x-0 bottom-0 rounded-[4px]"
+                    className="bg-brand absolute inset-x-0 bottom-0 transition-[height] duration-300 ease-out motion-reduce:transition-none"
                     style={{
-                      height: `${Math.min(100, Math.round((day.actual_km / Math.max(day.planned_km, day.actual_km, 1)) * 100))}%`,
+                      height: `${Math.round((day.actual_km / top) * 100)}%`,
                     }}
                   />
+                </div>
+              );
+            })}
+          </div>
+          {/* One rule under all seven, so a day with nothing on it reads as an
+              empty place on a line rather than as a mark of its own. */}
+          <div className="border-border mt-2 flex gap-1.5 border-t pt-2">
+            {cells.map(({ day, state }) => (
+              <div
+                className="flex flex-1 flex-col items-center gap-1"
+                key={day.day}
+              >
+                <MonoLabel
+                  className={cn(
+                    "text-mono-badge block",
+                    day.day === today && "text-foreground font-semibold",
+                    state === "missed" && "text-chart-5",
+                  )}
+                >
+                  {messages.days.initial[day.day]}
+                </MonoLabel>
+                {/* The scale, spelled out. A height on its own converts to no
+                    number, and the tooltip it used to hide behind never
+                    existed on a phone. */}
+                <span className="text-mono-badge text-stone font-mono tracking-normal tabular-nums">
+                  {state === "rest"
+                    ? ""
+                    : km(state === "done" ? day.actual_km : day.planned_km)}
+                </span>
+                <span className="sr-only">
+                  {t(DAY_READOUT[state], {
+                    day: messages.days.long[day.day],
+                    type: day.type,
+                    actual: day.actual_km,
+                    planned: day.planned_km,
+                  })}
+                  {day.day === today ? ` — ${t("rail.today")}` : ""}
                 </span>
               </div>
-              <MonoLabel className="text-mono-badge block text-center">
-                {messages.days.initial[day.day]}
-              </MonoLabel>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
+
         <p className="text-caption border-border border-t pt-3.5">
-          {t("rail.weekProgress", {
-            actual: plan.actual_km,
-            planned: plan.planned_km,
-          })}
           {plan.remaining === 0
             ? t("rail.weekComplete")
             : t("rail.sessionsLeft", { count: plan.remaining })}
+          {plan.remaining > 0 && next
+            ? ` · ${t("rail.nextSession", {
+                day: messages.days.short[next.day],
+                type: next.type,
+                planned: next.planned_km,
+              })}`
+            : ""}
         </p>
       </div>
+      <p className="text-caption text-stone leading-relaxed">
+        {t("rail.weekLegend")}
+      </p>
     </RailSection>
   );
 }
