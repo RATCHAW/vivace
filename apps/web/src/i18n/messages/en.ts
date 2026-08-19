@@ -456,6 +456,9 @@ export const en = {
     listLabel: "Conversations",
     today: "Today",
     delete: "Delete {{title}}",
+    /** The trash confirms on a hold, not a click — the label has to say so,
+     *  because a button that ignores a click is otherwise just broken. */
+    holdToDelete: "Hold to delete {{title}}",
     untitled: "conversation",
   },
 

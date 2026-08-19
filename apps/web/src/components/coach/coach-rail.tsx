@@ -259,7 +259,7 @@ function Signals({
       <div className="flex flex-col">
         {signals.map((signal) => (
           <button
-            className="border-border hover:bg-muted/40 focus-visible:ring-ring/50 flex w-full items-center gap-3 border-t px-0.5 py-3.5 text-left outline-none focus-visible:ring-3 focus-visible:ring-inset"
+            className="border-border hover:bg-muted/40 focus-visible:ring-ring/50 flex w-full items-center gap-3 border-t px-0.5 py-3.5 text-left transition-colors duration-100 ease-out outline-none focus-visible:ring-3 focus-visible:ring-inset"
             key={signal.id}
             onClick={() => onAsk(signal.question)}
             type="button"
@@ -345,7 +345,7 @@ export function CoachQueue({ queue, onAsk, onOpenThread }: CoachQueueProps) {
         ))}
       {queue?.map((item) => (
         <button
-          className="border-border hover:bg-muted focus-visible:ring-ring/50 flex gap-2.5 rounded-md border p-3 text-left outline-none focus-visible:ring-3 focus-visible:ring-inset"
+          className="border-border hover:bg-muted focus-visible:ring-ring/50 flex gap-2.5 rounded-md border p-3 text-left transition-colors duration-100 ease-out outline-none focus-visible:ring-3 focus-visible:ring-inset"
           key={item.id}
           onClick={() =>
             item.thread_id

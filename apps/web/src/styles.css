@@ -255,6 +255,15 @@
   --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
 }
 
+/* The curve a thing arrives on. Tailwind's own `ease-out` is
+   cubic-bezier(0, 0, 0.2, 1), which barely decelerates — fine for a hover, too
+   polite for something appearing where nothing was. This one lands hard and
+   settles, so an entrance reads as having arrived rather than having faded up.
+   Entrances only; `--ease-drawer` still owns sheets. */
+@theme {
+  --ease-entrance: cubic-bezier(0.23, 1, 0.32, 1);
+}
+
 /* The coach's "I'm working on it" dots. Three of these run together, staggered
    by 0.2s, so the row reads as one thought rather than three blinking lights.
    Not `animate-pulse`: that dips to 50% opacity, which is invisible at 6px. */

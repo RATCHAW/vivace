@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useLayoutEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Trans, useTranslation } from "react-i18next";
@@ -128,6 +128,7 @@ export function RunStudio({
   narrow,
   expanded,
   onToggleExpanded,
+  closing = false,
   onClose,
 }: {
   run: Run;
@@ -145,6 +146,9 @@ export function RunStudio({
   narrow: boolean;
   expanded: boolean;
   onToggleExpanded: () => void;
+  /** True while the narrow studio is sliding out. The element stays mounted
+   *  for the length of the transition so it has something to animate to. */
+  closing?: boolean;
   /** Leave the studio and go back to the list. Narrow layout only. */
   onClose: () => void;
 }) {
@@ -179,7 +183,11 @@ export function RunStudio({
   // would otherwise move a list nobody can see, and leave it somewhere else on
   // the way back. Locking `body` keeps the scroll position instead of resetting
   // it, which unmounting the list would not.
-  useEffect(() => {
+  //
+  // Layout effect, not a passive one: the panel's first painted frame is
+  // offset a full viewport width, and the lock has to already be in place when
+  // that frame is drawn.
+  useLayoutEffect(() => {
     if (!narrow) return;
     const previous = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -377,7 +385,15 @@ export function RunStudio({
 
   if (narrow) {
     return (
-      <div className="bg-background fixed inset-0 z-50 flex flex-col">
+      // Enters and leaves by the trailing edge — the direction the back arrow
+      // in the bar below points. `--ease-drawer` is the curve the sheets use,
+      // and the offset is a percentage of the panel's own width, so it is
+      // right at every viewport. `starting:` is @starting-style; `data-closing`
+      // is the page holding this mounted long enough for the exit to play.
+      <div
+        className="bg-background fixed inset-0 z-50 flex flex-col transition-transform duration-250 ease-drawer starting:translate-x-full data-[closing]:translate-x-full motion-reduce:transition-none"
+        data-closing={closing || undefined}
+      >
         {/* The list is gone, so the bar has to say which run this is. */}
         <div className="flex shrink-0 items-center gap-3 border-b px-4 py-3">
           <Button

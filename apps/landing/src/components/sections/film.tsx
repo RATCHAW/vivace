@@ -23,7 +23,7 @@ export function Film({ copy, locale }: { copy: Copy; locale: Locale }) {
           </p>
         </div>
 
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="reveal-stagger grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {t.chapters.map((chapter) => (
             <div
               key={chapter.label}

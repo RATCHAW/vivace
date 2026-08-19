@@ -309,7 +309,7 @@ export function RenderControls({
           <span
             aria-hidden
             data-slot="render-progress"
-            className="bg-muted pointer-events-none absolute inset-x-0 -bottom-2 h-1.5 overflow-hidden rounded-full"
+            className="bg-muted animate-in fade-in-0 pointer-events-none absolute inset-x-0 -bottom-2 h-1.5 overflow-hidden rounded-full duration-150 ease-entrance motion-reduce:animate-none"
           >
             {/* `scaleX` rather than width: SSE progress lands in steps, and a
                 compositor transform glides between them without relayout. */}
@@ -348,15 +348,22 @@ export function RenderControls({
   if (download) {
     // The video on file is the one the player is showing.
     return (
-      <Button
-        className="w-full"
-        onClick={noteDownload}
-        nativeButton={false}
-        render={<a href={download} download />}
-      >
-        <DownloadIcon />
-        {t("render.downloadVideo")}
-      </Button>
+      // The wrapper owns the entrance so the pill keeps its own
+      // `transition-all` for hover. This is the one moment on the screen worth
+      // marking: the render the athlete waited on Lambda for, which used to
+      // replace the progress bar inside a single frame — and does it at the
+      // same instant the automatic download fires, invisibly.
+      <div className="animate-in fade-in-0 slide-in-from-bottom-1 duration-220 ease-entrance motion-reduce:animate-none">
+        <Button
+          className="w-full"
+          onClick={noteDownload}
+          nativeButton={false}
+          render={<a href={download} download />}
+        >
+          <DownloadIcon />
+          {t("render.downloadVideo")}
+        </Button>
+      </div>
     );
   }
 
