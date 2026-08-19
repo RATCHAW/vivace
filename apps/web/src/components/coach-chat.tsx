@@ -617,14 +617,22 @@ export function CoachChat({
         />
         <ConversationContent className="mx-auto flex w-full max-w-[760px] flex-col gap-6 px-4 pt-6 pb-4 sm:px-6">
           {messages.length === 0 && (
+            // The one place in the app the delight budget is spent. An athlete
+            // sees this on their first conversation and each time they start a
+            // new one, so it is short and it never blocks the composer below —
+            // which is a sibling of this block, live from the first frame.
+            //
+            // `fill-mode-backwards` is load-bearing: without it the delayed
+            // lines paint at full opacity, wait, then snap back to start and
+            // animate.
             <div className="flex flex-col items-start gap-4 py-10">
-              <span className="bg-brand text-brand-foreground flex size-11 items-center justify-center rounded-full">
+              <span className="bg-brand text-brand-foreground animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-2 flex size-11 items-center justify-center rounded-full duration-300 ease-entrance fill-mode-backwards motion-reduce:animate-none">
                 <SparklesIcon className="size-5" />
               </span>
-              <h2 className="font-heading text-display-md text-balance">
+              <h2 className="font-heading text-display-md animate-in fade-in-0 slide-in-from-bottom-2 text-balance delay-75 duration-300 ease-entrance fill-mode-backwards motion-reduce:animate-none">
                 {t("coach.emptyTitle")}
               </h2>
-              <p className="text-body-lg text-muted-foreground max-w-[460px]">
+              <p className="text-body-lg text-muted-foreground animate-in fade-in-0 slide-in-from-bottom-2 max-w-[460px] delay-150 duration-300 ease-entrance fill-mode-backwards motion-reduce:animate-none">
                 {t("coach.emptyBody")}
               </p>
             </div>

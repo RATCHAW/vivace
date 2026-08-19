@@ -413,6 +413,7 @@ export const fr: Translated<Messages> = {
     listLabel: "Conversations",
     today: "Aujourd’hui",
     delete: "Supprimer {{title}}",
+    holdToDelete: "Maintenir pour supprimer {{title}}",
     untitled: "conversation",
   },
 

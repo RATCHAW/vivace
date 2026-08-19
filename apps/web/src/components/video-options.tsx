@@ -186,7 +186,7 @@ function ThemePicker({
             aria-pressed={name === theme}
             onClick={() => onChange(name)}
             className={cn(
-              "text-body-sm focus-visible:ring-ring/50 inline-flex h-12 items-center gap-2.5 rounded-full border px-4 font-semibold outline-none focus-visible:ring-3",
+              "text-body-sm focus-visible:ring-ring/50 inline-flex h-12 items-center gap-2.5 rounded-full border px-4 font-semibold transition-colors duration-100 ease-out outline-none active:translate-y-px focus-visible:ring-3",
               name === theme
                 ? "bg-muted border-transparent"
                 : "text-muted-foreground hover:bg-muted/40",

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -43,6 +43,10 @@ const STRAVA_URL = "https://www.strava.com";
  *  classes below can never disagree about which layout is in force. */
 const WIDE = "(min-width: 64rem)";
 
+/** How long the phone studio takes to slide out. Must stay in step with the
+ *  `duration-250` on the panel's own transition in <RunStudio>. */
+const STUDIO_EXIT_MS = 250;
+
 function averagePaceSeconds(run: Run): number | null {
   return run.average_speed > 0 ? 1000 / run.average_speed : null;
 }
@@ -67,6 +71,46 @@ export function Replays() {
   // Narrow is master-detail: the list, then the studio over it. A link that
   // already names a run opens straight into the film it was shared for.
   const [studioOpen, setStudioOpen] = useState(() => params.has("run"));
+
+  // The studio is kept mounted while it slides out, so it has a state to
+  // animate to. Reduced motion skips both the transition and this wait.
+  const [studioClosing, setStudioClosing] = useState(false);
+  const exitTimer = useRef<number | null>(null);
+  const reduceMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
+
+  useEffect(
+    () => () => {
+      if (exitTimer.current !== null) window.clearTimeout(exitTimer.current);
+    },
+    [],
+  );
+
+  const cancelExit = () => {
+    if (exitTimer.current !== null) window.clearTimeout(exitTimer.current);
+    exitTimer.current = null;
+    setStudioClosing(false);
+  };
+
+  /** Tapping a run — including one tapped while the last one is still on its
+   *  way out, which cancels that exit rather than queueing behind it. */
+  const openStudio = (runId: number) => {
+    cancelExit();
+    setParams({ run: String(runId) }, { replace: true });
+    setStudioOpen(true);
+  };
+
+  const closeStudio = () => {
+    if (reduceMotion) {
+      setStudioOpen(false);
+      return;
+    }
+    setStudioClosing(true);
+    exitTimer.current = window.setTimeout(() => {
+      exitTimer.current = null;
+      setStudioClosing(false);
+      setStudioOpen(false);
+    }, STUDIO_EXIT_MS);
+  };
 
   const { data: runs, error: runsError } = useQuery(getRunsOptions());
   const requested = Number(params.get("run"));
@@ -197,16 +241,13 @@ export function Replays() {
                   <button
                     key={run.id}
                     type="button"
-                    onClick={() => {
-                      setParams({ run: String(run.id) }, { replace: true });
-                      setStudioOpen(true);
-                    }}
+                    onClick={() => openStudio(run.id)}
                     aria-pressed={selected?.id === run.id}
                     // Tighter once it is a rail: the same padding that gives the
                     // row room when the list is the whole page would spend a
                     // third of a 320px column on its margins.
                     className={cn(
-                      "focus-visible:ring-ring/50 flex w-full items-center gap-5 border-b px-7 py-5 text-left outline-none last:border-b-0 focus-visible:ring-3 focus-visible:ring-inset lg:gap-4 lg:px-5 lg:py-4",
+                      "focus-visible:ring-ring/50 flex w-full items-center gap-5 border-b px-7 py-5 text-left transition-colors duration-100 ease-out outline-none last:border-b-0 focus-visible:ring-3 focus-visible:ring-inset lg:gap-4 lg:px-5 lg:py-4",
                       selected?.id === run.id
                         ? "bg-muted"
                         : "hover:bg-muted/40",
@@ -286,7 +327,8 @@ export function Replays() {
               narrow={!wide}
               expanded={expanded}
               onToggleExpanded={() => setExpanded((open) => !open)}
-              onClose={() => setStudioOpen(false)}
+              closing={studioClosing}
+              onClose={closeStudio}
             />
           )}
         </div>
