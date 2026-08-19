@@ -13,8 +13,15 @@ const { instances, FakeMap } = vi.hoisted(() => {
     onceHandlers: Record<string, Array<() => void>> = {};
     sources: Record<string, { data: unknown }> = {};
     removed = false;
+    /** How many frames actually reached the map — see the pushing tests. */
+    repaints = 0;
+    jumps = 0;
+    /** What `devicePixelRatio` read while this map sized its canvas, which is
+     *  the only moment Mapbox looks at it. */
+    pixelRatio: number;
 
     constructor() {
+      this.pixelRatio = window.devicePixelRatio;
       instances.push(this);
     }
 
@@ -50,8 +57,14 @@ const { instances, FakeMap } = vi.hoisted(() => {
     }
 
     setLayoutProperty() {}
-    jumpTo() {}
-    triggerRepaint() {}
+
+    jumpTo() {
+      this.jumps += 1;
+    }
+
+    triggerRepaint() {
+      this.repaints += 1;
+    }
 
     remove() {
       this.removed = true;
@@ -92,15 +105,33 @@ const layer = (key: string, points: [number, number][]): RouteLayer => ({
   avatarUrl: "",
 });
 
-const plate = (layers: RouteLayer[]): ReactElement => (
+const plate = (
+  layers: RouteLayer[],
+  camera = { center: [8.54, 47.37] as [number, number], zoom: 13 },
+): ReactElement => (
   <RouteMap
     layers={layers}
-    camera={{ center: [8.54, 47.37], zoom: 13 }}
+    camera={camera}
     token="pk.test"
     width={1080}
     height={1920}
   />
 );
+
+/** Run `body` with the window reporting a phone's pixel ratio. */
+function atPixelRatio(ratio: number, body: () => void) {
+  const own = Object.getOwnPropertyDescriptor(window, "devicePixelRatio");
+  Object.defineProperty(window, "devicePixelRatio", {
+    configurable: true,
+    get: () => ratio,
+  });
+  try {
+    body();
+  } finally {
+    if (own) Object.defineProperty(window, "devicePixelRatio", own);
+    else delete (window as { devicePixelRatio?: number }).devicePixelRatio;
+  }
+}
 
 const live = () => instances.filter((map) => !map.removed);
 
@@ -199,5 +230,73 @@ describe("RouteMap when the cast changes", () => {
 
     expect(instances).toHaveLength(1);
     expect(map.removed).toBe(false);
+  });
+});
+
+describe("RouteMap in the browser", () => {
+  it("sizes its canvas in composition pixels, whatever the screen is", () => {
+    // The plate is laid out at the film's own size — 1080×1920 — and Mapbox
+    // multiplies that by the window's pixel ratio, with no option to cap it. A
+    // phone at ratio 3 would build a 3240×5760 drawing buffer, and keep a
+    // second one of those because `preserveDrawingBuffer` is on, to fill a
+    // picture a few hundred pixels wide. That is what kills the tab.
+    atPixelRatio(3, () => {
+      render(plate([layer("you", YOU)]));
+    });
+
+    expect(instances[0].pixelRatio).toBe(1);
+  });
+
+  it("gives the window its pixel ratio back", () => {
+    // The cap is a patch over one synchronous constructor call. Anything else
+    // that reads the ratio — an avatar picking a source, a test after this one
+    // — has to see the real screen again.
+    atPixelRatio(3, () => {
+      render(plate([layer("you", YOU)]));
+      expect(window.devicePixelRatio).toBe(3);
+    });
+  });
+
+  it("draws a frame once, however many times it is handed over", () => {
+    // Every template's draw finishes before its film does, so the closing beats
+    // hand the plate the shot it is already showing — a quarter of the duo
+    // replay, whose card is a blur over this canvas, so each needless repaint
+    // is a full-frame blur recomputed for a picture that did not move.
+    const { rerender } = render(plate([{ ...layer("you", YOU), drawn: 2 }]));
+    const map = settle();
+    const [pushed, jumped] = [map.repaints, map.jumps];
+
+    for (let i = 0; i < 5; i += 1) {
+      act(() => {
+        rerender(plate([{ ...layer("you", YOU), drawn: 2 }]));
+      });
+    }
+
+    expect(map.repaints).toBe(pushed);
+    expect(map.jumps).toBe(jumped);
+  });
+
+  it("still draws a frame that moved", () => {
+    const { rerender } = render(plate([{ ...layer("you", YOU), drawn: 2 }]));
+    const map = settle();
+    const [pushed, jumped] = [map.repaints, map.jumps];
+
+    // The trace grew…
+    act(() => {
+      rerender(plate([{ ...layer("you", YOU), drawn: 3 }]));
+    });
+    expect(map.repaints).toBe(pushed + 1);
+
+    // …and, on a held trace, the camera moved.
+    act(() => {
+      rerender(
+        plate([{ ...layer("you", YOU), drawn: 3 }], {
+          center: [8.55, 47.38],
+          zoom: 14,
+        }),
+      );
+    });
+    expect(map.repaints).toBe(pushed + 2);
+    expect(map.jumps).toBe(jumped + 2);
   });
 });
