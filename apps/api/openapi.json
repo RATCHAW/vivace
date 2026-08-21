@@ -637,6 +637,13 @@
             ],
             "example": "Half marathon in October"
           },
+          "pinned_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
           "created_at": {
             "type": "string",
             "format": "date-time"
@@ -649,6 +656,7 @@
         "required": [
           "id",
           "title",
+          "pinned_at",
           "created_at",
           "updated_at"
         ]
@@ -740,6 +748,18 @@
             "type": "string"
           }
         }
+      },
+      "UpdateCoachThread": {
+        "type": "object",
+        "properties": {
+          "pinned": {
+            "type": "boolean",
+            "example": true
+          }
+        },
+        "required": [
+          "pinned"
+        ]
       },
       "CoachBriefing": {
         "type": "object",
@@ -2403,6 +2423,72 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/CoachThreadDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such conversation for this athlete.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "operationId": "updateCoachThread",
+        "tags": [
+          "Coach"
+        ],
+        "summary": "Pin or unpin one conversation",
+        "description": "Pinned conversations sort above the rest, newest pin first, and stay there however long it has been since the athlete last used them. Pinning an already-pinned thread re-stamps it, moving it to the top of the pinned group.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "8f2c1e34-9a1b-4f6d-8f0e-3b6a1c9d2e77"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCoachThread"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The conversation, as the list will now order it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CoachThread"
                 }
               }
             }

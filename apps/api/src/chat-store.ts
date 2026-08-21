@@ -7,7 +7,7 @@
 // a conversation.
 import { randomUUID } from "node:crypto";
 import type { UIMessage } from "ai";
-import { and, asc, desc, eq, exists, gte, sql } from "drizzle-orm";
+import { and, asc, eq, exists, gte, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db } from "./db/index.js";
 import { coachDebrief, coachMessage, coachThread } from "./db/schema/coach.js";
@@ -22,10 +22,20 @@ function toThread(row: ThreadRow): CoachThread {
   return {
     id: row.id,
     title: row.title,
+    pinned_at: row.pinnedAt?.toISOString() ?? null,
     created_at: row.createdAt.toISOString(),
     updated_at: row.updatedAt.toISOString(),
   };
 }
+
+/**
+ * Pinned first, newest pin at the top; everything else by when it was last used.
+ *
+ * Written out rather than `desc(coachThread.pinnedAt)` because Postgres sorts
+ * `DESC` as `NULLS FIRST`, which would put every unpinned conversation above
+ * every pinned one — the exact inverse of what this asks for.
+ */
+const threadOrder = sql`${coachThread.pinnedAt} desc nulls last, ${coachThread.updatedAt} desc`;
 
 /** Starts an empty conversation. The title arrives with the first message. */
 export async function createThread(userId: string): Promise<CoachThread> {
@@ -36,13 +46,13 @@ export async function createThread(userId: string): Promise<CoachThread> {
   return toThread(row);
 }
 
-/** Every conversation this athlete has had, most recently used first. */
+/** Every conversation this athlete has had: pinned first, then most recent. */
 export async function listThreads(userId: string): Promise<CoachThread[]> {
   const rows = await db
     .select()
     .from(coachThread)
     .where(eq(coachThread.userId, userId))
-    .orderBy(desc(coachThread.updatedAt));
+    .orderBy(threadOrder);
   return rows.map(toThread);
 }
 
@@ -58,6 +68,28 @@ export async function getThread(
     .select()
     .from(coachThread)
     .where(and(eq(coachThread.id, threadId), eq(coachThread.userId, userId)));
+  return row ? toThread(row) : null;
+}
+
+/**
+ * Pins or unpins a conversation, returning it as the list will now see it, or
+ * null when it doesn't exist or belongs to someone else.
+ *
+ * Pinning again re-stamps the time, which moves the thread to the top of its
+ * own group — the only handle the athlete has on the order of their pins.
+ */
+export async function setThreadPinned(
+  userId: string,
+  threadId: string,
+  pinned: boolean,
+): Promise<CoachThread | null> {
+  const [row] = await db
+    .update(coachThread)
+    // `now()` rather than a JS Date so the stamp comes from the same clock the
+    // rest of this table is written by.
+    .set({ pinnedAt: pinned ? sql`now()` : null })
+    .where(and(eq(coachThread.id, threadId), eq(coachThread.userId, userId)))
+    .returning();
   return row ? toThread(row) : null;
 }
 

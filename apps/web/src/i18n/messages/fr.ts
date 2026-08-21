@@ -412,9 +412,24 @@ export const fr: Translated<Messages> = {
       "Rien pour l’instant. Posez une question au coach et elle apparaîtra ici.",
     listLabel: "Conversations",
     today: "Aujourd’hui",
+    pin: "Épingler {{title}}",
+    unpin: "Désépingler {{title}}",
     delete: "Supprimer {{title}}",
-    holdToDelete: "Maintenir pour supprimer {{title}}",
+    menu: {
+      options: "Options pour {{title}}",
+      pin: "Épingler",
+      unpin: "Désépingler",
+      delete: "Supprimer",
+    },
+    confirmDelete: {
+      title: "Supprimer cette conversation ?",
+      body: "Cela supprime {{title}} et tous ses messages. C’est définitif.",
+      confirm: "Supprimer",
+      cancel: "Annuler",
+    },
     untitled: "conversation",
+    pinned: "Épinglées",
+    recent: "Récentes",
   },
 
   composer: {

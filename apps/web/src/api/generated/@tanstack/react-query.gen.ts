@@ -3,8 +3,8 @@
 import { type DefaultError, queryOptions, type UseMutationOptions } from '@tanstack/react-query';
 
 import { client } from '../client.gen';
-import { acceptCoachPlan, acceptRunInvite, createCoachThread, createRunInvite, declineRunInvite, deleteCoachThread, getCoachBriefing, getCoachThread, getHealth, getRunInvite, getRunInviteCandidates, getRunPartner, getRunRender, getRuns, getRunStreams, getStravaAthlete, listCoachThreads, listRunInvites, type Options, postClientLogs, receiveStravaWebhook, revokeRunInvite, startRunRender, updateCoachContext, validateStravaWebhook } from '../sdk.gen';
-import type { AcceptCoachPlanData, AcceptCoachPlanError, AcceptCoachPlanResponse, AcceptRunInviteData, AcceptRunInviteError, AcceptRunInviteResponse, CreateCoachThreadData, CreateCoachThreadError, CreateCoachThreadResponse, CreateRunInviteData, CreateRunInviteError, CreateRunInviteResponse, DeclineRunInviteData, DeclineRunInviteError, DeclineRunInviteResponse, DeleteCoachThreadData, DeleteCoachThreadError, DeleteCoachThreadResponse, GetCoachBriefingData, GetCoachBriefingError, GetCoachBriefingResponse, GetCoachThreadData, GetCoachThreadError, GetCoachThreadResponse, GetHealthData, GetHealthResponse, GetRunInviteCandidatesData, GetRunInviteCandidatesError, GetRunInviteCandidatesResponse, GetRunInviteData, GetRunInviteError, GetRunInviteResponse, GetRunPartnerData, GetRunPartnerError, GetRunPartnerResponse, GetRunRenderData, GetRunRenderError, GetRunRenderResponse, GetRunsData, GetRunsError, GetRunsResponse, GetRunStreamsData, GetRunStreamsError, GetRunStreamsResponse, GetStravaAthleteData, GetStravaAthleteError, GetStravaAthleteResponse, ListCoachThreadsData, ListCoachThreadsError, ListCoachThreadsResponse, ListRunInvitesData, ListRunInvitesError, ListRunInvitesResponse, PostClientLogsData, PostClientLogsResponse, ReceiveStravaWebhookData, ReceiveStravaWebhookError, ReceiveStravaWebhookResponse, RevokeRunInviteData, RevokeRunInviteError, RevokeRunInviteResponse, StartRunRenderData, StartRunRenderError, StartRunRenderResponse, UpdateCoachContextData, UpdateCoachContextError, UpdateCoachContextResponse, ValidateStravaWebhookData, ValidateStravaWebhookError, ValidateStravaWebhookResponse } from '../types.gen';
+import { acceptCoachPlan, acceptRunInvite, createCoachThread, createRunInvite, declineRunInvite, deleteCoachThread, getCoachBriefing, getCoachThread, getHealth, getRunInvite, getRunInviteCandidates, getRunPartner, getRunRender, getRuns, getRunStreams, getStravaAthlete, listCoachThreads, listRunInvites, type Options, postClientLogs, receiveStravaWebhook, revokeRunInvite, startRunRender, updateCoachContext, updateCoachThread, validateStravaWebhook } from '../sdk.gen';
+import type { AcceptCoachPlanData, AcceptCoachPlanError, AcceptCoachPlanResponse, AcceptRunInviteData, AcceptRunInviteError, AcceptRunInviteResponse, CreateCoachThreadData, CreateCoachThreadError, CreateCoachThreadResponse, CreateRunInviteData, CreateRunInviteError, CreateRunInviteResponse, DeclineRunInviteData, DeclineRunInviteError, DeclineRunInviteResponse, DeleteCoachThreadData, DeleteCoachThreadError, DeleteCoachThreadResponse, GetCoachBriefingData, GetCoachBriefingError, GetCoachBriefingResponse, GetCoachThreadData, GetCoachThreadError, GetCoachThreadResponse, GetHealthData, GetHealthResponse, GetRunInviteCandidatesData, GetRunInviteCandidatesError, GetRunInviteCandidatesResponse, GetRunInviteData, GetRunInviteError, GetRunInviteResponse, GetRunPartnerData, GetRunPartnerError, GetRunPartnerResponse, GetRunRenderData, GetRunRenderError, GetRunRenderResponse, GetRunsData, GetRunsError, GetRunsResponse, GetRunStreamsData, GetRunStreamsError, GetRunStreamsResponse, GetStravaAthleteData, GetStravaAthleteError, GetStravaAthleteResponse, ListCoachThreadsData, ListCoachThreadsError, ListCoachThreadsResponse, ListRunInvitesData, ListRunInvitesError, ListRunInvitesResponse, PostClientLogsData, PostClientLogsResponse, ReceiveStravaWebhookData, ReceiveStravaWebhookError, ReceiveStravaWebhookResponse, RevokeRunInviteData, RevokeRunInviteError, RevokeRunInviteResponse, StartRunRenderData, StartRunRenderError, StartRunRenderResponse, UpdateCoachContextData, UpdateCoachContextError, UpdateCoachContextResponse, UpdateCoachThreadData, UpdateCoachThreadError, UpdateCoachThreadResponse, ValidateStravaWebhookData, ValidateStravaWebhookError, ValidateStravaWebhookResponse } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
@@ -389,6 +389,25 @@ export const getCoachThreadOptions = (options: Options<GetCoachThreadData>) => q
     },
     queryKey: getCoachThreadQueryKey(options)
 });
+
+/**
+ * Pin or unpin one conversation
+ *
+ * Pinned conversations sort above the rest, newest pin first, and stay there however long it has been since the athlete last used them. Pinning an already-pinned thread re-stamps it, moving it to the top of the pinned group.
+ */
+export const updateCoachThreadMutation = (options?: Partial<Options<UpdateCoachThreadData>>): UseMutationOptions<UpdateCoachThreadResponse, UpdateCoachThreadError, Options<UpdateCoachThreadData>> => {
+    const mutationOptions: UseMutationOptions<UpdateCoachThreadResponse, UpdateCoachThreadError, Options<UpdateCoachThreadData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await updateCoachThread({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
 
 export const getCoachBriefingQueryKey = (options?: Options<GetCoachBriefingData>) => createQueryKey('getCoachBriefing', options);
 

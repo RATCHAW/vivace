@@ -54,6 +54,7 @@ import {
   RunSchema,
   RunStreamsSchema,
   StravaEventSchema,
+  UpdateCoachThreadSchema,
   VideoTemplateSchema,
   type ClientLogLevel,
   type StravaEvent,
@@ -124,6 +125,7 @@ import {
   getThread,
   listThreads,
   saveMessage,
+  setThreadPinned,
   setTitleIfUnset,
   titleFrom,
   truncateForRegenerate,
@@ -1741,6 +1743,59 @@ app.openapi(getCoachThreadRoute, async (c) => {
   // The stored parts are UIMessage parts; the schema describes them loosely.
   const messages = (await getMessages(id)) as CoachThreadDetail["messages"];
   return c.json({ thread, messages }, 200);
+});
+
+const updateCoachThreadRoute = createRoute({
+  method: "patch",
+  path: "/api/coach/threads/{id}",
+  operationId: "updateCoachThread",
+  tags: ["Coach"],
+  summary: "Pin or unpin one conversation",
+  description:
+    "Pinned conversations sort above the rest, newest pin first, and stay " +
+    "there however long it has been since the athlete last used them. " +
+    "Pinning an already-pinned thread re-stamps it, moving it to the top of " +
+    "the pinned group.",
+  security: [{ sessionCookie: [] }],
+  request: {
+    params: ThreadIdParamsSchema,
+    body: {
+      required: true,
+      content: { "application/json": { schema: UpdateCoachThreadSchema } },
+    },
+  },
+  responses: {
+    200: {
+      description: "The conversation, as the list will now order it.",
+      content: { "application/json": { schema: CoachThreadSchema } },
+    },
+    401: {
+      description: "No valid session.",
+      content: { "application/json": { schema: ErrorSchema } },
+    },
+    404: {
+      description: "No such conversation for this athlete.",
+      content: { "application/json": { schema: ErrorSchema } },
+    },
+  },
+});
+
+app.openapi(updateCoachThreadRoute, async (c) => {
+  const session = await currentUser(c);
+  if (!session) return c.json({ error: "Not signed in" }, 401);
+
+  const { id } = c.req.valid("param");
+  const { pinned } = c.req.valid("json");
+  const thread = await setThreadPinned(session.user.id, id, pinned);
+  if (!thread) return c.json({ error: "No such conversation" }, 404);
+
+  track(
+    c,
+    pinned ? "coach.thread_pinned" : "coach.thread_unpinned",
+    {},
+    pinned ? "Pinned a conversation" : "Unpinned a conversation",
+  );
+  return c.json(thread, 200);
 });
 
 const deleteCoachThreadRoute = createRoute({

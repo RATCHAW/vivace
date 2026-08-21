@@ -455,11 +455,31 @@ export const en = {
     empty: "Nothing yet. Ask the coach something and it will show up here.",
     listLabel: "Conversations",
     today: "Today",
+    /** The sidebar column's two icon buttons. An icon has no words of its own,
+     *  so its label carries the conversation it would act on. */
+    pin: "Pin {{title}}",
+    unpin: "Unpin {{title}}",
     delete: "Delete {{title}}",
-    /** The trash confirms on a hold, not a click — the label has to say so,
-     *  because a button that ignores a click is otherwise just broken. */
-    holdToDelete: "Hold to delete {{title}}",
+    /** The same three actions as the sheet draws them: a `⋯` per row, opening a
+     *  menu. Its items are short, because the trigger has already named the
+     *  conversation and repeating it in every item only slows a reader down. */
+    menu: {
+      options: "Options for {{title}}",
+      pin: "Pin",
+      unpin: "Unpin",
+      delete: "Delete",
+    },
+    /** Neither control deletes anything on its own; both open this. */
+    confirmDelete: {
+      title: "Delete this conversation?",
+      body: "This deletes {{title}} and every message in it. It can't be undone.",
+      confirm: "Delete",
+      cancel: "Cancel",
+    },
     untitled: "conversation",
+    /** The two group headings, shown only once something is pinned. */
+    pinned: "Pinned",
+    recent: "Recent",
   },
 
   composer: {

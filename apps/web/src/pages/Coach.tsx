@@ -143,13 +143,18 @@ export function Coach() {
     threads?.find((candidate) => candidate.id === selectedId)?.title ??
     t("coach.newConversation");
 
-  // The two outer columns, rendered once each. A sheet shows the same element
-  // the column does, and closes on whatever the tap was for — picking a thread
-  // or asking a question puts the athlete back in the transcript, which is
-  // where the answer is about to appear.
-  const conversations = (
+  // The two outer columns, written once each. A sheet shows what the column
+  // does, and closes on whatever the tap was for — picking a thread or asking a
+  // question puts the athlete back in the transcript, which is where the answer
+  // is about to appear.
+  //
+  // `inSheet` is the one thing the two renderings don't share: a row's actions
+  // are revealed by hover in the column, and a sheet is what this becomes on a
+  // phone, where there is no hover to reveal them with.
+  const conversations = (inSheet: boolean) => (
     <>
       <CoachThreads
+        inSheet={inSheet}
         onSelect={(id) => {
           selectThread(id);
           setThreadsOpen(false);
@@ -196,7 +201,7 @@ export function Coach() {
         {/* Clipped, not scrollable: the thread list inside carries the only
             scroll region, so the column can't grow a second bar around it. */}
         <aside className="border-border hidden min-h-0 flex-col gap-6 overflow-hidden border-r px-4 py-5 lg:flex">
-          {conversations}
+          {conversations(false)}
         </aside>
 
         <section
@@ -222,7 +227,7 @@ export function Coach() {
                   <SheetTitle>{t("threads.listLabel")}</SheetTitle>
                 </SheetHeader>
                 <SheetBody className="flex flex-col gap-6">
-                  {conversations}
+                  {conversations(true)}
                 </SheetBody>
               </SheetContent>
             </Sheet>

@@ -292,6 +292,44 @@
     transparent;
 }
 
+/* A line of text dissolving into the row's actions, for a list row whose
+   controls are over the text rather than beside it — the coach's conversations.
+
+   The alternative is padding the text away from them permanently, which spends
+   the end of every title on controls that may not be drawn. A mask rather than
+   a gradient laid over the top, because a scrim has to know what colour it is
+   fading into and this row has three answers to that (selected, hovered,
+   neither). Making the *text* transparent asks nothing of the background.
+
+   Two widths, because the row has two shapes. In the sidebar column it carries
+   a pair of 36px icons revealed on hover, and the mask is applied only while
+   they are; in the sheet it carries one `⋯` that is always there, and so is
+   its mask. Each ends where its own controls begin. */
+@utility thread-actions-fade {
+  /* Pin + delete: 36 + 2 + 36, and 6px off the row's edge. */
+  mask-image: linear-gradient(
+    to right,
+    #000 calc(100% - 5.5rem),
+    transparent calc(100% - 4rem)
+  );
+}
+
+@utility thread-menu-fade {
+  /* One trigger, 44px wide until `sm` puts it back to 36 — the touch rule. */
+  mask-image: linear-gradient(
+    to right,
+    #000 calc(100% - 4rem),
+    transparent calc(100% - 2.5rem)
+  );
+  @variant sm {
+    mask-image: linear-gradient(
+      to right,
+      #000 calc(100% - 3.5rem),
+      transparent calc(100% - 2rem)
+    );
+  }
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
