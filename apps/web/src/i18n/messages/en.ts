@@ -478,6 +478,60 @@ export const en = {
     },
   },
 
+  /**
+   * The key to a card, behind a `?` in its heading.
+   *
+   * Every entry is a legend first: a short term per mark, named in the words a
+   * runner would use, with card-help.tsx drawing the mark itself beside it.
+   * `note` is the one sentence each card is allowed, and it is spent on the
+   * thing no swatch can show — what decoupling measures, what acute:chronic
+   * compares, what a taper is for. Never on describing a colour: the swatch is
+   * right there, and a sentence about it is a sentence nobody reads.
+   */
+  help: {
+    label: "What am I looking at?",
+
+    week: {
+      title: "Your week",
+      ran: "What you ran",
+      todo: "Still to run",
+      missed: "Missed — that day has gone",
+      note: "Every session is written out under the chart with its own distance and pace.",
+    },
+    goal: {
+      title: "Your goal race",
+      week: "A week to go",
+      taper: "Taper week",
+      note: "Tapering is cutting volume so you arrive fresh rather than fit-but-tired. The coach plans yours in the last three weeks.",
+    },
+    splits: {
+      title: "Your splits",
+      normal: "A kilometre near your quickest",
+      slow: "Well off your quickest kilometre",
+      hr: "Heart rate",
+      note: "Decoupling compares pace against heart rate, the first half of the run against the second. Over 5%, your heart rate was climbing to hold the pace.",
+    },
+    volume: {
+      title: "Weekly volume",
+      normal: "A week’s kilometres",
+      spike: "Jumped over 25% on the week before",
+      note: "Acute:chronic puts your last 7 days against your last 28. Over 1.3 you are adding load faster than you are adapting to it.",
+    },
+    prediction: {
+      title: "Race prediction",
+      pr: "A personal record",
+      target: "Your goal time, and the pace it asks for",
+      behind: "Behind that target today",
+      note: "Riegel stretches a result at one distance to another. It reads your engine today, not whether you have done the long runs.",
+    },
+    plan: {
+      title: "This week",
+      key: "A key session — the week is built on it",
+      other: "Everything else",
+      note: "Move the easy days freely. Ask before moving a key one — that is what the swap buttons do.",
+    },
+  },
+
   cards: {
     watchReplay: "Watch the replay",
     readSplitBySplit: "Read it split by split",
@@ -567,10 +621,26 @@ export const en = {
     setGoalRace: "Set a goal race",
     askGoalRace: "I’m training for a race — let me tell you about it",
     noDate: "No date yet",
-    toGo: "To go",
     target: "Target",
     longDay: "Long day",
-    weeks: "{{count}} wk",
+    /** The countdown, in whatever unit the athlete is counting in by now. */
+    weeksToGo_one: "One week to go",
+    weeksToGo_other: "{{count}} weeks to go",
+    daysToGo_one: "Tomorrow",
+    daysToGo_other: "{{count}} days to go",
+    raceToday: "Race day",
+    raceRun: "That race has been run",
+    setNextRace: "Set the next one",
+    /** The one thing the countdown doesn't already say, in words. */
+    taperIn_one: "Taper starts next week",
+    taperIn_other: "Taper starts in {{count}} weeks",
+    taperNow: "You’re in the taper window",
+    /** The four distances an athlete names instead of measuring. */
+    race5k: "5K",
+    race10k: "10K",
+    raceHalf: "Half marathon",
+    raceMarathon: "Marathon",
+    remembersLabel: "Remembers",
     remembers:
       "The coach remembers this in every thread — you never re-explain what you’re training for.",
     thisWeek: "This week",
@@ -583,9 +653,6 @@ export const en = {
     weekComplete: "Week complete",
     sessionsLeft_one: "{{count}} session left",
     sessionsLeft_other: "{{count}} sessions left",
-    /** What the two marks mean — the card is otherwise a shape with no key. */
-    weekLegend:
-      "Filled is what you ran; the outline is what the week still asks for — and the sessions below follow the same rule.",
     today: "Today",
     /** Read out per session, since colour is what tells the two apart. */
     dayRest: "{{day}} · rest day",
