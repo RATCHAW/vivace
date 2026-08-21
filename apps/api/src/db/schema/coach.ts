@@ -27,6 +27,15 @@ export const coachThread = pgTable(
     userId: text("user_id").notNull(),
     /** Cut from the first thing the athlete says; null until they say it. */
     title: text("title"),
+    /**
+     * When the athlete pinned this conversation, or null if they haven't.
+     *
+     * A timestamp rather than a boolean because the pinned group needs an order
+     * of its own, and "when it was pinned" is the only one that holds still —
+     * ordering pins by `updated_at` would have them shuffling every time the
+     * athlete said something, which is the opposite of what pinning is for.
+     */
+    pinnedAt: timestamp("pinned_at", tz),
     createdAt: timestamp("created_at", tz).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", tz).notNull().defaultNow(),
   },
@@ -35,6 +44,11 @@ export const coachThread = pgTable(
     // recently used first. `nullsFirst` is Postgres's own default for DESC and
     // is spelled out only so this matches the index already in production —
     // Drizzle would otherwise emit `NULLS LAST`, which is a different index.
+    //
+    // Deliberately not re-cut to lead with `pinned_at`: this narrows to one
+    // athlete's threads, which is tens of rows, and sorting tens of rows in
+    // memory is cheaper than the write this index would cost on every message
+    // saved.
     index("coach_thread_user_idx").on(
       table.userId,
       table.updatedAt.desc().nullsFirst(),

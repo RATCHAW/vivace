@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, ServerSentEventsResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { AcceptCoachPlanData, AcceptCoachPlanErrors, AcceptCoachPlanResponses, AcceptRunInviteData, AcceptRunInviteErrors, AcceptRunInviteResponses, CoachChatData, CoachChatErrors, CoachChatResponse, CoachChatResponses, CreateCoachThreadData, CreateCoachThreadErrors, CreateCoachThreadResponses, CreateRunInviteData, CreateRunInviteErrors, CreateRunInviteResponses, DeclineRunInviteData, DeclineRunInviteErrors, DeclineRunInviteResponses, DeleteCoachThreadData, DeleteCoachThreadErrors, DeleteCoachThreadResponses, GetCoachBriefingData, GetCoachBriefingErrors, GetCoachBriefingResponses, GetCoachThreadData, GetCoachThreadErrors, GetCoachThreadResponses, GetHealthData, GetHealthResponses, GetRunInviteCandidatesData, GetRunInviteCandidatesErrors, GetRunInviteCandidatesResponses, GetRunInviteData, GetRunInviteErrors, GetRunInviteResponses, GetRunPartnerData, GetRunPartnerErrors, GetRunPartnerResponses, GetRunRenderData, GetRunRenderErrors, GetRunRenderResponses, GetRunsData, GetRunsErrors, GetRunsResponses, GetRunStreamsData, GetRunStreamsErrors, GetRunStreamsResponses, GetStravaAthleteData, GetStravaAthleteErrors, GetStravaAthleteResponses, ListCoachThreadsData, ListCoachThreadsErrors, ListCoachThreadsResponses, ListRunInvitesData, ListRunInvitesErrors, ListRunInvitesResponses, PostClientLogsData, PostClientLogsResponses, ReceiveStravaWebhookData, ReceiveStravaWebhookErrors, ReceiveStravaWebhookResponses, RevokeRunInviteData, RevokeRunInviteErrors, RevokeRunInviteResponses, StartRunRenderData, StartRunRenderErrors, StartRunRenderResponses, StreamRunRenderProgressData, StreamRunRenderProgressErrors, StreamRunRenderProgressResponse, StreamRunRenderProgressResponses, UpdateCoachContextData, UpdateCoachContextErrors, UpdateCoachContextResponses, ValidateStravaWebhookData, ValidateStravaWebhookErrors, ValidateStravaWebhookResponses } from './types.gen';
+import type { AcceptCoachPlanData, AcceptCoachPlanErrors, AcceptCoachPlanResponses, AcceptRunInviteData, AcceptRunInviteErrors, AcceptRunInviteResponses, CoachChatData, CoachChatErrors, CoachChatResponse, CoachChatResponses, CreateCoachThreadData, CreateCoachThreadErrors, CreateCoachThreadResponses, CreateRunInviteData, CreateRunInviteErrors, CreateRunInviteResponses, DeclineRunInviteData, DeclineRunInviteErrors, DeclineRunInviteResponses, DeleteCoachThreadData, DeleteCoachThreadErrors, DeleteCoachThreadResponses, GetCoachBriefingData, GetCoachBriefingErrors, GetCoachBriefingResponses, GetCoachThreadData, GetCoachThreadErrors, GetCoachThreadResponses, GetHealthData, GetHealthResponses, GetRunInviteCandidatesData, GetRunInviteCandidatesErrors, GetRunInviteCandidatesResponses, GetRunInviteData, GetRunInviteErrors, GetRunInviteResponses, GetRunPartnerData, GetRunPartnerErrors, GetRunPartnerResponses, GetRunRenderData, GetRunRenderErrors, GetRunRenderResponses, GetRunsData, GetRunsErrors, GetRunsResponses, GetRunStreamsData, GetRunStreamsErrors, GetRunStreamsResponses, GetStravaAthleteData, GetStravaAthleteErrors, GetStravaAthleteResponses, ListCoachThreadsData, ListCoachThreadsErrors, ListCoachThreadsResponses, ListRunInvitesData, ListRunInvitesErrors, ListRunInvitesResponses, PostClientLogsData, PostClientLogsResponses, ReceiveStravaWebhookData, ReceiveStravaWebhookErrors, ReceiveStravaWebhookResponses, RevokeRunInviteData, RevokeRunInviteErrors, RevokeRunInviteResponses, StartRunRenderData, StartRunRenderErrors, StartRunRenderResponses, StreamRunRenderProgressData, StreamRunRenderProgressErrors, StreamRunRenderProgressResponse, StreamRunRenderProgressResponses, UpdateCoachContextData, UpdateCoachContextErrors, UpdateCoachContextResponses, UpdateCoachThreadData, UpdateCoachThreadErrors, UpdateCoachThreadResponses, ValidateStravaWebhookData, ValidateStravaWebhookErrors, ValidateStravaWebhookResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -291,6 +291,25 @@ export const getCoachThread = <ThrowOnError extends boolean = false>(options: Op
         }],
     url: '/api/coach/threads/{id}',
     ...options
+});
+
+/**
+ * Pin or unpin one conversation
+ *
+ * Pinned conversations sort above the rest, newest pin first, and stay there however long it has been since the athlete last used them. Pinning an already-pinned thread re-stamps it, moving it to the top of the pinned group.
+ */
+export const updateCoachThread = <ThrowOnError extends boolean = false>(options: Options<UpdateCoachThreadData, ThrowOnError>): RequestResult<UpdateCoachThreadResponses, UpdateCoachThreadErrors, ThrowOnError> => (options.client ?? client).patch<UpdateCoachThreadResponses, UpdateCoachThreadErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'better-auth.session_token',
+            type: 'apiKey'
+        }],
+    url: '/api/coach/threads/{id}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
 });
 
 /**

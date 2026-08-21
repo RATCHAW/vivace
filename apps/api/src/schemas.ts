@@ -341,12 +341,23 @@ export const CoachThreadSchema = z
       .string()
       .nullable()
       .openapi({ example: "Half marathon in October" }),
+    /** When the athlete pinned it, or null. Pinned threads sort above the rest. */
+    pinned_at: z.iso.datetime().nullable(),
     created_at: z.iso.datetime(),
     updated_at: z.iso.datetime(),
   })
   .openapi("CoachThread");
 
 export type CoachThread = z.infer<typeof CoachThreadSchema>;
+
+/** What can be changed about a conversation after it exists. */
+export const UpdateCoachThreadSchema = z
+  .object({
+    pinned: z.boolean().openapi({ example: true }),
+  })
+  .openapi("UpdateCoachThread");
+
+export type UpdateCoachThread = z.infer<typeof UpdateCoachThreadSchema>;
 
 /**
  * One stored message, in the AI SDK's `UIMessage` shape.

@@ -142,6 +142,7 @@ export type AcceptRunInvite = {
 export type CoachThread = {
     id: string;
     title: string | null;
+    pinned_at: string | null;
     created_at: string;
     updated_at: string;
 };
@@ -169,6 +170,10 @@ export type CoachMessageMetadata = {
     };
     trace_id?: string;
 } | null;
+
+export type UpdateCoachThread = {
+    pinned: boolean;
+};
 
 export type CoachBriefing = {
     context: CoachContext;
@@ -903,6 +908,37 @@ export type GetCoachThreadResponses = {
 };
 
 export type GetCoachThreadResponse = GetCoachThreadResponses[keyof GetCoachThreadResponses];
+
+export type UpdateCoachThreadData = {
+    body: UpdateCoachThread;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/coach/threads/{id}';
+};
+
+export type UpdateCoachThreadErrors = {
+    /**
+     * No valid session.
+     */
+    401: ApiError;
+    /**
+     * No such conversation for this athlete.
+     */
+    404: ApiError;
+};
+
+export type UpdateCoachThreadError = UpdateCoachThreadErrors[keyof UpdateCoachThreadErrors];
+
+export type UpdateCoachThreadResponses = {
+    /**
+     * The conversation, as the list will now order it.
+     */
+    200: CoachThread;
+};
+
+export type UpdateCoachThreadResponse = UpdateCoachThreadResponses[keyof UpdateCoachThreadResponses];
 
 export type GetCoachBriefingData = {
     body?: never;
