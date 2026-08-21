@@ -40,6 +40,7 @@ import { Suggestion, Suggestions } from "@/components/ai-elements/suggestion";
 import { MonoLabel } from "@/components/mono";
 import { formatPace } from "@repo/video";
 import { useDictation } from "@/lib/use-dictation";
+import { useMediaQuery } from "@/lib/use-media-query";
 import { cn } from "@/lib/utils";
 
 /**
@@ -178,6 +179,22 @@ export function CoachComposer({
     if (isBusy) cancelDictation();
   }, [isBusy, cancelDictation]);
 
+  /**
+   * Whether the caret lands in the box the moment a conversation opens.
+   *
+   * It does, because typing is the first thing anybody does on this screen, and
+   * it does for a conversation reopened as well as a fresh one — `CoachChat` is
+   * keyed by thread id, so switching thread remounts this and the focus comes
+   * with the mount rather than needing to watch which id is selected.
+   *
+   * Except on a touch device, where the same line is a keyboard sliding up over
+   * the transcript nobody asked to leave. `(pointer: coarse)` rather than a
+   * width breakpoint: a phone held sideways is still a phone, and a tablet with
+   * a keyboard attached reports itself fine. A browser with no `matchMedia`
+   * reads false and gets the desktop behaviour.
+   */
+  const touch = useMediaQuery("(pointer: coarse)");
+
   // `/ch` narrows to /charge; a bare `/` shows the lot.
   const commands = useMemo(() => {
     const typed = draft.trim();
@@ -306,6 +323,7 @@ export function CoachComposer({
         <ComposerAttachments />
         <PromptInputBody>
           <PromptInputTextarea
+            autoFocus={!touch}
             disabled={isBusy}
             onChange={(event) => onDraftChange(event.target.value)}
             placeholder={t("composer.placeholder")}

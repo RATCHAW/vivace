@@ -368,8 +368,33 @@ session, no generated API client, no router. It links to the app, it never calls
   build time, so it is a Docker build arg, not a runtime env var. `signInUrl` is
   a *function* of the locale — see the i18n section below.
 - **Every page lives under `app/[locale]`.** `generateStaticParams` prerenders
-  `/en` and `/fr`; `src/proxy.ts` is the only per-request code and all it does is
-  redirect `/`. A new route goes inside the segment, or it has no language.
+  `/en` and `/fr`; `src/proxy.ts` is the only per-request code. A new route goes
+  inside the segment, or it has no language — and it goes in `SITE_PAGES`
+  (`src/lib/pages.ts`), which is the one list the sitemap, `llms.txt`, the
+  Markdown route and the proxy's "does this URL exist?" all read.
+- **The proxy decides three things: representation, language, existence.** In
+  that order, and the order matters — an agent asking for Markdown at `/` is
+  answered at `/`, not sent through a redirect first.
+- **A URL that names no page is a 404 where it stands.** It used to be redirected
+  into a locale and 404 there, so the honest answer to "does this exist?" was a
+  307 — which an agent that doesn't follow redirects reads as yes. The proxy
+  rewrites it to `/{locale}/404` with `status: 404` on the rewrite. That sentinel
+  slug is `NOT_FOUND_SLUG`, it is in `generateStaticParams`, and it is why there
+  is no `not-found.tsx`: that file renders without `params`, so it would have to
+  read the language from a header — and one `headers()` call inside `[locale]`
+  turns every page under it from a prerendered document into an on-demand render.
+- **Any page also serves Markdown** — `Accept: text/markdown`, or `.md` on the
+  path (acceptmarkdown.com). It is a *second rendering of the same catalogue*
+  (`src/lib/markdown.ts`), never a conversion of the HTML, so the two can't
+  drift. `Vary: Accept` rides on every response the proxy still owns; App Router
+  overwrites it on a page response with its own router list, which costs nothing
+  here because the proxy negotiates above the page cache.
+- **`/llms.txt` is the agent-facing index** (`src/lib/llms.ts`), to llmstxt.org's
+  format: H1, blockquote, heading-free prose, then H2 sections that are link
+  lists. Its "When to use Vivace" section names a job and a URL per line — that
+  is the part an agent acts on, and marketing adjectives are worse than useless
+  in it. English only: there is one such file and it has no locale to negotiate.
+  `/llms-full.txt` is every page, both languages, one document.
 - Hero-replay maths lives in `src/lib/replay.ts` as pure functions of `t` and is
   unit-tested. Keep it pure — the server and the first client frame must agree, or
   React logs a hydration mismatch.

@@ -5,7 +5,13 @@ import { LOCALES } from "@/i18n/config";
 import { CONTENT_PAGE_KEYS } from "@/i18n/content-pages";
 import { getDictionary } from "@/i18n/dictionaries";
 import { createPageMetadata, homePagePaths } from "./metadata";
-import { coachUrl, resolveSiteUrl, signInUrl, siteUrl } from "./site";
+import {
+  coachUrl,
+  resolveSiteUrl,
+  signInUrl,
+  siteUrl,
+  SOCIAL_PROFILES,
+} from "./site";
 import { homeStructuredData, siteStructuredData } from "./structured-data";
 
 /** The `@type` of every node in a graph, for asserting what a page claims. */
@@ -66,9 +72,27 @@ describe("SEO discovery", () => {
       expect(entry.alternates?.languages).toMatchObject({
         en: expect.stringContaining(`${siteUrl}/en`),
         fr: expect.stringContaining(`${siteUrl}/fr`),
-        "x-default": expect.stringContaining(`${siteUrl}/en`),
       });
     }
+  });
+
+  /**
+   * `/` is the language-negotiating redirect, which is what Google documents
+   * `x-default` for — and the only URL on this site that is the bare domain
+   * rather than a language folder, which is what a brand-name search should be
+   * able to return. The content pages have no such entry point, so theirs stays
+   * English.
+   */
+  it("points the home page's x-default at the bare domain", () => {
+    const byUrl = new Map(
+      sitemap().map((entry) => [entry.url, entry.alternates?.languages]),
+    );
+
+    expect(byUrl.get(`${siteUrl}/en`)?.["x-default"]).toBe(`${siteUrl}/`);
+    expect(byUrl.get(`${siteUrl}/fr`)?.["x-default"]).toBe(`${siteUrl}/`);
+    expect(byUrl.get(`${siteUrl}/en/about`)?.["x-default"]).toBe(
+      `${siteUrl}/en/about`,
+    );
   });
 });
 
@@ -86,6 +110,8 @@ describe("page metadata", () => {
       alternates: {
         canonical: "/fr",
         languages: { en: "/en", fr: "/fr", "x-default": "/en" },
+        // What a crawler follows when it does not know about `Accept`.
+        types: { "text/markdown": "/fr.md" },
       },
       openGraph: {
         locale: "fr_FR",
@@ -99,9 +125,48 @@ describe("page metadata", () => {
       },
     });
   });
+
+  it("lets the home page override x-default without touching the rest", () => {
+    const metadata = createPageMetadata({
+      locale: "en",
+      title: "Title",
+      description: "Description",
+      imageAlt: "Vivace preview",
+      paths: homePagePaths(),
+      xDefault: "/",
+    });
+
+    expect(metadata.alternates?.languages).toMatchObject({
+      en: "/en",
+      fr: "/fr",
+      "x-default": "/",
+    });
+  });
 });
 
 describe("structured data", () => {
+  /**
+   * `sameAs` is the one lever this codebase has on brand-name search: it says
+   * the profiles and the site are one entity. A typo'd or dead handle in here
+   * is worse than an empty list, so the shape is asserted rather than trusted.
+   */
+  it("claims the profiles Vivace actually runs", () => {
+    const [organization] = siteStructuredData() as [
+      { sameAs: string[]; description: string },
+    ];
+
+    expect(organization.sameAs).toEqual([...SOCIAL_PROFILES]);
+    expect(organization.description).toBe(getDictionary("en").meta.description);
+
+    for (const profile of organization.sameAs) {
+      expect(profile).toMatch(/^https:\/\//);
+      // The handle is the domain, which is what makes it a claim of identity
+      // rather than just a link to somewhere Vivace happens to post.
+      expect(profile).toContain("vivace.run");
+      expect(profile).not.toMatch(/\/$/);
+    }
+  });
+
   it("says only what is true of every page, site-wide", () => {
     // An FAQPage here would follow the layout onto /en/privacy and claim six
     // answers that page does not render.

@@ -199,6 +199,32 @@ export const en = {
     cta: "Continue with Strava",
   },
 
+  /**
+   * The site's own table of contents. It is the body of the 404 and the tail
+   * of every Markdown representation, because a person who mistyped a URL and
+   * an agent that guessed one need the same thing: the list of what does
+   * exist, and where the machine-readable index lives.
+   */
+  directory: {
+    pagesHeading: "Every page on this site",
+    agentsHeading: "If you’re an agent or a crawler",
+    agentsLead:
+      "Each of these describes the whole site in one request. Every page URL also answers to an Accept: text/markdown request, or to the same path with .md on the end.",
+    llms: "llms.txt — what Vivace is for, and when to reach for it",
+    llmsFull: "llms-full.txt — every page, as one Markdown file",
+    sitemap: "sitemap.xml — every URL, in both languages",
+  },
+
+  notFound: {
+    title: "Page not found | Vivace",
+    description:
+      "That URL does not exist on vivace.run. Every page on the site is listed here, with the machine-readable index an agent can read instead.",
+    eyebrow: "404",
+    heading: "That page isn’t here.",
+    lead: "Nothing on this site answers to that address. Everything it does have is listed below.",
+    backHome: "Back to Vivace",
+  },
+
   footer: {
     tagline: "AI coaching and replays for the runs you already did.",
     logIn: "Log in",
