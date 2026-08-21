@@ -105,6 +105,19 @@ export function Coach() {
   const [railOpen, setRailOpen] = useState(false);
   const phone = useMediaQuery(PHONE);
 
+  /**
+   * The run "Ask the coach" arrived with, read once.
+   *
+   * The first thing this page does is put a conversation in the URL, and
+   * `selectThread` drops `run` when it does — so anything reading the
+   * attachment off the live URL would find it already gone by the time there
+   * was a composer to put it in.
+   */
+  const [arrivedWithRun, setArrivedWithRun] = useState<number | null>(() => {
+    const id = Number(params.get("run"));
+    return Number.isInteger(id) && id > 0 ? id : null;
+  });
+
   // The rails sit outside the chat but ask through it. The chat re-registers on
   // every render, so this is never a stale send.
   const askRef = useRef<((text: string, runId?: number) => void) | null>(null);
@@ -117,6 +130,18 @@ export function Coach() {
     // The attached run belongs to the arrival, not to every thread after it.
     next.delete("run");
     setParams(next, { replace: true });
+  };
+
+  /**
+   * Opening a conversation by hand, which is also where the arrival ends.
+   *
+   * The run travelled with "Ask the coach" into the conversation that opened
+   * for it; walking off to another one leaves it behind, or every thread the
+   * athlete visited afterwards would open with a chip they never attached.
+   */
+  const chooseThread = (threadId: string) => {
+    setArrivedWithRun(null);
+    selectThread(threadId);
   };
 
   const { data: threads } = useQuery(listCoachThreadsOptions());
@@ -137,16 +162,26 @@ export function Coach() {
 
   // Nothing selected: open the newest conversation, or open a fresh one. The
   // guard on isPending and isSuccess keeps a slow round trip from starting two.
+  //
+  // A run in the URL asks for a conversation of its own. Landing in whatever
+  // was said last would file "why did I fade?" under a page of unrelated
+  // history — and the coach reads that history, so the question would arrive
+  // already answered about something else. A conversation that was started and
+  // never used is that blank page already: it has no title, because a title
+  // arrives with the first message, so it is reused rather than doubled.
   useEffect(() => {
     if (selectedId || !threads) return;
-    if (threads.length > 0) {
-      selectThread(threads[0].id);
+    const reusable = arrivedWithRun
+      ? threads.find((thread) => thread.title === null)
+      : threads[0];
+    if (reusable) {
+      selectThread(reusable.id);
     } else if (!create.isPending && !create.isSuccess) {
       create.mutate({});
     }
     // selectThread closes over `setParams`, which react-router keeps stable.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedId, threads, create.isPending, create.isSuccess]);
+  }, [selectedId, threads, create.isPending, create.isSuccess, arrivedWithRun]);
 
   const {
     data: thread,
@@ -157,13 +192,12 @@ export function Coach() {
     enabled: Boolean(selectedId),
   });
 
-  // `?run=` arrives from a replay's "Ask the coach"; it is only the opening
-  // attachment, so it is read once rather than watched.
-  const requestedRun = Number(params.get("run"));
+  // The runs list is a Strava round trip, so it can land well after the
+  // conversation does; the chat takes the mention whenever it turns up.
   const initialMention: RunMention | null = useMemo(() => {
-    const run = runs?.find((candidate) => candidate.id === requestedRun);
+    const run = runs?.find((candidate) => candidate.id === arrivedWithRun);
     return run ? toMention(run) : null;
-  }, [requestedRun, runs]);
+  }, [arrivedWithRun, runs]);
 
   const threadTitle =
     threads?.find((candidate) => candidate.id === selectedId)?.title ??
@@ -177,7 +211,7 @@ export function Coach() {
     <>
       <CoachThreads
         onSelect={(id) => {
-          selectThread(id);
+          chooseThread(id);
           setThreadsOpen(false);
         }}
         selectedId={selectedId}
@@ -188,7 +222,7 @@ export function Coach() {
           setThreadsOpen(false);
         }}
         onOpenThread={(id) => {
-          selectThread(id);
+          chooseThread(id);
           setThreadsOpen(false);
         }}
         // A briefing that failed is reported once, in the rail. Here it is an

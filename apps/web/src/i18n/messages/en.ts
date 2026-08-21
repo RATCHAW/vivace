@@ -463,12 +463,18 @@ export const en = {
   },
 
   composer: {
-    placeholder: "Ask about a run, or / for commands",
+    placeholder: "Ask about a run — @ to name one, / for commands",
     attachRun: "Attach a run",
     runShort: "Run",
     attachFile: "Attach a file",
     removeAttached: "Remove the attached run",
     noRunsSynced: "No runs synced from Strava yet.",
+    noRunsMatch: "No run matches “{{query}}”.",
+    runList: "Runs you can attach",
+    commandList: "Coach commands",
+    keyMove: "Move",
+    keySelect: "Select",
+    keyClose: "Close",
     commands: {
       week: { name: "/week", desc: "Write the next seven days" },
       review: { name: "/review", desc: "Read my last long run split by split" },

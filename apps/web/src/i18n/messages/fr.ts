@@ -418,12 +418,19 @@ export const fr: Translated<Messages> = {
   },
 
   composer: {
-    placeholder: "Posez une question sur une course, ou / pour les commandes",
+    placeholder:
+      "Posez une question — @ pour citer une course, / pour les commandes",
     attachRun: "Joindre une course",
     runShort: "Course",
     attachFile: "Joindre un fichier",
     removeAttached: "Retirer la course jointe",
     noRunsSynced: "Aucune course synchronisée depuis Strava.",
+    noRunsMatch: "Aucune course ne correspond à « {{query}} ».",
+    runList: "Courses à joindre",
+    commandList: "Commandes du coach",
+    keyMove: "Naviguer",
+    keySelect: "Choisir",
+    keyClose: "Fermer",
     commands: {
       week: { name: "/semaine", desc: "Écrire les sept prochains jours" },
       review: {

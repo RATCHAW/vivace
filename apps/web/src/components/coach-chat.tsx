@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useChat } from "@ai-sdk/react";
 import { getToolName, isToolUIPart, type UIMessage } from "ai";
@@ -430,6 +430,17 @@ export function CoachChat({
   const [pickerOpen, setPickerOpen] = useState(false);
   /** The question being rewritten, if one is — one at a time. */
   const [editingId, setEditingId] = useState<string | null>(null);
+
+  // The runs list is a Strava round trip, so it is often still in flight when
+  // the conversation opens and the run "Ask the coach" arrived with lands a
+  // moment after this mounted. Taken exactly once, and never over a run the
+  // athlete has chosen for themselves since.
+  const tookMention = useRef(initialMention !== null);
+  useEffect(() => {
+    if (tookMention.current || !initialMention) return;
+    tookMention.current = true;
+    setAttached(initialMention);
+  }, [initialMention]);
 
   const chat = coachChatFor(threadId, initialMessages);
   const { messages, sendMessage, regenerate, status, stop, error } = useChat({
