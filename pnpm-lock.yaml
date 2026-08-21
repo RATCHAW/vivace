@@ -58,8 +58,8 @@ importers:
   apps/api:
     dependencies:
       '@hono/node-server':
-        specifier: ^1.13.0
-        version: 1.19.17(hono@4.13.1)
+        specifier: ^2.1.0
+        version: 2.1.1(hono@4.13.1)
       '@hono/swagger-ui':
         specifier: ^0.6.1
         version: 0.6.1(hono@4.13.1)
@@ -1811,6 +1811,12 @@ packages:
   '@hono/node-server@1.19.17':
     resolution: {integrity: sha512-dSneS5qhiauZWGDCeK4o695Xd9nUNjviSZCMQrj10eetr8Uln1ucn6bbphOM6UynAMMtNIzZNSpL9vnASJwrPQ==}
     engines: {node: '>=18.14.1'}
+    peerDependencies:
+      hono: ^4
+
+  '@hono/node-server@2.1.1':
+    resolution: {integrity: sha512-ELuehkj5VCBdgEw9zs+ivkKwyzzUCSQuE96YmiPvn1ECBoZCczbFXJLeEGMTYjphP6gydh4pHMqEYPVMYUVgQg==}
+    engines: {node: '>=20'}
     peerDependencies:
       hono: ^4
 
@@ -8545,6 +8551,10 @@ snapshots:
   '@hey-api/types@0.1.4': {}
 
   '@hono/node-server@1.19.17(hono@4.13.1)':
+    dependencies:
+      hono: 4.13.1
+
+  '@hono/node-server@2.1.1(hono@4.13.1)':
     dependencies:
       hono: 4.13.1
 
