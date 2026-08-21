@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { CoachBriefing, PlanProgress } from "@/api";
 import { i18n } from "@/i18n";
-import { CoachRail, planDayState, todayIndex } from "./coach-rail";
+import { CoachRail, paceValue, planDayState, todayIndex } from "./coach-rail";
 
 afterEach(async () => {
   cleanup();
@@ -13,7 +13,15 @@ afterEach(async () => {
 type PlanDay = NonNullable<PlanProgress>["days"][number];
 
 function day(over: Partial<PlanDay> & { day: number }): PlanDay {
-  return { type: "Rest", planned_km: 0, actual_km: 0, run_ids: [], ...over };
+  return {
+    type: "Rest",
+    planned_km: 0,
+    actual_km: 0,
+    planned_pace: "",
+    actual_pace: null,
+    run_ids: [],
+    ...over,
+  };
 }
 
 /** The week in the screenshot the redesign came from: two sessions, none run. */
@@ -30,8 +38,8 @@ function plan(over: Partial<NonNullable<PlanProgress>> = {}) {
       day({ day: 2 }),
       day({ day: 3 }),
       day({ day: 4 }),
-      day({ day: 5, type: "Long", planned_km: 8 }),
-      day({ day: 6, type: "Easy", planned_km: 6 }),
+      day({ day: 5, type: "Long", planned_km: 8, planned_pace: "6:00 /km" }),
+      day({ day: 6, type: "Easy", planned_km: 6, planned_pace: "6:30 /km" }),
     ],
     ...over,
   } satisfies NonNullable<PlanProgress>;
@@ -77,6 +85,25 @@ describe("todayIndex", () => {
   });
 });
 
+describe("paceValue", () => {
+  it("pulls the pace out of however the coach wrote it", () => {
+    expect(paceValue("4:35 /km")).toBe("4:35");
+    expect(paceValue("around 5:20 per km")).toBe("5:20");
+  });
+
+  it("keeps a range whole", () => {
+    // "6:00" alone would promise a precision the week never had.
+    expect(paceValue("6:00-6:15 /km")).toBe("6:00-6:15");
+    expect(paceValue("6:00 – 6:15")).toBe("6:00 – 6:15");
+  });
+
+  it("is null for a note that is not a pace", () => {
+    expect(paceValue("conversational")).toBeNull();
+    expect(paceValue("legs up")).toBeNull();
+    expect(paceValue("")).toBeNull();
+  });
+});
+
 describe("planDayState", () => {
   it("calls a planned day missed only once it is behind the athlete", () => {
     const tuesday = day({ day: 1, type: "Easy", planned_km: 8 });
@@ -96,19 +123,118 @@ describe("planDayState", () => {
 });
 
 describe("this week", () => {
-  it("puts the numbers on the card rather than in a tooltip", () => {
+  it("spells every session out, with the unit on each number", () => {
     onDay(0);
     render(<CoachRail briefing={briefing()} onAsk={vi.fn()} />);
 
     expect(screen.getByText("0 of 14 km")).toBeDefined();
     expect(screen.getByText("Build 4 of 9")).toBeDefined();
-    // The two sessions are labelled with their kilometres, so a bar's height
-    // converts to a number without hovering anything.
-    expect(screen.getByText("8")).toBeDefined();
-    expect(screen.getByText("6")).toBeDefined();
+    // A bare "8" under a bar said nothing about what it counted, or about
+    // whether it was a target or a result. Each session now names itself.
+    expect(screen.getByText("Long")).toBeDefined();
+    expect(screen.getByText("8 km · 6:00 /km")).toBeDefined();
+    expect(screen.getByText("6 km · 6:30 /km")).toBeDefined();
+    expect(screen.getByText("2 sessions left")).toBeDefined();
+  });
+
+  it("shows the pace that was run, not the one that was asked for", () => {
+    onDay(6);
+    render(
+      <CoachRail
+        briefing={briefing({
+          plan: plan({
+            actual_km: 8,
+            remaining: 1,
+            days: [
+              day({ day: 0 }),
+              day({ day: 1 }),
+              day({ day: 2 }),
+              day({ day: 3 }),
+              day({ day: 4 }),
+              day({
+                day: 5,
+                type: "Long",
+                planned_km: 8,
+                actual_km: 8,
+                planned_pace: "6:00 /km",
+                actual_pace: "5:44",
+              }),
+              day({ day: 6, type: "Easy", planned_km: 6 }),
+            ],
+          }),
+        })}
+        onAsk={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("8 km · 5:44 /km")).toBeDefined();
+    expect(screen.queryByText("8 km · 6:00 /km")).toBeNull();
     expect(
-      screen.getByText("2 sessions left · next Sat, Long, 8 km"),
+      screen.getByText(/Saturday · Long · ran 8 of 8 km · at 5:44/),
     ).toBeDefined();
+  });
+
+  it("does not call a run nobody planned a rest day", () => {
+    onDay(6);
+    render(
+      <CoachRail
+        briefing={briefing({
+          plan: plan({
+            actual_km: 5,
+            days: [
+              // The briefing types a day with no session "Rest". On a line of
+              // its own, next to 5 km that were actually run, that reads wrong.
+              day({ day: 0, actual_km: 5, actual_pace: "5:30" }),
+              day({ day: 1 }),
+              day({ day: 2 }),
+              day({ day: 3 }),
+              day({ day: 4 }),
+              day({ day: 5, type: "Long", planned_km: 8 }),
+              day({ day: 6, type: "Easy", planned_km: 6 }),
+            ],
+          }),
+        })}
+        onAsk={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Unplanned")).toBeDefined();
+    expect(screen.queryByText("Rest")).toBeNull();
+    expect(screen.getByText("5 km · 5:30 /km")).toBeDefined();
+    expect(
+      screen.getByText("Monday · unplanned · ran 5 km · at 5:30 /km"),
+    ).toBeDefined();
+  });
+
+  it("leaves the pace off a session the coach wrote as a note", () => {
+    onDay(0);
+    render(
+      <CoachRail
+        briefing={briefing({
+          plan: plan({
+            days: [
+              day({ day: 0 }),
+              day({ day: 1 }),
+              day({ day: 2 }),
+              day({ day: 3 }),
+              day({ day: 4 }),
+              day({
+                day: 5,
+                type: "Long",
+                planned_km: 8,
+                planned_pace: "conversational",
+              }),
+              day({ day: 6, type: "Easy", planned_km: 6 }),
+            ],
+          }),
+        })}
+        onAsk={vi.fn()}
+      />,
+    );
+
+    // The distance still stands on its own; nothing is invented for the pace.
+    expect(screen.getByText("8 km")).toBeDefined();
+    expect(screen.getByText("6 km")).toBeDefined();
   });
 
   it("gives a rest day no mark at all", () => {
@@ -166,19 +292,26 @@ describe("this week", () => {
     expect(saturday?.querySelector<HTMLElement>("span")?.style.height).toBe(
       "50%",
     );
-    // The day's own label reads what was run, not what was asked for.
-    expect(screen.getByText("4")).toBeDefined();
+    // The session's own line reads what was run, not what was asked for.
+    expect(screen.getByText("4 km")).toBeDefined();
   });
 
-  it("reads each day out for a screen reader", () => {
-    onDay(0);
+  it("reads each session out for a screen reader", () => {
+    onDay(5);
     render(<CoachRail briefing={briefing()} onAsk={vi.fn()} />);
 
-    expect(screen.getByText(/Monday · rest day/)).toBeDefined();
+    // Colour is all that separates a session that happened from one still
+    // owed, so the readout says it — and says which of the two the pace is.
     expect(
-      screen.getByText("Saturday · Long · 8 km still to run"),
+      screen.getByText(
+        "Saturday · Long · 8 km still to run · target 6:00 /km — Today",
+      ),
     ).toBeDefined();
-    expect(screen.getByText(/Monday · rest day — Today/)).toBeDefined();
+    expect(
+      screen.getByText("Sunday · Easy · 6 km still to run · target 6:30 /km"),
+    ).toBeDefined();
+    // The chart is a shape, not a second copy of those sentences.
+    expect(screen.queryByText(/rest day/)).toBeNull();
   });
 
   it("asks the coach to adjust the week", () => {

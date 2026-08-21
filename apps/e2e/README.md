@@ -32,6 +32,12 @@ It is a *development* stack, not the suite: its database is a volume rather than
 still accepted this afternoon. It runs the API and Vite in watch mode, so it is
 something to keep open while changing the code it is running.
 
+The script in this workspace is `dev:fake`, not `dev`, and it has to stay that
+way. `pnpm dev` at the root is `turbo run dev`, which runs the `dev` script of
+*every* workspace that has one — and this one starts a second API and a second
+Vite of its own. Named `dev`, it turned `pnpm dev` into six servers instead of
+three, and a missing `db-dev-fake` took the real stack down with it.
+
 Ports sit a hundred above the suite's — app **5373**, API **3200**, fake Strava
 **4200**, database **5534** — so both can be up at once, and
 `DEV_FAKE_PORT_OFFSET` shifts the set the same way `E2E_PORT_OFFSET` does.

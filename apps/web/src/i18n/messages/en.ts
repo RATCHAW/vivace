@@ -583,16 +583,21 @@ export const en = {
     weekComplete: "Week complete",
     sessionsLeft_one: "{{count}} session left",
     sessionsLeft_other: "{{count}} sessions left",
-    nextSession: "next {{day}}, {{type}}, {{planned}} km",
     /** What the two marks mean — the card is otherwise a shape with no key. */
     weekLegend:
-      "Filled is what you ran; the outline is what the week still asks for.",
+      "Filled is what you ran; the outline is what the week still asks for — and the sessions below follow the same rule.",
     today: "Today",
-    /** Read out per day, because a bar has nothing a screen reader can say. */
+    /** Read out per session, since colour is what tells the two apart. */
     dayRest: "{{day}} · rest day",
     dayDone: "{{day}} · {{type}} · ran {{actual}} of {{planned}} km",
     dayTodo: "{{day}} · {{type}} · {{planned}} km still to run",
     dayMissed: "{{day}} · {{type}} · {{planned}} km not run",
+    /** A run on a day the week left empty — the briefing types it "Rest". */
+    unplanned: "Unplanned",
+    dayUnplanned: "{{day}} · unplanned · ran {{actual}} km",
+    /** Appended to the five above, so a pace is never read out unlabelled. */
+    dayRanAt: "at {{pace}} /km",
+    dayAtPace: "target {{pace}} /km",
     signals: "Signals",
     tapSignal: "Tap a signal to ask about it.",
     queue: "Coach queue",

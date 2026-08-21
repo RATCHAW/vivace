@@ -88,6 +88,21 @@ function km(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }
 
+/**
+ * The pace inside whatever the coach wrote.
+ *
+ * `planned_pace` is free text — "4:35 /km", "6:00-6:15 /km", "conversational",
+ * "legs up" — and the row supplies the unit itself. A range is kept whole: the
+ * lower bound alone would promise a precision the week doesn't have. A note
+ * with no clock in it isn't a pace at all, and the row shows none rather than
+ * inventing one.
+ */
+export function paceValue(text: string): string | null {
+  return (
+    /\d{1,3}:[0-5]\d(?:\s*[-–—]\s*\d{1,3}:[0-5]\d)?/.exec(text)?.[0] ?? null
+  );
+}
+
 function RailSection({
   title,
   action,
@@ -235,10 +250,28 @@ function ThisWeek({
   }
 
   const today = todayIndex(plan.week_starting);
-  const cells = plan.days.map((day) => ({
-    day,
-    state: planDayState(day, today),
-  }));
+  // What a day reports is decided once, here, and the mark, the distance and
+  // the pace all follow it: a day that has been run reports itself, a day that
+  // hasn't reports what it is still being asked for.
+  const cells = plan.days.map((day) => {
+    const state = planDayState(day, today);
+    // A run the week never asked for still counts, and the briefing types it
+    // "Rest" because no session sits under it. Naming a run "Rest" on its own
+    // line is a lie the old chart never had to tell, having shown no name.
+    const unplanned = state === "done" && day.planned_km === 0;
+    return {
+      day,
+      state,
+      unplanned,
+      name: unplanned ? t("rail.unplanned") : day.type,
+      distance: km(state === "done" ? day.actual_km : day.planned_km),
+      pace:
+        state === "done" ? day.actual_pace : paceValue(day.planned_pace ?? ""),
+    };
+  });
+  // The week as sessions rather than as seven slots. A rest day is the absence
+  // of one, which the chart above already draws as a gap.
+  const sessions = cells.filter(({ state }) => state !== "rest");
   const peak = Math.max(
     ...plan.days.map((day) => Math.max(day.planned_km, day.actual_km)),
     1,
@@ -247,13 +280,6 @@ function ThisWeek({
     plan.planned_km > 0
       ? Math.min(100, Math.round((plan.actual_km / plan.planned_km) * 100))
       : 0;
-  // The session the athlete owes next — today's if it is still unrun, else the
-  // first one after it. `remaining` counts them; this one names one.
-  const next =
-    today === null
-      ? undefined
-      : cells.find(({ day, state }) => day.day >= today && state === "todo")
-          ?.day;
   const total = t("rail.weekProgress", {
     actual: plan.actual_km,
     planned: plan.planned_km,
@@ -291,7 +317,10 @@ function ThisWeek({
           <Progress aria-label={total} value={done} variant="brand" />
         </div>
 
-        <div className="flex flex-col">
+        {/* The shape of the week, and only the shape — every number it draws is
+            spelled out in the sessions below, so there is nothing here for a
+            screen reader that it is not about to be told in words. */}
+        <div aria-hidden className="flex flex-col">
           <div className="flex h-[72px] items-end gap-1.5">
             {cells.map(({ day, state }) => {
               // A rest day keeps its place in the row and puts nothing in it:
@@ -337,52 +366,90 @@ function ThisWeek({
               empty place on a line rather than as a mark of its own. */}
           <div className="border-border mt-2 flex gap-1.5 border-t pt-2">
             {cells.map(({ day, state }) => (
-              <div
-                className="flex flex-1 flex-col items-center gap-1"
+              <MonoLabel
+                className={cn(
+                  "text-mono-badge flex-1 text-center",
+                  day.day === today && "text-foreground font-semibold",
+                  state === "missed" && "text-chart-5",
+                )}
                 key={day.day}
               >
-                <MonoLabel
-                  className={cn(
-                    "text-mono-badge block",
-                    day.day === today && "text-foreground font-semibold",
-                    state === "missed" && "text-chart-5",
-                  )}
-                >
-                  {messages.days.initial[day.day]}
-                </MonoLabel>
-                {/* The scale, spelled out. A height on its own converts to no
-                    number, and the tooltip it used to hide behind never
-                    existed on a phone. */}
-                <span className="text-mono-badge text-stone font-mono tracking-normal tabular-nums">
-                  {state === "rest"
-                    ? ""
-                    : km(state === "done" ? day.actual_km : day.planned_km)}
-                </span>
-                <span className="sr-only">
-                  {t(DAY_READOUT[state], {
-                    day: messages.days.long[day.day],
-                    type: day.type,
-                    actual: day.actual_km,
-                    planned: day.planned_km,
-                  })}
-                  {day.day === today ? ` — ${t("rail.today")}` : ""}
-                </span>
-              </div>
+                {messages.days.initial[day.day]}
+              </MonoLabel>
             ))}
           </div>
         </div>
+
+        {/* Each session on its own line, because a distance and a pace do not
+            both fit under a mark 28px wide — and a mark can't say "Tempo" at
+            all. Every number carries its unit here, which is what the row of
+            bare figures under the chart never did. */}
+        <ul className="flex flex-col gap-2.5">
+          {sessions.map(({ day, state, unplanned, name, distance, pace }) => (
+            <li className="flex items-baseline gap-2.5" key={day.day}>
+              <MonoLabel
+                aria-hidden
+                className={cn(
+                  "text-mono-badge w-7 shrink-0",
+                  day.day === today && "text-foreground font-semibold",
+                  state === "missed" && "text-chart-5",
+                )}
+              >
+                {messages.days.short[day.day]}
+              </MonoLabel>
+              {/* The one thing here allowed to lose characters: "8 × 400 with
+                  90s float" is a name, and a number that truncates is a lie. */}
+              <span
+                aria-hidden
+                className={cn(
+                  "text-caption min-w-0 flex-1 truncate",
+                  unplanned && "text-muted-foreground",
+                )}
+                title={name}
+              >
+                {name}
+              </span>
+              {/* Solid ink is a session that happened, the same promise the
+                  filled mark above it makes; grey is one the week is still
+                  asking for. */}
+              <span
+                aria-hidden
+                className={cn(
+                  "text-mono-badge shrink-0 font-mono tracking-normal tabular-nums",
+                  state === "done" ? "text-foreground" : "text-stone",
+                  state === "missed" && "text-chart-5",
+                )}
+              >
+                {distance} {t("common.km")}
+                {pace ? ` · ${pace} ${t("common.perKm")}` : ""}
+              </span>
+              {/* Colour is the only thing separating a session that happened
+                  from one that hasn't, so the readout says it in words. */}
+              <span className="sr-only">
+                {unplanned
+                  ? t("rail.dayUnplanned", {
+                      day: messages.days.long[day.day],
+                      actual: day.actual_km,
+                    })
+                  : t(DAY_READOUT[state], {
+                      day: messages.days.long[day.day],
+                      type: day.type,
+                      actual: day.actual_km,
+                      planned: day.planned_km,
+                    })}
+                {pace
+                  ? ` · ${t(state === "done" ? "rail.dayRanAt" : "rail.dayAtPace", { pace })}`
+                  : ""}
+                {day.day === today ? ` — ${t("rail.today")}` : ""}
+              </span>
+            </li>
+          ))}
+        </ul>
 
         <p className="text-caption border-border border-t pt-3.5">
           {plan.remaining === 0
             ? t("rail.weekComplete")
             : t("rail.sessionsLeft", { count: plan.remaining })}
-          {plan.remaining > 0 && next
-            ? ` · ${t("rail.nextSession", {
-                day: messages.days.short[next.day],
-                type: next.type,
-                planned: next.planned_km,
-              })}`
-            : ""}
         </p>
       </div>
       <p className="text-caption text-stone leading-relaxed">

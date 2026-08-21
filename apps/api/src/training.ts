@@ -545,6 +545,10 @@ export interface PlanDayProgress {
   type: string;
   planned_km: number;
   actual_km: number;
+  /** The target pace as the coach wrote it — "4:35 /km", or "legs up". */
+  planned_pace: string;
+  /** What the day was run at, `m:ss` per km; null when nothing was logged. */
+  actual_pace: string | null;
   /** Runs logged on the day, for the tooltip and for "which run was that?". */
   run_ids: number[];
 }
@@ -582,13 +586,17 @@ export function planProgress(
   for (let day = 0; day < 7; day++) {
     const session = sessions.find((s) => s.day === day);
     const logged = byDay.get(day) ?? [];
+    const metres = logged.reduce((sum, run) => sum + run.distance, 0);
+    const seconds = logged.reduce((sum, run) => sum + run.moving_time, 0);
     days.push({
       day,
       type: session?.type ?? "Rest",
       planned_km: session?.km ?? 0,
-      actual_km: Number(
-        (logged.reduce((sum, run) => sum + run.distance, 0) / 1000).toFixed(1),
-      ),
+      actual_km: Number((metres / 1000).toFixed(1)),
+      planned_pace: session?.pace ?? "",
+      // Distance over time across the whole day, never the mean of each run's
+      // pace: a 3 km shakeout and a 15 km long run don't weigh the same.
+      actual_pace: metres > 0 ? pace(seconds / (metres / 1000)) : null,
       run_ids: logged.map((run) => run.id),
     });
   }
