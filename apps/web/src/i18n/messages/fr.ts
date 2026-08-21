@@ -523,6 +523,7 @@ export const fr: Translated<Messages> = {
     askChangeGoal: "Je veux changer ma course objectif",
     setGoalRace: "Définir une course objectif",
     askGoalRace: "Je prépare une course — laisse-moi t’en parler",
+    goalHint: "Définissez ici votre course objectif",
     noDate: "Pas encore de date",
     toGo: "Reste",
     target: "Objectif",
