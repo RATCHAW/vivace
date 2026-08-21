@@ -366,6 +366,34 @@ describe("planProgress", () => {
     expect(progress.remaining).toBe(3);
   });
 
+  it("carries both paces, so the chart can say how fast as well as how far", () => {
+    const progress = planProgress(
+      // 4 km in 20:00 and 6 km in 36:00 — 10 km in 56:00, which is 5:36 /km.
+      // The mean of 5:00 and 6:00 would say 5:30 and be wrong.
+      week,
+      [
+        run("2026-08-10", 4, { moving_time: 1200 }),
+        run("2026-08-10", 6, { moving_time: 2160 }),
+      ],
+      "2026-08-10",
+      "2026-08-13",
+    );
+    expect(progress.days[0]).toMatchObject({
+      planned_pace: "6:30 /km",
+      actual_pace: "5:36",
+    });
+    // A day with nothing on it reports the target and no result.
+    expect(progress.days[1]).toMatchObject({
+      planned_pace: "4:35 /km",
+      actual_pace: null,
+    });
+    // A rest day the coach wrote a note on keeps the note, not a clock.
+    expect(progress.days[3]).toMatchObject({
+      planned_pace: "legs up",
+      actual_pace: null,
+    });
+  });
+
   it("ignores runs from a neighbouring week", () => {
     const progress = planProgress(
       week,

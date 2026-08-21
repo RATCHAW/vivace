@@ -198,6 +198,8 @@ export type PlanProgress = {
         type: string;
         planned_km: number;
         actual_km: number;
+        planned_pace: string;
+        actual_pace: string | null;
         run_ids: Array<number>;
     }>;
 } | null;

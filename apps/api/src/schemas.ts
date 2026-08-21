@@ -545,6 +545,10 @@ export const PlanProgressSchema = z
         type: z.string(),
         planned_km: z.number(),
         actual_km: z.number(),
+        /** As the coach wrote it: "4:35 /km", or a note like "legs up". */
+        planned_pace: z.string(),
+        /** `m:ss` per km over the day's runs, null when none were logged. */
+        actual_pace: z.string().nullable(),
         run_ids: z.array(z.number().int()),
       }),
     ),

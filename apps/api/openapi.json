@@ -877,6 +877,15 @@
                 "actual_km": {
                   "type": "number"
                 },
+                "planned_pace": {
+                  "type": "string"
+                },
+                "actual_pace": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
                 "run_ids": {
                   "type": "array",
                   "items": {
@@ -889,6 +898,8 @@
                 "type",
                 "planned_km",
                 "actual_km",
+                "planned_pace",
+                "actual_pace",
                 "run_ids"
               ]
             }
