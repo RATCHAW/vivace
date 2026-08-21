@@ -476,6 +476,23 @@ export const en = {
       load: { name: "/load", desc: "Check my volume ramp and load ratio" },
       goal: { name: "/goal", desc: "Set or change the goal race" },
     },
+    /**
+     * The microphone. The transcription is the browser's own, so the errors
+     * below are the four a `SpeechRecognitionErrorEvent` can mean to an
+     * athlete — the rest are silence, which is not a failure.
+     */
+    dictation: {
+      start: "Dictate",
+      stop: "Stop dictating",
+      listening: "Listening",
+      errors: {
+        denied:
+          "Microphone access is blocked. Allow it in your browser settings to dictate.",
+        noMicrophone: "No microphone found.",
+        network: "Dictation needs a connection, and this one dropped.",
+        failed: "Dictation stopped. Type the question instead.",
+      },
+    },
   },
 
   cards: {
