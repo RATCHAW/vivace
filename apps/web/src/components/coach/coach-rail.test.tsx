@@ -2,7 +2,17 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { CoachBriefing, PlanProgress } from "@/api";
 import { i18n } from "@/i18n";
-import { CoachRail, paceValue, planDayState, todayIndex } from "./coach-rail";
+import {
+  CoachRail,
+  countdown,
+  countdownWeeks,
+  paceValue,
+  planDayState,
+  raceDistanceKey,
+  targetPace,
+  todayIndex,
+  weeksToTaper,
+} from "./coach-rail";
 
 afterEach(async () => {
   cleanup();
@@ -63,10 +73,32 @@ function briefing(over: Partial<CoachBriefing> = {}): CoachBriefing {
   };
 }
 
+/** A goal race with everything filled in; each test empties what it is about. */
+function goal(
+  over: Partial<CoachBriefing["context"]> = {},
+): CoachBriefing["context"] {
+  return {
+    race_name: "Casablanca Half",
+    race_date: "2026-10-18",
+    race_distance_m: 21097.5,
+    target_seconds: 5880,
+    long_run_day: 6,
+    notes: null,
+    updated_at: null,
+    ...over,
+  };
+}
+
 /** Monday of the fixture week, so `todayIndex` lands where a test wants it. */
 function onDay(offset: number) {
   vi.useFakeTimers();
   vi.setSystemTime(new Date(2026, 7, 17 + offset, 9, 0, 0));
+}
+
+/** A calendar day, 1-indexed on the month, for the countdown to be read from. */
+function at(year: number, month: number, day: number) {
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date(year, month - 1, day, 9, 0, 0));
 }
 
 describe("todayIndex", () => {
@@ -104,6 +136,116 @@ describe("paceValue", () => {
   });
 });
 
+describe("countdown", () => {
+  it("counts weeks the way the API's queue counts them", () => {
+    // Rounded up, like `weeksToRace` — the queue's taper item and the card's
+    // countdown are on screen together and cannot disagree by one.
+    expect(countdown("2026-10-18", new Date(2026, 7, 30))).toEqual({
+      kind: "weeks",
+      value: 7,
+    });
+    expect(countdown("2026-10-18", new Date(2026, 8, 1))).toEqual({
+      kind: "weeks",
+      value: 7,
+    });
+  });
+
+  it("counts days once the race is inside a fortnight", () => {
+    expect(countdown("2026-10-18", new Date(2026, 9, 5))).toEqual({
+      kind: "days",
+      value: 13,
+    });
+    expect(countdown("2026-10-18", new Date(2026, 9, 4))).toEqual({
+      kind: "weeks",
+      value: 2,
+    });
+  });
+
+  it("reads the browser's calendar, not UTC's", () => {
+    // 23:30 the night before. `toISOString()` already says race day anywhere
+    // east of Greenwich, and the card would count a day the athlete still has.
+    expect(countdown("2026-10-18", new Date(2026, 9, 17, 23, 30))).toEqual({
+      kind: "days",
+      value: 1,
+    });
+  });
+
+  it("tells a race with no date from one that has been run", () => {
+    // Both used to render as the same em dash under "To go".
+    expect(countdown(null)).toEqual({ kind: "none" });
+    expect(countdown("not-a-date")).toEqual({ kind: "none" });
+    expect(countdown("2026-10-18", new Date(2026, 9, 18))).toEqual({
+      kind: "today",
+    });
+    expect(countdown("2026-10-18", new Date(2026, 9, 19))).toEqual({
+      kind: "past",
+    });
+  });
+});
+
+describe("countdownWeeks", () => {
+  it("marks the last three weeks as the taper", () => {
+    const { overflow, weeks } = countdownWeeks(5);
+    expect(overflow).toBe(0);
+    expect(weeks.map(({ week }) => week)).toEqual([5, 4, 3, 2, 1]);
+    expect(weeks.filter(({ taper }) => taper).map(({ week }) => week)).toEqual([
+      3, 2, 1,
+    ]);
+  });
+
+  it("carries the weeks that don't fit as a count rather than dropping them", () => {
+    const { overflow, weeks } = countdownWeeks(20);
+    expect(overflow).toBe(8);
+    expect(weeks).toHaveLength(12);
+    expect(weeks[0].week).toBe(12);
+    expect(weeks.at(-1)).toEqual({ week: 1, taper: true });
+  });
+});
+
+describe("weeksToTaper", () => {
+  it("counts the weeks until the taper starts", () => {
+    expect(weeksToTaper({ kind: "weeks", value: 9 })).toBe(6);
+    expect(weeksToTaper({ kind: "weeks", value: 4 })).toBe(1);
+  });
+
+  it("is zero once the athlete is inside the window", () => {
+    // Three weeks is where `briefing.ts` starts raising the taper itself.
+    expect(weeksToTaper({ kind: "weeks", value: 3 })).toBe(0);
+    expect(weeksToTaper({ kind: "days", value: 6 })).toBe(0);
+    expect(weeksToTaper({ kind: "today" })).toBe(0);
+  });
+
+  it("has nothing to say without a race to taper for", () => {
+    expect(weeksToTaper({ kind: "none" })).toBeNull();
+    expect(weeksToTaper({ kind: "past" })).toBeNull();
+  });
+});
+
+describe("targetPace", () => {
+  it("says how fast the target is, not only what it is", () => {
+    expect(targetPace(5880, 21097.5)).toBe("4:39");
+  });
+
+  it("invents nothing from half a goal", () => {
+    expect(targetPace(5880, null)).toBeNull();
+    expect(targetPace(null, 21097.5)).toBeNull();
+  });
+});
+
+describe("raceDistanceKey", () => {
+  it("names the distance the way the athlete would", () => {
+    expect(raceDistanceKey(21097.5)).toBe("rail.raceHalf");
+    // A half typed in as a round number is still a half.
+    expect(raceDistanceKey(21100)).toBe("rail.raceHalf");
+    expect(raceDistanceKey(42195)).toBe("rail.raceMarathon");
+  });
+
+  it("has no name for a distance that isn't one", () => {
+    expect(raceDistanceKey(15000)).toBeNull();
+    expect(raceDistanceKey(null)).toBeNull();
+  });
+});
+
 describe("planDayState", () => {
   it("calls a planned day missed only once it is behind the athlete", () => {
     const tuesday = day({ day: 1, type: "Easy", planned_km: 8 });
@@ -119,6 +261,154 @@ describe("planDayState", () => {
 
   it("counts a run nobody planned as done", () => {
     expect(planDayState(day({ day: 0, actual_km: 5 }), 3)).toBe("done");
+  });
+});
+
+describe("goal race", () => {
+  it("leads with the countdown and names the distance", () => {
+    at(2026, 8, 30);
+    render(
+      <CoachRail briefing={briefing({ context: goal() })} onAsk={vi.fn()} />,
+    );
+
+    // "7 wk" used to be one of three figures at the foot of the card, two of
+    // which were usually an em dash.
+    expect(screen.getByText("7 weeks to go")).toBeDefined();
+    expect(screen.getByText("Half marathon")).toBeDefined();
+  });
+
+  it("says how fast the target is, not only what it is", () => {
+    at(2026, 8, 30);
+    render(
+      <CoachRail briefing={briefing({ context: goal() })} onAsk={vi.fn()} />,
+    );
+
+    expect(screen.getByText("1:38:00")).toBeDefined();
+    expect(screen.getByText("4:39 /km")).toBeDefined();
+    // Two columns leave room for the day's name; three only ever fit "Sun".
+    expect(screen.getByText("Sunday")).toBeDefined();
+  });
+
+  it("draws a mark a week, and says in words what they mean", () => {
+    at(2026, 7, 12);
+    const { container } = render(
+      <CoachRail briefing={briefing({ context: goal() })} onAsk={vi.fn()} />,
+    );
+
+    // Fourteen weeks out: twelve marks fit the rail and the other two are
+    // carried at the head of the row rather than dropped off it.
+    expect(container.querySelectorAll("[data-week]")).toHaveLength(12);
+    expect(screen.getByText("+2")).toBeDefined();
+    expect(
+      [...container.querySelectorAll("[data-taper]")].map((mark) =>
+        mark.getAttribute("data-week"),
+      ),
+    ).toEqual(["3", "2", "1"]);
+
+    // The shape never stands alone: the number above and the sentence below say
+    // everything it draws, which is what lets it be aria-hidden.
+    expect(screen.getByText("14 weeks to go")).toBeDefined();
+    expect(screen.getByText("Taper starts in 11 weeks")).toBeDefined();
+
+    // Told apart by density, never by hue. Amber is spoken for in this column:
+    // the week card below uses it for a session the athlete missed, and the
+    // signals under that for a reading out of band.
+    expect(container.innerHTML).not.toContain("chart-5");
+  });
+
+  it("has no marks to draw inside a fortnight", () => {
+    at(2026, 10, 12);
+    const { container } = render(
+      <CoachRail briefing={briefing({ context: goal() })} onAsk={vi.fn()} />,
+    );
+
+    // Two marks is not a countdown. At this range the number is the shape.
+    expect(container.querySelectorAll("[data-week]")).toHaveLength(0);
+    expect(screen.getByText("6 days to go")).toBeDefined();
+    expect(screen.getByText("You’re in the taper window")).toBeDefined();
+  });
+
+  it("draws nothing for a stat the athlete never set", () => {
+    at(2026, 8, 30);
+    render(
+      <CoachRail
+        briefing={briefing({
+          context: goal({ target_seconds: null, long_run_day: null }),
+        })}
+        onAsk={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByText("Target")).toBeNull();
+    expect(screen.queryByText("Long day")).toBeNull();
+    expect(screen.queryByText("—")).toBeNull();
+  });
+
+  it("shows what the coach remembers instead of promising it", () => {
+    at(2026, 8, 30);
+    render(
+      <CoachRail
+        briefing={briefing({
+          context: goal({ notes: "Left achilles, no Tuesday sessions" }),
+        })}
+        onAsk={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Remembers")).toBeDefined();
+    const notes = screen.getByText("Left achilles, no Tuesday sessions");
+    // Session replay is on, and an injury is the athlete's health.
+    expect(notes.className).toContain("ph-no-capture");
+  });
+
+  it("offers the next race once this one has been run", () => {
+    at(2026, 10, 20);
+    const onAsk = vi.fn();
+    render(
+      <CoachRail briefing={briefing({ context: goal() })} onAsk={onAsk} />,
+    );
+
+    expect(screen.getByText("That race has been run")).toBeDefined();
+    fireEvent.click(screen.getByRole("button", { name: "Set the next one" }));
+    expect(onAsk).toHaveBeenCalledWith(
+      "I’m training for a race — let me tell you about it",
+    );
+  });
+
+  it("keys its own marks behind the ?", () => {
+    at(2026, 8, 30);
+    render(
+      <CoachRail briefing={briefing({ context: goal() })} onAsk={vi.fn()} />,
+    );
+
+    // The marks may be drawn without a legend under them precisely because
+    // this exists — and "taper" is a coaching word, so an athlete meeting it
+    // for the first time gets a sentence rather than having to go looking.
+    const [help] = screen.getAllByRole("button", {
+      name: "What am I looking at?",
+    });
+    fireEvent.click(help);
+
+    const panel = document.querySelector('[data-slot="popover-content"]');
+    expect(panel?.textContent).toContain("Your goal race");
+    // Two marks on the card, two rows in the key, each one drawn in the ink it
+    // stands for rather than spelled out in a sentence about a colour.
+    expect(panel?.textContent).toContain("A week to go");
+    expect(panel?.textContent).toContain("Taper week");
+    expect(panel?.querySelectorAll("li")).toHaveLength(2);
+    // "Taper" is a coaching word, and the one thing here no swatch can show.
+    expect(panel?.textContent).toMatch(/Tapering is cutting volume/);
+  });
+
+  it("still offers a goal to an athlete without one", () => {
+    at(2026, 8, 30);
+    const onAsk = vi.fn();
+    render(<CoachRail briefing={briefing()} onAsk={onAsk} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Set a goal race" }));
+    expect(onAsk).toHaveBeenCalledWith(
+      "I’m training for a race — let me tell you about it",
+    );
   });
 });
 
@@ -312,6 +602,28 @@ describe("this week", () => {
     ).toBeDefined();
     // The chart is a shape, not a second copy of those sentences.
     expect(screen.queryByText(/rest day/)).toBeNull();
+  });
+
+  it("keys the chart behind the ? instead of under the card", () => {
+    onDay(0);
+    render(<CoachRail briefing={briefing()} onAsk={vi.fn()} />);
+
+    // The legend used to be a paragraph every visit re-read. It explains an
+    // encoding, which is a thing you look up once.
+    expect(screen.queryByText(/Filled is what you ran/)).toBeNull();
+
+    // The week's `?` is the second on screen; the goal race owns the first.
+    const help = screen.getAllByRole("button", {
+      name: "What am I looking at?",
+    });
+    fireEvent.click(help[help.length - 1]);
+
+    const panel = document.querySelector('[data-slot="popover-content"]');
+    expect(panel?.textContent).toContain("Your week");
+    // Three states on the chart, three rows in the key, each drawn as itself.
+    expect(
+      [...(panel?.querySelectorAll("li") ?? [])].map((row) => row.textContent),
+    ).toEqual(["What you ran", "Still to run", "Missed — that day has gone"]);
   });
 
   it("asks the coach to adjust the week", () => {
