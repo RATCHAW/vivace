@@ -27,6 +27,7 @@ export function createPageMetadata({
   openGraphDescription = description,
   imageAlt,
   paths,
+  xDefault = paths.en,
 }: {
   locale: Locale;
   title: string;
@@ -35,6 +36,12 @@ export function createPageMetadata({
   openGraphDescription?: string;
   imageAlt: string;
   paths: LocalePaths;
+  /**
+   * What `hreflang="x-default"` points at. The home page overrides it with
+   * `/`, which is the language-negotiating redirect Google documents
+   * `x-default` for — and the only URL on this site that is the bare domain.
+   */
+  xDefault?: string;
 }): Metadata {
   return {
     metadataBase: new URL(siteUrl),
@@ -46,7 +53,12 @@ export function createPageMetadata({
       canonical: paths[locale],
       languages: {
         ...Object.fromEntries(LOCALES.map((other) => [other, paths[other]])),
-        "x-default": paths.en,
+        "x-default": xDefault,
+      },
+      // The same page as Markdown, for a crawler that reads `rel="alternate"`
+      // rather than sending `Accept: text/markdown`. `proxy.ts` serves both.
+      types: {
+        "text/markdown": `${paths[locale]}.md`,
       },
     },
     openGraph: {

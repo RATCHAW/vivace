@@ -14,6 +14,7 @@ import { useMessages } from "@/i18n";
 import { useFormatters } from "@/i18n/format";
 import { MonoLabel } from "@/components/mono";
 import { Button } from "@/components/ui/button";
+import { CardHelp, type CardHelpId } from "@/components/coach/card-help";
 import { cn } from "@/lib/utils";
 
 // --- the shapes the API draws -------------------------------------------------
@@ -170,11 +171,25 @@ function CardShell({
   );
 }
 
-function CardHeading({ title, aside }: { title: string; aside?: ReactNode }) {
+function CardHeading({
+  title,
+  aside,
+  help,
+}: {
+  title: string;
+  aside?: ReactNode;
+  /** Which entry of `help` explains this card, if any explains it. */
+  help?: CardHelpId;
+}) {
   return (
     <div className="flex items-baseline justify-between gap-4">
       <span className="text-body-sm font-semibold">{title}</span>
-      {aside}
+      {aside || help ? (
+        <span className="flex shrink-0 items-center gap-2.5">
+          {aside}
+          {help ? <CardHelp id={help} /> : null}
+        </span>
+      ) : null}
     </div>
   );
 }
@@ -348,6 +363,7 @@ export function RunSplits({
     <CardShell className="flex flex-col gap-4 p-5">
       <CardHeading
         title={card.title}
+        help="splits"
         aside={
           <span className="text-stone flex items-center gap-3.5">
             <span className="flex items-center gap-1.5">
@@ -465,6 +481,7 @@ export function TrainingVolume({
     <CardShell className="flex flex-col gap-5 p-5">
       <CardHeading
         title={t("cards.weeklyVolume", { count: weeks.length })}
+        help="volume"
         aside={
           <MonoLabel className="text-mono-badge">
             {t("cards.safeRamp", { limit: RAMP_LIMIT })}
@@ -549,6 +566,7 @@ export function RacePrediction({
     <CardShell className="flex flex-col gap-5 p-5">
       <CardHeading
         title={t("cards.racePrediction")}
+        help="prediction"
         aside={
           <MonoLabel className="text-mono-badge">
             {t("cards.fromBestEfforts")}
@@ -678,14 +696,22 @@ export function WeekPlan({
 
   return (
     <CardShell className="max-w-[720px]">
-      <div className="flex items-baseline justify-between gap-4 px-5 pt-5 pb-4">
-        <span className="text-body-sm font-semibold">
-          {t("cards.weekOf", { week: format.weekStamp(card.week_starting) })}
-          {card.label ? ` · ${card.label}` : ""}
-        </span>
-        <MonoLabel className="text-mono-badge">
-          {t("cards.weekTotals", { km: card.total_km, quality: card.quality })}
-        </MonoLabel>
+      <div className="px-5 pt-5 pb-4">
+        <CardHeading
+          title={
+            t("cards.weekOf", { week: format.weekStamp(card.week_starting) }) +
+            (card.label ? ` · ${card.label}` : "")
+          }
+          help="plan"
+          aside={
+            <MonoLabel className="text-mono-badge">
+              {t("cards.weekTotals", {
+                km: card.total_km,
+                quality: card.quality,
+              })}
+            </MonoLabel>
+          }
+        />
       </div>
 
       <ol className="grid grid-cols-2 gap-1.5 px-5 pb-5 sm:grid-cols-4 lg:grid-cols-7">

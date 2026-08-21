@@ -197,6 +197,26 @@ export const fr: Translated<Dictionary> = {
     cta: "Continuer avec Strava",
   },
 
+  directory: {
+    pagesHeading: "Toutes les pages du site",
+    agentsHeading: "Si vous êtes un agent ou un robot d’indexation",
+    agentsLead:
+      "Chacun de ces fichiers décrit le site entier en une seule requête. Chaque page répond aussi à une requête Accept : text/markdown, ou au même chemin suivi de .md.",
+    llms: "llms.txt — à quoi sert Vivace, et quand y recourir",
+    llmsFull: "llms-full.txt — toutes les pages, en un seul fichier Markdown",
+    sitemap: "sitemap.xml — toutes les URL, dans les deux langues",
+  },
+
+  notFound: {
+    title: "Page introuvable | Vivace",
+    description:
+      "Cette adresse n’existe pas sur vivace.run. Toutes les pages du site sont listées ici, avec l’index lisible par machine qu’un agent peut consulter à la place.",
+    eyebrow: "404",
+    heading: "Cette page n’est pas ici.",
+    lead: "Rien sur ce site ne répond à cette adresse. Tout ce qui existe est listé ci-dessous.",
+    backHome: "Retour à Vivace",
+  },
+
   footer: {
     tagline:
       "Coaching IA et replays pour les courses que vous avez déjà faites.",

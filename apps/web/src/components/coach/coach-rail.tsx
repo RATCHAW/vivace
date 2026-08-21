@@ -14,10 +14,11 @@ import type {
 import { useMessages, type TranslationKey } from "@/i18n";
 import { useFormatters } from "@/i18n/format";
 import { MonoLabel } from "@/components/mono";
+import { CardHelp, type CardHelpId } from "@/components/coach/card-help";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
-import { formatClock } from "@repo/video";
+import { formatClock, formatPace } from "@repo/video";
 import { cn } from "@/lib/utils";
 
 /** A measurement outside its band shouts; one drifting towards it murmurs. */
@@ -29,16 +30,131 @@ function toneClass(tone: CoachTone): string {
       : "text-foreground";
 }
 
-/** Whole weeks from today to the race, or null once it has been run. */
-function weeksAway(raceDate: string | null): number | null {
-  if (!raceDate) return null;
-  const today = new Date().toISOString().slice(0, 10);
-  const days = Math.round(
-    (new Date(`${raceDate}T00:00:00Z`).getTime() -
-      new Date(`${today}T00:00:00Z`).getTime()) /
-      86_400_000,
+/**
+ * How far off the goal race is, in the unit the athlete would count it in.
+ *
+ * `none` is a goal with no date on it yet, `past` one that has been run — the
+ * card used to render both as an em dash under "To go", which says the same
+ * nothing about two completely different situations.
+ */
+export type Countdown =
+  | { kind: "none" }
+  | { kind: "past" }
+  | { kind: "today" }
+  | { kind: "days"; value: number }
+  | { kind: "weeks"; value: number };
+
+/** Inside a fortnight an athlete counts sleeps, not weeks. */
+const COUNTDOWN_DAYS = 13;
+
+/**
+ * Read off the browser's calendar rather than UTC, for the same reason
+ * `todayIndex` is: at 23:30 in Paris the two disagree about what day it is, and
+ * a card that says "Race day" a day early is the worst thing this one can do.
+ */
+export function countdown(
+  raceDate: string | null,
+  now = new Date(),
+): Countdown {
+  if (!raceDate) return { kind: "none" };
+  const race = Date.parse(`${raceDate}T00:00:00Z`);
+  if (Number.isNaN(race)) return { kind: "none" };
+  const today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+  const days = Math.round((race - today) / 86_400_000);
+
+  if (days < 0) return { kind: "past" };
+  if (days === 0) return { kind: "today" };
+  if (days <= COUNTDOWN_DAYS) return { kind: "days", value: days };
+  // Rounded up, the way the API's `weeksToRace` rounds it. The queue's taper
+  // item and this line sit on the same screen; they must not disagree by one.
+  return { kind: "weeks", value: Math.ceil(days / 7) };
+}
+
+/** Inside this many weeks the coach starts writing a taper — see briefing.ts. */
+const TAPER_WEEKS = 3;
+/**
+ * How many weeks fit the rail as marks that can still be counted. Past twelve
+ * they are 8px wide and stop being a countdown, so the rest are carried as a
+ * `+N` at the head of the row rather than silently dropped off it.
+ */
+const COUNTDOWN_MARKS = 12;
+
+export interface CountdownWeek {
+  /** Weeks left at this mark. 1 is race week, so the row reads left to right. */
+  week: number;
+  taper: boolean;
+}
+
+/**
+ * The weeks between here and the start line, as marks.
+ *
+ * The shape is the glanceable half; `weeksToTaper` below is the same fact in
+ * words, and the section's `?` is the key. That is the arrangement the week
+ * chart already uses — a chart is allowed to be texture exactly when the words
+ * under it carry the meaning on their own.
+ */
+export function countdownWeeks(total: number): {
+  overflow: number;
+  weeks: CountdownWeek[];
+} {
+  const drawn = Math.min(total, COUNTDOWN_MARKS);
+  return {
+    overflow: total - drawn,
+    weeks: Array.from({ length: drawn }, (_, i) => ({
+      week: drawn - i,
+      taper: drawn - i <= TAPER_WEEKS,
+    })),
+  };
+}
+
+/** Weeks until the taper starts; 0 once inside it, null with no race to run. */
+export function weeksToTaper(away: Countdown): number | null {
+  if (away.kind === "none" || away.kind === "past") return null;
+  // Days out, or race day itself: inside the window by definition.
+  if (away.kind !== "weeks") return 0;
+  return Math.max(0, away.value - TAPER_WEEKS);
+}
+
+/**
+ * The pace a target time asks for over the race's distance — `4:39`.
+ *
+ * The week card's rule (#75), applied to the goal instead: a time is what the
+ * athlete is handed at the finish, a pace is what they have to run to get it.
+ * Null unless both halves are known, rather than a pace over a guessed distance.
+ */
+export function targetPace(
+  seconds: number | null,
+  metres: number | null,
+): string | null {
+  if (!seconds || !metres || metres <= 0) return null;
+  return formatPace(seconds / (metres / 1000));
+}
+
+/** The four distances an athlete names instead of measuring. */
+const RACE_DISTANCES: { metres: number; key: TranslationKey }[] = [
+  { metres: 5000, key: "rail.race5k" },
+  { metres: 10000, key: "rail.race10k" },
+  { metres: 21097.5, key: "rail.raceHalf" },
+  { metres: 42195, key: "rail.raceMarathon" },
+];
+
+/** Within 1%, so a half the athlete entered as 21,100 m is still a half. */
+export function raceDistanceKey(metres: number | null): TranslationKey | null {
+  if (!metres) return null;
+  return (
+    RACE_DISTANCES.find(
+      (race) => Math.abs(race.metres - metres) / race.metres <= 0.01,
+    )?.key ?? null
   );
-  return days < 0 ? null : Math.ceil(days / 7);
+}
+
+/** One fact about the goal worth a column of the card — and only if it exists. */
+interface GoalStat {
+  id: string;
+  label: string;
+  value: string;
+  /** A second line under the number, where one adds something. */
+  note: string | null;
 }
 
 /** One row of the accepted week, as the briefing sends it. */
@@ -106,17 +222,26 @@ export function paceValue(text: string): string | null {
 function RailSection({
   title,
   action,
+  help,
   children,
 }: {
   title: string;
   action?: React.ReactNode;
+  /** Which entry of `help` explains this section, if any explains it. */
+  help?: CardHelpId;
   children: React.ReactNode;
 }) {
   return (
     <section className="flex flex-col gap-3.5">
       <div className="flex items-center justify-between gap-2">
         <MonoLabel>{title}</MonoLabel>
-        {action}
+        {/* The `?` sits inside the action group and to the left of it: the
+            thing that starts a conversation stays the rightmost, loudest
+            control in the row. */}
+        <span className="-my-1 flex shrink-0 items-center gap-1">
+          {help ? <CardHelp id={help} /> : null}
+          {action}
+        </span>
       </div>
       {children}
     </section>
@@ -149,10 +274,60 @@ function GoalRace({
     );
   }
 
-  const weeks = weeksAway(context.race_date);
+  // The countdown is this card's number, the way "3 of 26 km" is the week's:
+  // first, and in words, rather than a figure in a row of three at the bottom.
+  const away = countdown(context.race_date);
+  const toGo =
+    away.kind === "none"
+      ? null
+      : away.kind === "past"
+        ? t("rail.raceRun")
+        : away.kind === "today"
+          ? t("rail.raceToday")
+          : t(away.kind === "days" ? "rail.daysToGo" : "rail.weeksToGo", {
+              count: away.value,
+            });
+  // The shape of what's left, and the same thing in words underneath it. The
+  // marks are only drawn once there are enough to count — inside a fortnight
+  // the countdown is in days and the number is the shape.
+  const marks = away.kind === "weeks" ? countdownWeeks(away.value) : null;
+  const taper = weeksToTaper(away);
+
+  const distanceKey = raceDistanceKey(context.race_distance_m);
+  const distance = distanceKey
+    ? t(distanceKey)
+    : context.race_distance_m
+      ? `${(context.race_distance_m / 1000).toFixed(1)} ${t("common.km")}`
+      : null;
+
+  // A stat with nothing in it isn't drawn at all. The card used to spend a
+  // third of its width on an em dash — the same thing the week chart used to do
+  // with five empty days.
+  const pace = targetPace(context.target_seconds, context.race_distance_m);
+  const stats: GoalStat[] = [];
+  if (context.target_seconds !== null) {
+    stats.push({
+      id: "target",
+      label: t("rail.target"),
+      value: formatClock(context.target_seconds),
+      note: pace ? `${pace} ${t("common.perKm")}` : null,
+    });
+  }
+  if (context.long_run_day !== null) {
+    stats.push({
+      id: "longDay",
+      label: t("rail.longDay"),
+      // Two columns leave room for the day's real name; three only ever had
+      // room for "Sun".
+      value: messages.days.long[context.long_run_day],
+      note: null,
+    });
+  }
+
   return (
     <RailSection
       title={t("rail.goalRace")}
+      help="goal"
       action={
         <Button
           className="h-auto px-0 font-semibold"
@@ -164,8 +339,13 @@ function GoalRace({
         </Button>
       }
     >
-      <div className="border-border flex flex-col gap-3.5 rounded-md border p-5">
+      <div className="border-border flex flex-col gap-5 rounded-md border p-5">
         <div className="flex flex-col gap-1.5">
+          {/* The distance is the one thing about a race an athlete names rather
+              than measures — "half marathon", not "21.1 km". */}
+          {distance ? (
+            <MonoLabel className="text-mono-badge">{distance}</MonoLabel>
+          ) : null}
           <span className="text-body-md font-semibold">
             {context.race_name}
           </span>
@@ -173,50 +353,109 @@ function GoalRace({
             {context.race_date
               ? format.raceDay(context.race_date)
               : t("rail.noDate")}
-            {context.race_distance_m
-              ? ` · ${(context.race_distance_m / 1000).toFixed(1)} ${t("common.km")}`
-              : ""}
           </span>
         </div>
-        <dl className="border-border flex gap-5 border-t pt-3.5">
-          <div className="flex flex-col gap-1.5">
-            <dt>
-              <MonoLabel className="text-mono-badge">
-                {t("rail.toGo")}
-              </MonoLabel>
-            </dt>
-            <dd className="text-heading-sm font-semibold tabular-nums">
-              {weeks !== null
-                ? t("rail.weeks", { count: weeks })
-                : t("common.dash")}
-            </dd>
+
+        {toGo ? (
+          <div className="flex flex-col gap-2.5">
+            <span className="text-heading-sm font-semibold tabular-nums">
+              {toGo}
+            </span>
+            {/* One mark a week between here and the start line.
+
+                Aria-hidden, and it can afford to be: the number above and the
+                sentence below say everything it draws, so a screen reader hears
+                the whole card and nothing twice.
+
+                Density, not hue — the taper is cobalt at full strength against
+                cobalt at a quarter, so the row solidifies as the race arrives.
+                Amber is spoken for in this column: the week card below uses it
+                for a session missed, the signals under that for a reading out
+                of band. A taper is neither. */}
+            {marks ? (
+              <div aria-hidden className="flex items-center gap-1">
+                {marks.overflow > 0 ? (
+                  <MonoLabel className="text-mono-badge shrink-0">
+                    +{marks.overflow}
+                  </MonoLabel>
+                ) : null}
+                {marks.weeks.map(({ week, taper: isTaper }) => (
+                  <span
+                    className={cn(
+                      "h-2 flex-1 rounded-[2px]",
+                      isTaper ? "bg-brand" : "bg-brand/25",
+                    )}
+                    data-taper={isTaper || undefined}
+                    data-week={week}
+                    key={week}
+                  />
+                ))}
+              </div>
+            ) : null}
+            {/* What the marks mean, in the words a chart cannot say. This is
+                the row's caption, not its legend — the legend is the `?`. */}
+            {taper !== null ? (
+              <span className="text-caption text-stone">
+                {taper === 0
+                  ? t("rail.taperNow")
+                  : t("rail.taperIn", { count: taper })}
+              </span>
+            ) : null}
           </div>
-          <div className="flex flex-col gap-1.5">
-            <dt>
-              <MonoLabel className="text-mono-badge">
-                {t("rail.target")}
-              </MonoLabel>
-            </dt>
-            <dd className="text-heading-sm font-semibold tabular-nums">
-              {context.target_seconds
-                ? formatClock(context.target_seconds)
-                : t("common.dash")}
-            </dd>
+        ) : null}
+
+        {/* A race that has been run is a dead end otherwise: the card would sit
+            there naming last spring's half until somebody thought to edit it. */}
+        {away.kind === "past" ? (
+          <Button onClick={() => onAsk(t("rail.askGoalRace"))} size="sm">
+            {t("rail.setNextRace")}
+          </Button>
+        ) : null}
+
+        {stats.length > 0 ? (
+          <dl className="border-border flex gap-5 border-t pt-3.5">
+            {stats.map((stat) => (
+              <div className="flex flex-col gap-1.5" key={stat.id}>
+                <dt>
+                  <MonoLabel className="text-mono-badge">
+                    {stat.label}
+                  </MonoLabel>
+                </dt>
+                <dd className="flex flex-col gap-0.5">
+                  <span className="text-heading-sm font-semibold tabular-nums">
+                    {stat.value}
+                  </span>
+                  {stat.note ? (
+                    <span className="text-mono-badge text-stone font-mono tracking-normal tabular-nums">
+                      {stat.note}
+                    </span>
+                  ) : null}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        ) : null}
+
+        {/* What the coach remembers, in the athlete's own words. It has been on
+            the wire since the context row existed, and the card only ever
+            promised it in the abstract. */}
+        {context.notes ? (
+          <div className="border-border flex flex-col gap-1.5 border-t pt-3.5">
+            <MonoLabel className="text-mono-badge">
+              {t("rail.remembersLabel")}
+            </MonoLabel>
+            {/* ph-no-capture: session replay is on, and "my left achilles has
+                been sore since June" is the athlete's health, not telemetry. */}
+            <p
+              className="ph-no-capture text-caption line-clamp-3 leading-relaxed"
+              title={context.notes}
+            >
+              {context.notes}
+            </p>
           </div>
-          <div className="flex flex-col gap-1.5">
-            <dt>
-              <MonoLabel className="text-mono-badge">
-                {t("rail.longDay")}
-              </MonoLabel>
-            </dt>
-            <dd className="text-heading-sm font-semibold">
-              {context.long_run_day !== null
-                ? messages.days.short[context.long_run_day]
-                : t("common.dash")}
-            </dd>
-          </div>
-        </dl>
+        ) : null}
       </div>
+      {/* No legend: there is no longer a shape on this card to key. */}
       <p className="text-caption text-stone leading-relaxed">
         {t("rail.remembers")}
       </p>
@@ -288,6 +527,7 @@ function ThisWeek({
   return (
     <RailSection
       title={t("rail.thisWeek")}
+      help="week"
       action={
         <Button
           className="h-auto px-0 font-semibold"
@@ -452,9 +692,11 @@ function ThisWeek({
             : t("rail.sessionsLeft", { count: plan.remaining })}
         </p>
       </div>
-      <p className="text-caption text-stone leading-relaxed">
-        {t("rail.weekLegend")}
-      </p>
+      {/* The legend that used to sit here is behind the `?` now. It explained
+          an encoding — filled against outline — which is a thing to look up
+          once, not a paragraph to re-read under the card every single visit.
+          Nothing is lost by moving it: every session it keys is spelled out in
+          words in the list above. */}
     </RailSection>
   );
 }
