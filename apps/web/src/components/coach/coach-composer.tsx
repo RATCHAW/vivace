@@ -1,12 +1,13 @@
 // The composer, shaped like the questions runners actually ask.
 //
-// Three things the plain box didn't have: `@` attaches a run so "why did I
+// Four things the plain box didn't have: `@` attaches a run so "why did I
 // fade?" names a session instead of hoping the model picks the right one, `/`
-// opens the handful of questions asked over and over, and the chips underneath
-// follow whatever the coach just drew.
-import { useMemo } from "react";
+// opens the handful of questions asked over and over, the microphone takes a
+// question asked out loud with a phone in a pocket after a run, and the chips
+// underneath follow whatever the coach just drew.
+import { useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { AtSignIcon, XIcon } from "lucide-react";
+import { AtSignIcon, MicIcon, SquareIcon, XIcon } from "lucide-react";
 import { toast } from "sonner";
 import type { ChatStatus } from "ai";
 import type { Run } from "@/api";
@@ -38,6 +39,8 @@ import {
 import { Suggestion, Suggestions } from "@/components/ai-elements/suggestion";
 import { MonoLabel } from "@/components/mono";
 import { formatPace } from "@repo/video";
+import { useDictation } from "@/lib/use-dictation";
+import { useMediaQuery } from "@/lib/use-media-query";
 import { cn } from "@/lib/utils";
 
 /**
@@ -165,6 +168,32 @@ export function CoachComposer({
   const format = useFormatters();
   const mentionLabel = useMentionLabel();
   const isBusy = status === "submitted" || status === "streaming";
+  const dictation = useDictation(onDraftChange);
+
+  // The other ways a turn starts — a slash command, a suggestion chip, a card's
+  // button — never touch the form, and all of them empty the box. A microphone
+  // left open across one would type the sent question straight back out.
+  // `isBusy` is where all of them meet.
+  const { cancel: cancelDictation } = dictation;
+  useEffect(() => {
+    if (isBusy) cancelDictation();
+  }, [isBusy, cancelDictation]);
+
+  /**
+   * Whether the caret lands in the box the moment a conversation opens.
+   *
+   * It does, because typing is the first thing anybody does on this screen, and
+   * it does for a conversation reopened as well as a fresh one — `CoachChat` is
+   * keyed by thread id, so switching thread remounts this and the focus comes
+   * with the mount rather than needing to watch which id is selected.
+   *
+   * Except on a touch device, where the same line is a keyboard sliding up over
+   * the transcript nobody asked to leave. `(pointer: coarse)` rather than a
+   * width breakpoint: a phone held sideways is still a phone, and a tablet with
+   * a keyboard attached reports itself fine. A browser with no `matchMedia`
+   * reads false and gets the desktop behaviour.
+   */
+  const touch = useMediaQuery("(pointer: coarse)");
 
   // `/ch` narrows to /charge; a bare `/` shows the lot.
   const commands = useMemo(() => {
@@ -282,11 +311,19 @@ export function CoachComposer({
         maxFiles={MAX_FILES}
         multiple
         onError={(err) => toast.error(err.message)}
-        onSubmit={onSubmit}
+        onSubmit={(message) => {
+          // Send is the athlete saying they have finished talking. The question
+          // is what is in the box; a syllable still being weighed is not part
+          // of it, and the effect above would only drop it a frame too late —
+          // `useEffect` runs after the paint that cleared the draft.
+          cancelDictation();
+          onSubmit(message);
+        }}
       >
         <ComposerAttachments />
         <PromptInputBody>
           <PromptInputTextarea
+            autoFocus={!touch}
             disabled={isBusy}
             onChange={(event) => onDraftChange(event.target.value)}
             placeholder={t("composer.placeholder")}
@@ -314,8 +351,53 @@ export function CoachComposer({
                 <PromptInputActionAddAttachments />
               </PromptInputActionMenuContent>
             </PromptInputActionMenu>
+            {/* The words appearing in the box are the sighted athlete's whole
+                indicator; this is the same fact said once, out loud. */}
+            <span aria-live="polite" className="sr-only" role="status">
+              {dictation.listening ? t("composer.dictation.listening") : ""}
+            </span>
           </PromptInputTools>
-          <PromptInputSubmit onStop={onStop} status={status} />
+          {/* Talking and sending are one gesture, so the two controls sit
+              together at the end of the row rather than at opposite ends of
+              it. Send never leaves: an athlete who has said enough presses it
+              mid-sentence and the question goes as it reads. */}
+          <div className="flex shrink-0 items-center gap-1.5">
+            {/* Absent rather than disabled where the browser has no recogniser:
+                a microphone that can never be switched on is a promise, and
+                Firefox would wear it on every conversation. */}
+            {dictation.supported && (
+              <PromptInputButton
+                aria-label={t(
+                  dictation.listening
+                    ? "composer.dictation.stop"
+                    : "composer.dictation.start",
+                )}
+                aria-pressed={dictation.listening}
+                className={cn(
+                  dictation.listening && "bg-muted text-foreground",
+                )}
+                disabled={isBusy}
+                onClick={() => dictation.toggle(draft)}
+                tooltip={t(
+                  dictation.listening
+                    ? "composer.dictation.stop"
+                    : "composer.dictation.start",
+                )}
+                variant="ghost"
+              >
+                {/* The same square the submit button wears while an answer is
+                    streaming — on this surface it is already the word "stop",
+                    and a microphone with a slash through it reads as muted
+                    rather than as a control. */}
+                {dictation.listening ? (
+                  <SquareIcon className="fill-current" />
+                ) : (
+                  <MicIcon />
+                )}
+              </PromptInputButton>
+            )}
+            <PromptInputSubmit onStop={onStop} status={status} />
+          </div>
         </PromptInputFooter>
       </PromptInput>
     </div>

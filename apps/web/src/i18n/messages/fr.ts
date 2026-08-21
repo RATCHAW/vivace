@@ -443,6 +443,18 @@ export const fr: Translated<Messages> = {
         desc: "Définir ou changer la course objectif",
       },
     },
+    dictation: {
+      start: "Dicter",
+      stop: "Arrêter la dictée",
+      listening: "Écoute en cours",
+      errors: {
+        denied:
+          "L’accès au micro est bloqué. Autorisez-le dans les réglages du navigateur pour dicter.",
+        noMicrophone: "Aucun micro détecté.",
+        network: "La dictée a besoin d’une connexion, et celle-ci a lâché.",
+        failed: "La dictée s’est arrêtée. Écrivez la question à la place.",
+      },
+    },
   },
 
   help: {
@@ -567,6 +579,7 @@ export const fr: Translated<Messages> = {
     askChangeGoal: "Je veux changer ma course objectif",
     setGoalRace: "Définir une course objectif",
     askGoalRace: "Je prépare une course — laisse-moi t’en parler",
+    goalHint: "Définissez ici votre course objectif",
     noDate: "Pas encore de date",
     target: "Objectif",
     longDay: "Jour long",

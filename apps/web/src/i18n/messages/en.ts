@@ -476,6 +476,23 @@ export const en = {
       load: { name: "/load", desc: "Check my volume ramp and load ratio" },
       goal: { name: "/goal", desc: "Set or change the goal race" },
     },
+    /**
+     * The microphone. The transcription is the browser's own, so the errors
+     * below are the four a `SpeechRecognitionErrorEvent` can mean to an
+     * athlete — the rest are silence, which is not a failure.
+     */
+    dictation: {
+      start: "Dictate",
+      stop: "Stop dictating",
+      listening: "Listening",
+      errors: {
+        denied:
+          "Microphone access is blocked. Allow it in your browser settings to dictate.",
+        noMicrophone: "No microphone found.",
+        network: "Dictation needs a connection, and this one dropped.",
+        failed: "Dictation stopped. Type the question instead.",
+      },
+    },
   },
 
   /**
@@ -620,6 +637,10 @@ export const en = {
     askChangeGoal: "I want to change my goal race",
     setGoalRace: "Set a goal race",
     askGoalRace: "I’m training for a race — let me tell you about it",
+    /** The phone's callout on the header icon this whole rail lives behind.
+     *  One line: it is a tooltip hanging off a 32px button at the edge of a
+     *  9:16 screen. Only ever shown while there is no goal race to point at. */
+    goalHint: "Set your goal race in here",
     noDate: "No date yet",
     target: "Target",
     longDay: "Long day",

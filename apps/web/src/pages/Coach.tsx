@@ -17,6 +17,7 @@ import { CoachChat } from "@/components/coach-chat";
 import { CoachQueue, CoachRail } from "@/components/coach/coach-rail";
 import { toMention, type RunMention } from "@/components/coach/coach-composer";
 import { CoachThreads } from "@/components/coach-threads";
+import { Hint } from "@/components/hint";
 import { MonoLabel } from "@/components/mono";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -36,6 +37,8 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import { trackEvent } from "@/lib/logger";
+import { useMediaQuery } from "@/lib/use-media-query";
 
 /**
  * How much history the coach reads for this thread.
@@ -52,6 +55,28 @@ const RANGES = [
 
 /** The catalogue key doubles as the select's value — stable, and unique. */
 type RangeLabel = (typeof RANGES)[number]["label"];
+
+/**
+ * A phone: below `lg`, which is the same line `Replays` draws.
+ *
+ * The rail is a sheet all the way up to `xl`, but between the two breakpoints
+ * there is a mouse, a conversations column and room to look around. The goal
+ * callout is for the screen that has none of that.
+ */
+const PHONE = "(max-width: 63.999rem)";
+
+/**
+ * How long after the briefing lands the goal callout arrives, and how long it
+ * stays.
+ *
+ * The transcript resolves on its own clock, so arriving with the briefing means
+ * arriving mid-swap on a screen that is still assembling itself. A beat later
+ * the page is still and the athlete has had time to look at it. Three seconds
+ * is a short sentence read twice — and nothing is lost when it goes, because
+ * the sheet it points at is one tap away for as long as the goal is unset.
+ */
+const GOAL_HINT_DELAY = 900;
+const GOAL_HINT_LIFE = 3000;
 
 /**
  * The coach.
@@ -78,6 +103,7 @@ export function Coach() {
   const range = RANGES.find((entry) => entry.label === rangeLabel) ?? RANGES[0];
   const [threadsOpen, setThreadsOpen] = useState(false);
   const [railOpen, setRailOpen] = useState(false);
+  const phone = useMediaQuery(PHONE);
 
   // The rails sit outside the chat but ask through it. The chat re-registers on
   // every render, so this is never a stale send.
@@ -173,6 +199,18 @@ export function Coach() {
     </>
   );
 
+  // The one thing on this page an athlete can't see they are missing. On a
+  // phone the rail is behind a target icon, and an icon says nothing about the
+  // race that isn't set — while every answer the coach gives is quietly worse
+  // for it. So the icon says it itself, once, and only while it is true.
+  //
+  // `briefing &&` rather than `!briefing?.context.race_name`: a briefing still
+  // in flight has no goal either, and pointing at an empty rail before we know
+  // it is empty is a callout the athlete taps to find nothing.
+  const goalUnset = Boolean(
+    phone && !railOpen && briefing && !briefing.context.race_name,
+  );
+
   const rail = briefingError ? (
     <Alert variant="destructive">
       <AlertTitle>{t("coach.briefingError")}</AlertTitle>
@@ -263,18 +301,32 @@ export function Coach() {
             </Select>
 
             <Sheet onOpenChange={setRailOpen} open={railOpen}>
-              <SheetTrigger
-                render={
-                  <Button
-                    aria-label={t("rail.title")}
-                    className="xl:hidden"
-                    size="icon-sm"
-                    variant="subtle"
-                  />
-                }
+              {/* Below the trigger, and aligned to its end: it is the last
+                  control on a header at the top of the screen, so there is
+                  nothing above it but the app bar and nothing to its right but
+                  the edge. */}
+              <Hint
+                align="end"
+                content={t("rail.goalHint")}
+                delay={GOAL_HINT_DELAY}
+                life={GOAL_HINT_LIFE}
+                onShown={() => trackEvent("ui.goal_hint_shown")}
+                show={goalUnset}
+                side="bottom"
               >
-                <TargetIcon />
-              </SheetTrigger>
+                <SheetTrigger
+                  render={
+                    <Button
+                      aria-label={t("rail.title")}
+                      className="xl:hidden"
+                      size="icon-sm"
+                      variant="subtle"
+                    />
+                  }
+                >
+                  <TargetIcon />
+                </SheetTrigger>
+              </Hint>
               <SheetContent side="right">
                 <SheetHeader>
                   <SheetTitle>{t("rail.title")}</SheetTitle>
