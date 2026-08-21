@@ -34,6 +34,10 @@ export async function generateMetadata({
     openGraphDescription: t.ogDescription,
     imageAlt: t.imageAlt,
     paths: homePagePaths(),
+    // `/` is the auto-redirecting entry point, which is exactly what
+    // `x-default` is for — and the one URL that shows the bare domain in a
+    // result rather than a language folder.
+    xDefault: "/",
   });
 }
 

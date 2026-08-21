@@ -1,38 +1,39 @@
 import type { MetadataRoute } from "next";
 import { LOCALES } from "@/i18n/config";
-import { CONTENT_PAGE_KEYS, contentPagePaths } from "@/i18n/content-pages";
-import {
-  absoluteSiteUrl,
-  homePagePaths,
-  type LocalePaths,
-} from "@/lib/metadata";
+import { absoluteSiteUrl, type LocalePaths } from "@/lib/metadata";
+import { pagePaths, SITE_PAGES, type Page } from "@/lib/pages";
 
-function localizedUrls(paths: LocalePaths): Record<string, string> {
+function localizedUrls(paths: LocalePaths, xDefault: string) {
   return {
     ...Object.fromEntries(
       LOCALES.map((locale) => [locale, absoluteSiteUrl(paths[locale])]),
     ),
-    "x-default": absoluteSiteUrl(paths.en),
+    "x-default": absoluteSiteUrl(xDefault),
   };
 }
 
-export default function sitemap(): MetadataRoute.Sitemap {
-  const pages: { paths: LocalePaths; priority: number }[] = [
-    { paths: homePagePaths(), priority: 1 },
-    ...CONTENT_PAGE_KEYS.map((key) => ({
-      paths: contentPagePaths(key),
-      priority: key === "about" ? 0.7 : 0.5,
-    })),
-  ];
+/**
+ * The About page is the one a search engine reads to learn what Vivace is, so
+ * it outranks the legal pages; the home page outranks everything.
+ */
+function priorityOf(page: Page): number {
+  if (page.kind === "home") return 1;
+  return page.key === "about" ? 0.7 : 0.5;
+}
 
-  return pages.flatMap(({ paths, priority }) =>
-    LOCALES.map((locale) => ({
+export default function sitemap(): MetadataRoute.Sitemap {
+  return SITE_PAGES.flatMap((page) => {
+    const paths = pagePaths(page);
+    // Same rule as the `hreflang` tags: the home page's `x-default` is `/`,
+    // the redirect that chooses a language, because that is the URL an athlete
+    // with no stated preference should land on.
+    const xDefault = page.kind === "home" ? "/" : paths.en;
+
+    return LOCALES.map((locale) => ({
       url: absoluteSiteUrl(paths[locale]),
       changeFrequency: "monthly" as const,
-      priority,
-      alternates: {
-        languages: localizedUrls(paths),
-      },
-    })),
-  );
+      priority: priorityOf(page),
+      alternates: { languages: localizedUrls(paths, xDefault) },
+    }));
+  });
 }

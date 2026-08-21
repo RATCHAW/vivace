@@ -52,4 +52,22 @@ export function resolveSiteUrl(value?: string): string {
   return (value || "https://www.vivace.run").replace(/\/$/, "");
 }
 
+/**
+ * Where else Vivace is, in schema.org's sense of `sameAs`: the same entity,
+ * under our control, somewhere else.
+ *
+ * This is the one lever a codebase has on brand-name search. "Vivace" on its
+ * own competes with the tempo marking, and an entity a search engine can only
+ * see at one URL is an entity it has no reason to connect to a name. Every
+ * profile here is `vivace.run`, deliberately — a handle that differs from the
+ * domain is a link, not a claim of identity.
+ *
+ * Only profiles we actually run belong here. A `sameAs` pointing at a dead
+ * handle is worse than no `sameAs` at all.
+ */
+export const SOCIAL_PROFILES = [
+  "https://www.tiktok.com/@vivace.run",
+  "https://www.instagram.com/vivace.run",
+] as const;
+
 export const siteUrl = resolveSiteUrl(process.env.NEXT_PUBLIC_SITE_URL);
