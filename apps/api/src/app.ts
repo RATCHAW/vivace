@@ -92,7 +92,7 @@ import {
 } from "./invite-store.js";
 import { rankCandidates } from "./pairing.js";
 import {
-  attachedRun,
+  attachedRuns,
   COACH_NOT_CONFIGURED,
   COACH_VARIANT_FLAG,
   coachFailure,
@@ -2198,7 +2198,7 @@ app.openapi(coachChatRoute, async (c) => {
   const result = streamText({
     model: config.model,
     system: coachSystemPrompt(today, body.range_weeks, {
-      attached: attachedRun(messages),
+      attached: attachedRuns(messages),
       prompt: variant.prompt,
       language: body.language,
     }),

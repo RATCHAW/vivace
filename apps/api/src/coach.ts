@@ -304,12 +304,18 @@ function isPromptVersion(value: string): value is CoachPromptVersion {
 
 /** What the athlete's message is folded into, when no variant says otherwise. */
 export interface CoachPromptOptions {
-  /** The run the composer's `@` picker put on the message. */
-  attached?: AttachedRun;
+  /** The runs the composer's `@` picker put on the message, in the order the
+   *  athlete attached them. */
+  attached?: AttachedRun[];
   /** Which prompt in the catalogue answers this turn. */
   prompt?: CoachPromptVersion;
   /** The language the athlete is reading the app in. Defaults to English. */
   language?: CoachLanguage;
+}
+
+/** One attached run, as the prompt names it — enough for the model to fetch it. */
+function describeRun(run: AttachedRun): string {
+  return `"${run.name}" on ${run.date}, Strava activity id ${run.id}`;
 }
 
 /**
@@ -328,9 +334,21 @@ export function coachSystemPrompt(
     SYSTEM_PROMPTS[prompt ?? DEFAULT_PROMPT_VERSION],
     `Today is ${today}. The athlete is looking at the last ${rangeWeeks} weeks of training; prefer that window unless they ask for another.`,
   ];
-  if (attached) {
+  // One run and several are said differently on purpose: "this run" resolving
+  // to the one attached is the whole point of a single mention, and telling the
+  // model that while five are attached would have it answer about one of them.
+  if (attached?.length === 1) {
+    const [only] = attached;
     lines.push(
-      `The athlete attached a run to this message: "${attached.name}" on ${attached.date}, Strava activity id ${attached.id}. "This run", "it" and "that session" mean that one — read it rather than asking which.`,
+      `The athlete attached a run to this message: ${describeRun(only)}. "This run", "it" and "that session" mean that one — read it rather than asking which.`,
+    );
+  } else if (attached && attached.length > 1) {
+    lines.push(
+      `The athlete attached ${attached.length} runs to this message, in this order: ${attached
+        .map(describeRun)
+        .join(
+          "; ",
+        )}. "These runs", "them" and "the first one" mean those — read them rather than asking which, and compare them when the question is a comparison.`,
     );
   }
   if (language !== "en") {
@@ -459,12 +477,23 @@ export async function resolveCoachVariant(
   };
 }
 
-/** The run the composer's `@` picker put on a message. */
+/** A run the composer's `@` picker put on a message. */
 export interface AttachedRun {
   id: number;
   name: string;
   date: string;
 }
+
+/**
+ * How many runs one question is allowed to carry.
+ *
+ * Each one spends a line of the system prompt and invites a tool call, so a
+ * question with thirty runs on it is a question the model answers badly and
+ * slowly. The composer stops the athlete at the same number
+ * (`MAX_ATTACHED_RUNS` in apps/web/src/components/coach/coach-composer.tsx);
+ * this is the half that holds when the request doesn't come from it.
+ */
+export const MAX_ATTACHED_RUNS = 5;
 
 /**
  * Metadata is only validated when a schema is supplied, and an unvalidated
@@ -473,22 +502,45 @@ export interface AttachedRun {
  * Optional at the top level because `validateUIMessages` runs this against
  * every message's metadata whether or not it has any, and most messages don't.
  */
+const runMention = z.object({
+  id: z.number().int(),
+  name: z.string(),
+  date: z.string(),
+});
+
 export const coachMessageMetadataSchema = z
   .object({
-    run: z
-      .object({ id: z.number().int(), name: z.string(), date: z.string() })
-      .optional(),
+    /** What transcripts written before a question could carry more than one
+     *  run hold. Read, never written — see CoachMessageMetadataSchema. */
+    run: runMention.optional(),
+    runs: z.array(runMention).optional(),
   })
   .optional();
 
-/** The run attached to the newest message in a transcript, if there is one. */
-export function attachedRun(
+/**
+ * The runs attached to the newest message in a transcript.
+ *
+ * Deduplicated because the same run reaching the list twice would be described
+ * to the model twice, and capped because the browser is not the only thing that
+ * can post a message.
+ */
+export function attachedRuns(
   messages: { metadata?: unknown }[],
-): AttachedRun | undefined {
+): AttachedRun[] {
   const parsed = coachMessageMetadataSchema.safeParse(
     messages.at(-1)?.metadata,
   );
-  return parsed.success ? parsed.data?.run : undefined;
+  if (!parsed.success || !parsed.data) return [];
+  const { run, runs } = parsed.data;
+  const seen = new Set<number>();
+  const attached: AttachedRun[] = [];
+  for (const mention of runs ?? (run ? [run] : [])) {
+    if (seen.has(mention.id)) continue;
+    seen.add(mention.id);
+    attached.push(mention);
+    if (attached.length === MAX_ATTACHED_RUNS) break;
+  }
+  return attached;
 }
 
 // --- tool output shaping ------------------------------------------------------
