@@ -40,6 +40,8 @@ function run(date: string, km: number, over: Partial<Run> = {}): Run {
     total_elevation_gain: 0,
     sport_type: "Run",
     start_date_local: `${date}T07:00:00Z`,
+    start_latlng: null,
+    end_latlng: null,
     average_speed: (km * 1000) / moving_time,
     average_heartrate: null,
     max_heartrate: null,

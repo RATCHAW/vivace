@@ -27,6 +27,7 @@ import {
   StravaApiError,
   type BestEffort,
 } from "./strava.js";
+import { fetchRunWeather, type RunWeather } from "./weather.js";
 import { getContext, getPlan, saveContext } from "./coach-store.js";
 import { getFeatureVariantFor } from "./posthog.js";
 import {
@@ -590,6 +591,26 @@ function stravaFailure(err: unknown): { error: string } {
 }
 
 /**
+ * The conditions the run happened in, as one readable line — averaged between
+ * the start and the end of the run, because a long run that leaves at dawn
+ * finishes in different weather than it started in. Null when the run has no
+ * GPS or the weather service didn't answer; the card simply omits the line.
+ */
+function weatherLine(weather: RunWeather | null): string | null {
+  if (!weather) return null;
+  const parts = [
+    `${weather.description}, ${Math.round(weather.temperature_c)}°C`,
+    `feels like ${Math.round(weather.apparent_c)}°C`,
+    `${Math.round(weather.humidity_pct)}% humidity`,
+    `wind ${Math.round(weather.wind_kph)} km/h`,
+  ];
+  if (weather.precipitation_mm >= 0.1) {
+    parts.push(`${weather.precipitation_mm.toFixed(1)} mm precipitation`);
+  }
+  return parts.join(" · ");
+}
+
+/**
  * How this run sits against the four weeks behind it.
  *
  * The debrief card carries one factual line rather than a written one: it is
@@ -677,6 +698,7 @@ export async function buildRunDebriefCard(
   const detail = await fetchRunDetail(accessToken, target?.id ?? id!);
   const run = target ?? detail.run;
   const date = localDate(run);
+  const weather = await fetchRunWeather(run);
 
   return {
     card: "run-debrief" as const,
@@ -689,6 +711,7 @@ export async function buildRunDebriefCard(
         : run.workout_type.replace("_", " ").toUpperCase(),
     route_path: routePath(detail.polyline),
     line: comparisonLine(run, runs, today),
+    weather: weatherLine(weather),
     stats: [
       { label: "DISTANCE", value: `${(run.distance / 1000).toFixed(2)} km` },
       { label: "TIME", value: clock(run.moving_time) },
@@ -1145,8 +1168,11 @@ export function createCoachTools(ctx: CoachToolContext): ToolSet {
 
     getRunDebrief: tool({
       description:
-        "One run as a card the athlete can see: its numbers, its route, and " +
-        "how it compares to the four weeks behind it. Use it when they ask " +
+        "One run as a card the athlete can see: its numbers, its route, the " +
+        "weather it was run in (averaged between start and finish), and " +
+        "how it compares to the four weeks behind it. Weather explains an " +
+        "off pace — heat, humidity and wind slow a run down; factor it into " +
+        "the read. Use it when they ask " +
         "about a specific session, or to open a debrief of the latest run. " +
         "Draws the run — don't repeat its numbers underneath.",
       inputSchema: z.object({

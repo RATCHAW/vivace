@@ -81,6 +81,13 @@ export const RunSchema = z
     start_date_local: z.iso
       .datetime()
       .openapi({ example: "2026-08-09T07:12:00Z" }),
+    /** `[lat, lng]` where the run started, or null for treadmill and manual entries. */
+    start_latlng: z
+      .array(z.number())
+      .nullable()
+      .openapi({ example: [48.8566, 2.3522] }),
+    /** `[lat, lng]` where the run ended, or null for treadmill and manual entries. */
+    end_latlng: z.array(z.number()).nullable(),
     /** Meters per second. */
     average_speed: z.number(),
     /** Beats per minute, or null when recorded without a heart-rate monitor. */

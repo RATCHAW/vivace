@@ -215,6 +215,28 @@
             "format": "date-time",
             "example": "2026-08-09T07:12:00Z"
           },
+          "start_latlng": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "number"
+            },
+            "example": [
+              48.8566,
+              2.3522
+            ]
+          },
+          "end_latlng": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "number"
+            }
+          },
           "average_speed": {
             "type": "number"
           },
@@ -249,6 +271,8 @@
           "total_elevation_gain",
           "sport_type",
           "start_date_local",
+          "start_latlng",
+          "end_latlng",
           "average_speed",
           "average_heartrate",
           "max_heartrate",
