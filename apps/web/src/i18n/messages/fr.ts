@@ -573,6 +573,7 @@ export const fr: Translated<Messages> = {
     weekTotals: "{{km}} km · {{quality}} clés",
     accepted: "Acceptée · dans votre semaine",
     acceptWeek: "Accepter cette semaine",
+    acceptingWeek: "Ajout à votre semaine…",
     swapDay: "Changer {{day}}",
     askSwapDay: "Remplace {{day}} par autre chose",
     longRunTo: "Sortie longue → {{day}}",

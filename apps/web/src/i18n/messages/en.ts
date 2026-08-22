@@ -623,6 +623,7 @@ export const en = {
     weekTotals: "{{km}} km · {{quality}} key",
     accepted: "Accepted · in your week",
     acceptWeek: "Accept this week",
+    acceptingWeek: "Adding it to your week…",
     swapDay: "Swap {{day}}",
     askSwapDay: "Swap {{day}} for something else",
     longRunTo: "Long run → {{day}}",
