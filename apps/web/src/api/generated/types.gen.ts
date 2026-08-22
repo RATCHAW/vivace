@@ -39,6 +39,8 @@ export type Run = {
     total_elevation_gain: number;
     sport_type: string;
     start_date_local: string;
+    start_latlng: Array<number> | null;
+    end_latlng: Array<number> | null;
     average_speed: number;
     average_heartrate: number | null;
     max_heartrate: number | null;

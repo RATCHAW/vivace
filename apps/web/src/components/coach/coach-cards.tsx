@@ -33,6 +33,12 @@ export interface DebriefCard {
   /** An SVG path in a 100-square viewBox, or null for a treadmill run. */
   route_path: string | null;
   line: string;
+  /**
+   * The conditions the run happened in, averaged between start and finish.
+   * Absent on cards stored before weather existed; null when the run has no
+   * GPS or the weather service didn't answer.
+   */
+  weather?: string | null;
   stats: Stat[];
   elevation_m: number;
   calories: number | null;
@@ -289,6 +295,11 @@ export function RunDebrief({
             <span className="text-caption text-muted-foreground">
               {card.line}
             </span>
+            {card.weather ? (
+              <span className="text-caption text-muted-foreground">
+                {card.weather}
+              </span>
+            ) : null}
           </div>
           <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {card.stats.map((stat) => (

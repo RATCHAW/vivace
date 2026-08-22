@@ -155,6 +155,8 @@ function run(id: number, name: string, day: string): Run {
     total_elevation_gain: 40,
     sport_type: "Run",
     start_date_local: `${day}T07:30:00Z`,
+    start_latlng: null,
+    end_latlng: null,
     average_speed: 3.5,
     average_heartrate: 148,
     max_heartrate: 171,

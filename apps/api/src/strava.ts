@@ -95,6 +95,10 @@ function toRun(activity: StravaActivityResponse): Run {
     total_elevation_gain: activity.total_elevation_gain ?? 0,
     sport_type: activity.sport_type ?? "Run",
     start_date_local: activity.start_date_local ?? new Date().toISOString(),
+    // Strava sends an empty array, not null, for runs without GPS.
+    start_latlng:
+      activity.start_latlng?.length === 2 ? activity.start_latlng : null,
+    end_latlng: activity.end_latlng?.length === 2 ? activity.end_latlng : null,
     average_speed: activity.average_speed ?? 0,
     average_heartrate: activity.average_heartrate ?? null,
     max_heartrate: activity.max_heartrate ?? null,
