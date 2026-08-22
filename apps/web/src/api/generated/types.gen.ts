@@ -168,6 +168,11 @@ export type CoachMessageMetadata = {
         name: string;
         date: string;
     };
+    runs?: Array<{
+        id: number;
+        name: string;
+        date: string;
+    }>;
     trace_id?: string;
 } | null;
 

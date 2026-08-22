@@ -487,7 +487,9 @@ export const en = {
     attachRun: "Attach a run",
     runShort: "Run",
     attachFile: "Attach a file",
-    removeAttached: "Remove the attached run",
+    removeAttached: "Remove {{run}}",
+    runsFull:
+      "{{max}} runs is as many as one question can carry. Take one off to add another.",
     noRunsSynced: "No runs synced from Strava yet.",
     noRunsMatch: "No run matches “{{query}}”.",
     runList: "Runs you can attach",

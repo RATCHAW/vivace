@@ -11,6 +11,7 @@ import {
   listCoachThreadsOptions,
   listCoachThreadsQueryKey,
   toUIMessages,
+  type CoachThread,
 } from "@/api";
 import { AppHeader } from "@/components/app-header";
 import { CoachChat } from "@/components/coach-chat";
@@ -77,6 +78,26 @@ const PHONE = "(max-width: 63.999rem)";
  */
 const GOAL_HINT_DELAY = 900;
 const GOAL_HINT_LIFE = 3000;
+
+/**
+ * A conversation nobody has said anything in yet — the blank page "Ask the
+ * coach" is looking for.
+ *
+ * Not `title === null`, which is what this used to ask. A title is cut from the
+ * *text* of the first message, and a message that is only an attachment — a
+ * watch screenshot, a plan PDF — has none, so it is stored deliberately
+ * untitled (`titleFrom` in apps/api/src/chat-store.ts). An untitled thread can
+ * therefore have a whole conversation in it, and reusing that one would file a
+ * question about the run just watched under history the coach then reads.
+ *
+ * `updated_at` is bumped by `saveMessage` and by nothing else — pinning writes
+ * only `pinned_at` — and a thread is created with both stamps from the same
+ * `now()`. So carrying the timestamp it was created with is exactly "no message
+ * has ever landed here".
+ */
+function isUnused(thread: CoachThread): boolean {
+  return thread.updated_at === thread.created_at;
+}
 
 /**
  * The coach.
@@ -167,13 +188,10 @@ export function Coach() {
   // was said last would file "why did I fade?" under a page of unrelated
   // history — and the coach reads that history, so the question would arrive
   // already answered about something else. A conversation that was started and
-  // never used is that blank page already: it has no title, because a title
-  // arrives with the first message, so it is reused rather than doubled.
+  // never used is that blank page already, so it is reused rather than doubled.
   useEffect(() => {
     if (selectedId || !threads) return;
-    const reusable = arrivedWithRun
-      ? threads.find((thread) => thread.title === null)
-      : threads[0];
+    const reusable = arrivedWithRun ? threads.find(isUnused) : threads[0];
     if (reusable) {
       selectThread(reusable.id);
     } else if (!create.isPending && !create.isSuccess) {
@@ -194,9 +212,13 @@ export function Coach() {
 
   // The runs list is a Strava round trip, so it can land well after the
   // conversation does; the chat takes the mention whenever it turns up.
-  const initialMention: RunMention | null = useMemo(() => {
+  //
+  // A list of one: the composer holds several runs, but a replay is one film
+  // and `?run=` names the one being watched. What the athlete does next in the
+  // composer is theirs.
+  const initialMentions: RunMention[] = useMemo(() => {
     const run = runs?.find((candidate) => candidate.id === arrivedWithRun);
-    return run ? toMention(run) : null;
+    return run ? [toMention(run)] : [];
   }, [arrivedWithRun, runs]);
 
   const threadTitle =
@@ -390,7 +412,7 @@ export function Coach() {
             // one conversation's stream into another's transcript.
             <CoachChat
               acceptedWeek={briefing?.plan?.week_starting ?? null}
-              initialMention={initialMention}
+              initialMentions={initialMentions}
               initialMessages={toUIMessages(thread.messages)}
               key={thread.thread.id}
               onOpenRun={(runId) => navigate(`/replays?run=${runId}`)}

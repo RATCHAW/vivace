@@ -9,6 +9,7 @@
 // because a list of eight runs between the box and the send button would be
 // eight presses of Tab away from sending.
 import { useEffect, useRef, type ReactNode } from "react";
+import { CheckIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /** What opens the run list from inside the sentence being written. */
@@ -45,9 +46,9 @@ export function mentionToken(
 /**
  * The draft with the mention cut out — what is left once a run has been picked.
  *
- * The chip below the box carries the run now, so the `@morn` that found it has
- * done its job; leaving it in would send the coach a question with half a run
- * name in the middle of it.
+ * The chip at the top of the box carries the run now, so the `@morn` that found
+ * it has done its job; leaving it in would send the coach a question with half
+ * a run name in the middle of it.
  */
 export function withoutMention(
   draft: string,
@@ -178,6 +179,10 @@ export function ComposerMenuList({
 export interface ComposerMenuOptionProps {
   id: string;
   active: boolean;
+  /** Already on the message — the run list can hold several at once. */
+  attached?: boolean;
+  /** Offered, and not choosable: the message is carrying all it can. */
+  disabled?: boolean;
   onSelect: () => void;
   /** Moving the pointer over a row takes the highlight from the keyboard. */
   onHighlight: () => void;
@@ -208,20 +213,32 @@ export interface ComposerMenuOptionProps {
 export function ComposerMenuOption({
   id,
   active,
+  attached,
+  disabled = false,
   onSelect,
   onHighlight,
   children,
 }: ComposerMenuOptionProps) {
   return (
     <li
+      // `aria-selected` is the cursor here — which row Enter would take, named
+      // by the textarea's `aria-activedescendant`. What is already on the
+      // message is `aria-checked`, the state a multi-select listbox announces,
+      // and the two move independently: the cursor passes over a checked row
+      // without unchecking it.
+      aria-checked={attached}
+      aria-disabled={disabled || undefined}
       aria-selected={active}
       className={cn(
-        "border-border flex w-full cursor-pointer items-center gap-3 border-t py-2.5 pr-4 pl-3 text-left first:border-t-0",
+        "border-border flex w-full items-center gap-3 border-t py-2.5 pr-4 pl-3 text-left first:border-t-0",
         active && "bg-brand/15",
+        disabled ? "cursor-default opacity-50" : "cursor-pointer",
       )}
       data-active={active}
       id={id}
-      onClick={onSelect}
+      // Still highlightable, and still announced: a row that cannot be chosen
+      // right now is worth reading, and the line under the list says why.
+      onClick={disabled ? undefined : onSelect}
       onMouseMove={onHighlight}
       role="option"
     >
@@ -235,6 +252,21 @@ export function ComposerMenuOption({
         )}
       />
       {children}
+      {/* Only where a row has the state to show — the commands are chosen, not
+          collected, and an invisible tick at the end of each of them would be
+          16px of nothing taken out of the description.
+          At the end of the row rather than beside the cursor bar: this is what
+          the row *is*, not which row the keyboard is on, and the two would
+          read as one control stacked against the left edge. */}
+      {attached !== undefined && (
+        <CheckIcon
+          aria-hidden
+          className={cn(
+            "text-brand size-3.5 shrink-0",
+            attached ? "opacity-100" : "opacity-0",
+          )}
+        />
+      )}
     </li>
   );
 }

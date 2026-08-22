@@ -744,6 +744,28 @@
               "date"
             ]
           },
+          "runs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "date": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "date"
+              ]
+            }
+          },
           "trace_id": {
             "type": "string"
           }

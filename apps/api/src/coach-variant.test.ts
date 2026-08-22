@@ -228,11 +228,11 @@ describe("coachSystemPrompt", () => {
     expect(terse).toContain("two sentences, three at the very most");
   });
 
-  it("still folds in the attached run, whichever prompt answers", () => {
+  it("still folds in the attached runs, whichever prompt answers", () => {
     for (const version of PROMPT_VERSIONS) {
       const prompt = coachSystemPrompt("2026-08-18", 6, {
         prompt: version,
-        attached: { id: 42, name: "Long run", date: "2026-08-16" },
+        attached: [{ id: 42, name: "Long run", date: "2026-08-16" }],
       });
       expect(prompt).toContain("Strava activity id 42");
     }

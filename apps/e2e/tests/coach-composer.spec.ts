@@ -67,11 +67,42 @@ test.describe("the coach composer", () => {
     await expect(
       page.getByRole("heading", { name: "What are we training for?" }),
     ).toBeVisible();
-    // And the run came with it, without the athlete naming it.
+    // And the run came with it, without the athlete naming it — as a chip
+    // inside the box, which is where a message's attachments live.
+    const chip = page.getByRole("button", {
+      name: new RegExp(`^Remove ${LONG_RUN.name}`),
+    });
+    await expect(chip).toBeVisible();
+    await expect(page.locator('[data-slot="input-group"]')).toContainText(
+      LONG_RUN.name,
+    );
+  });
+
+  // The box holds a list now, so the question an athlete cannot ask any other
+  // way — "which of these two went better?" — has to survive a real browser:
+  // two rows of one list, two chips, and a caret that never left the sentence.
+  test("a question can name more than one run", async ({ page }) => {
+    await page.goto(url("/coach"));
+    await composer(page).click();
+
+    await composer(page).pressSequentially(`@${LONG_RUN.name.slice(0, 6)}`);
+    await page.keyboard.press("Enter");
+    await composer(page).pressSequentially(`@${EASY_RUN.name.slice(0, 6)}`);
+    await page.keyboard.press("Enter");
+
     await expect(
-      page.getByRole("button", { name: "Remove the attached run" }),
+      page.getByRole("button", {
+        name: new RegExp(`^Remove ${LONG_RUN.name}`),
+      }),
     ).toBeVisible();
-    await expect(page.getByText(LONG_RUN.name).last()).toBeVisible();
+    await expect(
+      page.getByRole("button", {
+        name: new RegExp(`^Remove ${EASY_RUN.name}`),
+      }),
+    ).toBeVisible();
+    // Both mentions came back out of the sentence, and the caret stayed in it.
+    await expect(composer(page)).toHaveValue("");
+    await expect(composer(page)).toBeFocused();
   });
 
   test("a typed `@` opens the run list, and the arrows walk it", async ({
@@ -97,12 +128,16 @@ test.describe("the coach composer", () => {
     await composer(page).press("ArrowUp");
     expect(await highlighted(page)).toContain(EASY_RUN.name);
 
-    // Enter takes the highlighted run and cuts the `@` back out of the draft.
+    // Enter takes the highlighted run — the one the arrows left on, which is
+    // the easy run — and cuts the `@` back out of the draft. The list goes with
+    // the `@` it was opened by, rather than being closed.
     await composer(page).press("Enter");
     await expect(list).toBeHidden();
     await expect(composer(page)).toHaveValue("");
     await expect(
-      page.getByRole("button", { name: "Remove the attached run" }),
+      page.getByRole("button", {
+        name: new RegExp(`^Remove ${EASY_RUN.name}`),
+      }),
     ).toBeVisible();
   });
 
@@ -154,10 +189,21 @@ test.describe("the coach composer", () => {
     expect(await highlighted(page)).toContain(LONG_RUN.name);
     await composer(page).press("Enter");
 
-    await expect(list).toBeHidden();
     await expect(
-      page.getByRole("button", { name: "Remove the attached run" }),
+      page.getByRole("button", {
+        name: new RegExp(`^Remove ${LONG_RUN.name}`),
+      }),
     ).toBeVisible();
+    // The list this one was opened from stays open — nothing was typed to close
+    // it with, and a second run is often the point of having opened it. The row
+    // just taken wears a tick, so a second Enter would put it back.
+    await expect(list).toBeVisible();
+    await expect(list.getByRole("option").first()).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+    await composer(page).press("Escape");
+    await expect(list).toBeHidden();
   });
 
   /**

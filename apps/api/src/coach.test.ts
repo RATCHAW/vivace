@@ -16,10 +16,12 @@ import {
 } from "./training.js";
 import { toQueue, toSignals, weeksToRace } from "./briefing.js";
 import {
+  attachedRuns,
   buildQuestionnaire,
   coachFailure,
   coachSystemPrompt,
   dropUnannouncedToolInput,
+  MAX_ATTACHED_RUNS,
   mondayFirst,
   type QuestionnaireCard,
 } from "./coach.js";
@@ -818,6 +820,83 @@ describe("coachSystemPrompt", () => {
     const prompt = coachSystemPrompt("2026-08-18", 6, { language: "fr" });
     expect(prompt).toContain("reading the app in French");
     expect(prompt).toContain("Everything you write yourself stays in English");
+  });
+
+  it("lets one attached run be what `this run` means", () => {
+    const prompt = coachSystemPrompt("2026-08-18", 6, {
+      attached: [{ id: 42, name: "Long run", date: "2026-08-16" }],
+    });
+    expect(prompt).toContain(
+      'attached a run to this message: "Long run" on 2026-08-16, Strava activity id 42',
+    );
+    expect(prompt).toContain(
+      '"This run", "it" and "that session" mean that one',
+    );
+  });
+
+  // The singular sentence over five runs would have the model answer about
+  // whichever one it picked, which is the question nobody asked.
+  it("names every attached run, in order, when there are several", () => {
+    const prompt = coachSystemPrompt("2026-08-18", 6, {
+      attached: [
+        { id: 42, name: "Long run", date: "2026-08-16" },
+        { id: 43, name: "Tempo", date: "2026-08-13" },
+      ],
+    });
+    expect(prompt).toContain("attached 2 runs to this message, in this order");
+    expect(prompt).toContain(
+      '"Long run" on 2026-08-16, Strava activity id 42; "Tempo" on 2026-08-13, Strava activity id 43',
+    );
+    expect(prompt).not.toContain('"This run", "it" and "that session"');
+  });
+
+  it("says nothing about a run when none is attached", () => {
+    expect(coachSystemPrompt("2026-08-18", 6, { attached: [] })).not.toContain(
+      "attached",
+    );
+  });
+});
+
+describe("attachedRuns", () => {
+  const LONG = { id: 42, name: "Long run", date: "2026-08-16" };
+  const TEMPO = { id: 43, name: "Tempo", date: "2026-08-13" };
+
+  it("reads the runs off the newest message, and only that one", () => {
+    expect(
+      attachedRuns([
+        { metadata: { runs: [TEMPO] } },
+        { metadata: { runs: [LONG] } },
+      ]),
+    ).toEqual([LONG]);
+  });
+
+  it("reads a transcript written before a question could carry two", () => {
+    expect(attachedRuns([{ metadata: { run: LONG } }])).toEqual([LONG]);
+  });
+
+  it("has nothing for a message that attached nothing", () => {
+    expect(attachedRuns([{ metadata: { trace_id: "t1" } }])).toEqual([]);
+    expect(attachedRuns([{}])).toEqual([]);
+    expect(attachedRuns([])).toEqual([]);
+  });
+
+  // Twice in the list is twice in the system prompt, and the browser is not the
+  // only thing that can post a message here.
+  it("keeps the first of a run named twice", () => {
+    expect(attachedRuns([{ metadata: { runs: [LONG, TEMPO, LONG] } }])).toEqual(
+      [LONG, TEMPO],
+    );
+  });
+
+  it("stops at the cap the composer stops at", () => {
+    const many = Array.from({ length: MAX_ATTACHED_RUNS + 3 }, (_, i) => ({
+      id: i + 1,
+      name: `Run ${i + 1}`,
+      date: "2026-08-16",
+    }));
+    expect(attachedRuns([{ metadata: { runs: many } }])).toHaveLength(
+      MAX_ATTACHED_RUNS,
+    );
   });
 });
 
