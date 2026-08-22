@@ -8,7 +8,7 @@ import { type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
-import { ArrowRightIcon, CheckIcon } from "lucide-react";
+import { ArrowRightIcon, CheckIcon, Loader2Icon } from "lucide-react";
 import type { PlannedSession } from "@/api";
 import { useMessages } from "@/i18n";
 import { useFormatters } from "@/i18n/format";
@@ -143,8 +143,14 @@ export interface CardActions {
   onAsk: (text: string, runId?: number) => void;
   /** Accept a proposed week. */
   onAcceptPlan: (card: PlanCard) => void;
-  /** True while the accept request is in flight. */
-  accepting?: boolean;
+  /**
+   * The week whose accept is in flight, by `week_starting`.
+   *
+   * The week rather than a boolean: a conversation that reworked a plan has
+   * several of these cards in it, and a flag would spin every one of them at
+   * once for a request that only concerns the card that was pressed.
+   */
+  acceptingWeek?: string | null;
   /** The week already accepted, so a re-rendered card knows it is live. */
   acceptedWeek?: string | null;
 }
@@ -683,6 +689,10 @@ export function WeekPlan({
   // The card is stored in the transcript, so `accepted` is only true of the
   // week as it stood when the tool ran. The live answer is the briefing's.
   const accepted = actions.acceptedWeek === card.week_starting || card.accepted;
+  // Accepting is a round trip to us and then a reload of the briefing behind
+  // it, so the button has to say it is working — a disabled pill that only
+  // greys out reads as a press that did nothing.
+  const accepting = actions.acceptingWeek === card.week_starting;
 
   // The buttons name real days rather than a fixed "Swap Tuesday": the first
   // quality session that isn't the long run, and wherever the long run landed.
@@ -751,11 +761,12 @@ export function WeekPlan({
           </span>
         ) : (
           <Button
-            disabled={actions.accepting}
+            disabled={accepting}
             onClick={() => actions.onAcceptPlan(card)}
             size="sm"
           >
-            {t("cards.acceptWeek")}
+            {accepting && <Loader2Icon className="animate-spin" />}
+            {accepting ? t("cards.acceptingWeek") : t("cards.acceptWeek")}
           </Button>
         )}
         {quality && (

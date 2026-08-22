@@ -564,6 +564,14 @@ export function CoachChat({
    * Only for the gaps nothing else covers: a running tool draws its own, and a
    * streaming reasoning block draws the Reasoning component's, so showing one
    * here as well would put two spinners on screen for the same second.
+   *
+   * "Covered" is about what is moving *now*, not about what the turn has
+   * produced so far. A coach turn is up to eight steps, and between them the
+   * model thinks with nothing on the wire — text that has finished arriving
+   * (`state: "done"`) is an answer, not a sign of life, so counting it left the
+   * longest silences of a turn, the ones either side of a tool, with no
+   * indicator at all: the sentence stopped mid-thought and the rest appeared
+   * seconds later.
    */
   const { working, workingLabel } = useMemo(() => {
     if (status === "submitted") {
@@ -578,7 +586,11 @@ export function CoachChat({
 
     const covered = latest.parts.some(
       (part) =>
-        (part.type === "text" && part.text.length > 0) ||
+        // A transcript written before the SDK stamped a state on text parts
+        // has none; there, any text still counts, as it used to.
+        (part.type === "text" &&
+          part.text.length > 0 &&
+          part.state !== "done") ||
         (part.type === "reasoning" && part.state === "streaming") ||
         (isToolUIPart(part) &&
           part.state !== "output-available" &&
@@ -612,7 +624,9 @@ export function CoachChat({
           sessions: card.sessions,
         },
       }),
-    accepting: accept.isPending,
+    acceptingWeek: accept.isPending
+      ? (accept.variables?.body.week_starting ?? null)
+      : null,
     acceptedWeek,
   };
 
@@ -765,6 +779,9 @@ export function CoachChat({
             const steps = parts.filter(({ part }) => isStepPart(part));
             const answer = parts.filter(({ part }) => !isStepPart(part));
 
+            /** The turn being written, right now. */
+            const live = isBusy && isLast;
+
             /**
              * Fold the working away once it is working no longer.
              *
@@ -775,7 +792,7 @@ export function CoachChat({
              */
             const collapsed =
               steps.length > 0 &&
-              !(isBusy && isLast) &&
+              !live &&
               !(isLast && pending?.messageId === message.id);
 
             return (
@@ -796,19 +813,33 @@ export function CoachChat({
                   />
                 )}
 
-                {!editing && (
-                  <>
-                    {steps.length > 0 &&
-                      (collapsed ? (
-                        <CoachSteps count={steps.length}>
-                          {steps.map(renderPart)}
-                        </CoachSteps>
-                      ) : (
-                        steps.map(renderPart)
-                      ))}
-                    {answer.map(renderPart)}
-                  </>
-                )}
+                {/* While it is being written, in the order it happened; once it
+                    is written, working first and answer after — which is the
+                    order the folded row needs, and by then nothing is moving so
+                    nothing is lost by reordering it.
+
+                    Chronological is not a nicety mid-turn: a tool called after
+                    a card was drawn is the *last* thing in the message, and
+                    hoisting its indicator to the top put it above a 190px chart
+                    and off the bottom of the viewport the thread is pinned to.
+                    The athlete watched a finished sentence sit there with no
+                    sign that anything was still running. */}
+                {!editing &&
+                  (live ? (
+                    parts.map(renderPart)
+                  ) : (
+                    <>
+                      {steps.length > 0 &&
+                        (collapsed ? (
+                          <CoachSteps count={steps.length}>
+                            {steps.map(renderPart)}
+                          </CoachSteps>
+                        ) : (
+                          steps.map(renderPart)
+                        ))}
+                      {answer.map(renderPart)}
+                    </>
+                  ))}
 
                 {/* Copy and rewrite, on the athlete's own turn. Hidden while
                     an answer is arriving for the same reason the coach's own
