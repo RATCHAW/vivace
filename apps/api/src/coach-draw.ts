@@ -1,12 +1,18 @@
 // The coach drawing a card of its own, when none of the prebuilt ones fit.
 //
-// `drawCard`'s input is a json-render spec: a flat tree of whitelisted
-// components the browser renders with the same furniture as the five prebuilt
-// cards (apps/web/src/components/coach/coach-drawn-card.tsx). The whitelist is
-// the design system made enforceable — the model chooses layout and words,
-// never a className — and this file is the server half of that contract: the
-// component names and props here must match the web catalogue exactly, the way
-// every other card shape in coach.ts matches coach-cards.tsx.
+// `drawCard`'s input is deliberately *not* the json-render spec the browser
+// renders. It was, briefly: a flat tree of elements with ids, `children`
+// references and nested `props`. The default model could not reliably author
+// that inside a tool call — it stringified the object, flattened the props,
+// and finally melted down retrying — while the same model fills `askAthlete`'s
+// flat array of questions without a wobble. So the model writes what it is
+// good at: a title and a flat list of blocks, top to bottom. This file
+// composes those blocks into the json-render spec, and the browser
+// (apps/web/src/components/coach/coach-drawn-card.tsx) renders that spec with
+// the same furniture and tokens as the five prebuilt cards. The component
+// names and props in the composed spec are the contract with the web
+// catalogue, the way every other card shape in coach.ts matches
+// coach-cards.tsx.
 //
 // What this card gives up is the one guarantee the prebuilt cards keep: their
 // numbers are computed from Strava data and cannot be wrong about a run. Here
@@ -14,16 +20,18 @@
 // only figures other tools returned this turn. The validation below can hold
 // the design system; honesty stays a property of the prompt.
 //
-// Validated in `execute`, not in the input schema, for the reason spelled out
-// on `askAthlete`: a schema rejection throws out of `streamText` and costs the
-// athlete the whole turn, while an `{ error }` result keeps the turn alive and
-// tells the model what to fix. Where trimming is enough, it trims.
+// Everything is validated here in `execute`, never by the tool's input
+// schema. The SDK validates input *before* `execute`, and a rejection there
+// throws out of `streamText` and takes the athlete's whole turn — a live call
+// died exactly that way. Here a broken block is dropped with a note the model
+// reads, and only a card with nothing left in it is an error.
 import { z } from "zod";
 
-/** How many elements one card may hold — a card, not a page. */
-const MAX_ELEMENTS = 40;
+/** How many blocks one card may hold — a card, not a page. */
+const MAX_BLOCKS = 12;
 
-/** One trimmed string, cut to length rather than rejected. */
+/** One trimmed string, cut to length rather than rejected, like the
+ *  questionnaire's `clamp`. */
 const short = (limit: number) =>
   z
     .string()
@@ -40,33 +48,24 @@ const atMost = <T extends z.ZodTypeAny>(item: T, limit: number) =>
     .transform((items) => items.slice(0, limit));
 
 /**
- * The vocabulary, one zod schema per component.
+ * The blocks, one schema per kind.
  *
- * Mirrored by the catalogue in coach-drawn-card.tsx — the props parsed here are
- * the props the browser's registry receives, so the two lists move together.
+ * Each block becomes one json-render element; `BLOCK_COMPONENTS` below names
+ * which. The props that come out of these schemas are the props the browser's
+ * registry receives, so this list and the catalogue in coach-drawn-card.tsx
+ * move together.
  */
-const COMPONENT_PROPS = {
-  /** The frame — always the root. */
-  Card: z.object({
-    title: short(80).nullish(),
-    /** A mono eyebrow on the heading's right, e.g. "LAST 3 SUNDAYS". */
-    aside: short(40).nullish(),
-  }),
-  /** Layout. */
-  Stack: z.object({
-    direction: z.enum(["row", "column"]).nullish(),
-    gap: z.enum(["tight", "cozy", "loose"]).nullish(),
-  }),
-  Text: z.object({
+const BLOCK_PROPS = {
+  text: z.object({
     text: short(300),
     look: z.enum(["body", "strong", "caption", "muted", "mono"]).nullish(),
   }),
   /** The labelled-figure grid every prebuilt card uses. */
-  Stats: z.object({
+  stats: z.object({
     items: atMost(z.object({ label: short(24), value: short(24) }), 8),
   }),
   /** A bar chart; heights are normalised client-side like the splits chart. */
-  Bars: z.object({
+  bars: z.object({
     bars: atMost(
       z.object({
         label: short(12).nullish(),
@@ -79,73 +78,49 @@ const COMPONENT_PROPS = {
     unit: short(20).nullish(),
   }),
   /** The one-line read under a chart, with its coloured rule. */
-  Callout: z.object({
+  callout: z.object({
     tone: z.enum(["brand", "warn", "alert"]).nullish(),
     text: short(300),
   }),
   /** A tap that asks the coach the question it carries. */
-  AskButton: z.object({
+  ask: z.object({
     label: short(60),
     question: short(200),
   }),
 };
 
-type ComponentType = keyof typeof COMPONENT_PROPS;
+type BlockKind = keyof typeof BLOCK_PROPS;
 
-/** The components allowed to hold children; everything else is a leaf. */
-const CONTAINERS = new Set<ComponentType>(["Card", "Stack"]);
+/** Which json-render component draws each kind of block. */
+const BLOCK_COMPONENTS: Record<BlockKind, string> = {
+  text: "Text",
+  stats: "Stats",
+  bars: "Bars",
+  callout: "Callout",
+  ask: "AskButton",
+};
 
-function isComponentType(value: string): value is ComponentType {
-  return value in COMPONENT_PROPS;
+function isBlockKind(value: unknown): value is BlockKind {
+  return typeof value === "string" && value in BLOCK_PROPS;
 }
 
-/**
- * The spec's coarse shape, checked here rather than by the tool's input
- * schema. The SDK validates input *before* `execute`, and a rejection there
- * throws out of `streamText` and takes the athlete's whole turn — which is
- * exactly what happened the first time a model sent `spec` as a JSON string.
- * So the tool accepts `unknown` and this file answers whatever arrives.
- *
- * `looseObject` keeps the keys the schema doesn't name: models flatten an
- * element's props onto the element itself often enough ("title" beside "type"
- * rather than under "props") that `walk` treats those spare keys as the props.
- */
-const proposedSpecSchema = z.object({
-  root: z.string(),
-  elements: z.record(
-    z.string(),
-    z.looseObject({
-      type: z.string(),
-      props: z.record(z.string(), z.unknown()).nullish(),
-      children: z.array(z.string()).nullish(),
-    }),
-  ),
-});
-
-/** Exported for the tests, which build specs the way a model would. */
-export type ProposedSpec = z.infer<typeof proposedSpecSchema>;
-
-type ProposedElement = ProposedSpec["elements"][string];
-
-/** The keys of an element that are structure, not flattened props. */
-const ELEMENT_KEYS = new Set(["type", "props", "children"]);
-
-/**
- * An element's props, wherever the model put them: under `props`, or spread
- * across the element beside `type` — accepted the way `mondayFirst` accepts a
- * week numbered 1…7, because rejecting it costs the athlete a round trip.
- */
-function propsOf(element: ProposedElement): Record<string, unknown> {
-  if (element.props) return element.props;
-  const flat = Object.entries(element).filter(
-    ([key]) => !ELEMENT_KEYS.has(key),
-  );
-  return Object.fromEntries(flat);
+/** What the model passes in, before any of it is trusted. */
+export interface ProposedCard {
+  title?: unknown;
+  aside?: unknown;
+  blocks?: unknown;
 }
 
-/** One element as the browser renders it. */
+/** A heading if the model wrote one, null for anything else — a wrong-typed
+ *  title costs the title, never the card. */
+function heading(value: unknown, limit: number): string | null {
+  const parsed = short(limit).safeParse(value);
+  return parsed.success && parsed.data ? parsed.data : null;
+}
+
+/** One element of the spec the browser renders. */
 interface DrawnElement {
-  type: ComponentType;
+  type: string;
   props: Record<string, unknown>;
   children: string[];
 }
@@ -156,137 +131,113 @@ export interface DrawnCard {
     root: string;
     elements: Record<string, DrawnElement>;
   };
-  /** What was trimmed to fit — addressed to the model, never drawn. */
+  /** What was dropped or trimmed to fit — addressed to the model, never drawn. */
   note?: string;
 }
 
 /**
- * The spec as the browser can actually render it, or the reason it can't.
+ * The blocks as a json-render spec the browser can render, or the reason
+ * there is no card.
  *
- * Walked from the root rather than validated wholesale: an element nothing
- * references is dropped instead of failing the card, and the walk is also what
- * catches a cycle or a shared element — the spec is a tree, and an id drawn in
- * two places would render the same React key twice.
+ * Forgiving on purpose, in the `mondayFirst` way: a stringified `blocks` is
+ * parsed, a block naming its kind `type` is read anyway, a broken block is
+ * dropped with a note that tells the model what was wrong with it. The only
+ * errors left are the ones with nothing to salvage — no blocks at all, or
+ * none that survived.
  *
- * Pure, and exported for the tests: this shape is the contract with
- * coach-drawn-card.tsx, and it is the one part of the tool that can be checked
- * without a model.
+ * Pure, and exported for the tests: the spec it composes is the contract with
+ * coach-drawn-card.tsx, and it is the one part of the tool that can be
+ * checked without a model.
  */
 export function buildDrawnCard(
-  proposed: unknown,
+  proposed: ProposedCard,
 ): DrawnCard | { error: string } {
-  // A spec that arrives as a string is a model that serialised twice; parsed
-  // rather than rejected, because the JSON inside is usually the right one.
-  let raw = proposed;
+  const kinds = Object.keys(BLOCK_PROPS).join(", ");
+
+  // A blocks array that arrives as a string is a model that serialised twice;
+  // parsed rather than rejected, because the JSON inside is usually right.
+  let raw = proposed.blocks;
   if (typeof raw === "string") {
     try {
       raw = JSON.parse(raw);
     } catch {
       return {
         error:
-          "`spec` arrived as a string that isn't valid JSON. Pass `spec` as " +
-          'a JSON object: {"root": "card", "elements": {…}}.',
+          "`blocks` arrived as a string that isn't valid JSON. Pass it as " +
+          "a JSON array of blocks.",
       };
     }
   }
-
-  const parsed = proposedSpecSchema.safeParse(raw);
-  if (!parsed.success) {
-    const issue = parsed.error.issues[0];
+  if (!Array.isArray(raw) || raw.length === 0) {
     return {
-      error:
-        `\`spec\` must be {"root": string, "elements": {id: {"type", ` +
-        `"props", "children"}}}. Invalid at ${issue.path.join(".") || "root"}` +
-        ` — ${issue.message}.`,
+      error: `\`blocks\` must be a non-empty array of blocks. Kinds: ${kinds}.`,
     };
   }
-  const spec = parsed.data;
 
   const notes: string[] = [];
-  const elements: Record<string, DrawnElement> = {};
-
-  const root = spec.elements[spec.root];
-  if (!root) {
-    return {
-      error: `The root id "${spec.root}" names no element in \`elements\`.`,
-    };
-  }
-  if (root.type !== "Card") {
-    return {
-      error:
-        `The root element must be a Card — it is the frame every drawn card ` +
-        `shares. Got "${root.type}".`,
-    };
-  }
-
-  const seen = new Set<string>();
-  const walk = (id: string): { error: string } | null => {
-    if (seen.has(id)) {
-      return {
-        error:
-          `Element "${id}" is referenced more than once. The spec is a tree: ` +
-          "give each place its own element.",
-      };
-    }
-    seen.add(id);
-    if (seen.size > MAX_ELEMENTS) {
-      return {
-        error: `More than ${MAX_ELEMENTS} elements — simplify the card.`,
-      };
-    }
-
-    const element = spec.elements[id];
-    if (!element) {
-      return { error: `Child id "${id}" names no element in \`elements\`.` };
-    }
-    if (!isComponentType(element.type)) {
-      return {
-        error:
-          `Unknown component "${element.type}". Use only: ` +
-          `${Object.keys(COMPONENT_PROPS).join(", ")}.`,
-      };
-    }
-
-    const props = COMPONENT_PROPS[element.type].safeParse(propsOf(element));
-    if (!props.success) {
-      const issue = props.error.issues[0];
-      return {
-        error:
-          `Element "${id}" (${element.type}): invalid props at ` +
-          `${issue.path.join(".") || "root"} — ${issue.message}`,
-      };
-    }
-
-    let children = element.children ?? [];
-    if (children.length > 0 && !CONTAINERS.has(element.type)) {
-      notes.push(
-        `${element.type} "${id}" takes no children; they were dropped.`,
-      );
-      children = [];
-    }
-
-    elements[id] = { type: element.type, props: props.data, children };
-    for (const child of children) {
-      const failed = walk(child);
-      if (failed) return failed;
-    }
-    return null;
-  };
-
-  const failed = walk(spec.root);
-  if (failed) return failed;
-
-  const unreachable = Object.keys(spec.elements).length - seen.size;
-  if (unreachable > 0) {
+  if (raw.length > MAX_BLOCKS) {
     notes.push(
-      `${unreachable} element(s) nothing references were dropped — every ` +
-        "element must be reachable from the root through `children`.",
+      `Only the first ${MAX_BLOCKS} of your ${raw.length} blocks were drawn.`,
     );
   }
 
+  const elements: Record<string, DrawnElement> = {};
+  const children: string[] = [];
+
+  for (const [index, block] of raw.slice(0, MAX_BLOCKS).entries()) {
+    if (typeof block !== "object" || block === null) {
+      notes.push(`Block ${index + 1} is not an object; it was dropped.`);
+      continue;
+    }
+    // `kind` is the field's name; `type` is what a model that has just read a
+    // json-render spec calls it. Both are read.
+    const { kind, type, ...props } = block as Record<string, unknown>;
+    const named = kind ?? type;
+    if (!isBlockKind(named)) {
+      notes.push(
+        `Block ${index + 1} has kind "${String(named)}", which is not one ` +
+          `of: ${kinds}. It was dropped.`,
+      );
+      continue;
+    }
+
+    const parsed = BLOCK_PROPS[named].safeParse(props);
+    if (!parsed.success) {
+      const issue = parsed.error.issues[0];
+      notes.push(
+        `Block ${index + 1} (${named}) was dropped: invalid at ` +
+          `${issue.path.join(".") || "root"} — ${issue.message}.`,
+      );
+      continue;
+    }
+
+    const id = `b${index}`;
+    elements[id] = {
+      type: BLOCK_COMPONENTS[named],
+      props: parsed.data,
+      children: [],
+    };
+    children.push(id);
+  }
+
+  if (children.length === 0) {
+    return {
+      error: `No block could be drawn. ${notes.join(" ")}`.trim(),
+    };
+  }
+
+  elements.card = {
+    type: "Card",
+    props: {
+      title: heading(proposed.title, 80),
+      aside: heading(proposed.aside, 40),
+    },
+    children,
+  };
+
   return {
     card: "drawn",
-    spec: { root: spec.root, elements },
+    spec: { root: "card", elements },
     ...(notes.length > 0 ? { note: notes.join(" ") } : {}),
   };
 }

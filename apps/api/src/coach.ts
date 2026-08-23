@@ -1455,41 +1455,43 @@ export function createCoachTools(ctx: CoachToolContext): ToolSet {
         "Draw a one-off card when no other tool draws what the athlete " +
         "needs — a comparison of two runs, a trend over time, a season " +
         "recap. The dedicated tools win whenever one fits; this is for the " +
-        "chart they cannot make. Compose a spec from these components only: " +
-        "Card (title?, aside?) — the frame, always the root; " +
-        "Stack (direction: row|column, gap: tight|cozy|loose) — layout; " +
-        "Text (text, look: body|strong|caption|muted|mono); " +
-        "Stats (items: [{label, value}], up to 8) — labels are short and " +
-        "uppercase, values arrive formatted, e.g. '5:12 /km'; " +
-        "Bars (bars: [{label?, value, tone?: brand|alert}], unit?, up to " +
-        "30) — raw numbers, heights are normalised for you; " +
-        "Callout (tone: brand|warn|alert, text) — the one-line read under a " +
-        "chart; " +
-        "AskButton (label, question) — a tap that sends you the question. " +
-        "Card and Stack take children; everything else is a leaf. Every " +
-        "number you draw must come from a tool result in this turn — a " +
-        "figure you did not read is one you invented, so leave it out. " +
+        "chart they cannot make. A card is a title and a flat list of " +
+        "blocks, drawn top to bottom. Block kinds: " +
+        '{"kind": "text", "text": "…", "look": "body|strong|caption|muted|mono"} — a line of text; ' +
+        '{"kind": "stats", "items": [{"label": "PACE", "value": "5:32 /km"}]} — up to 8 labelled figures, labels short and uppercase, values already formatted; ' +
+        '{"kind": "bars", "bars": [{"label": "W1", "value": 42.5}], "unit": "km"} — a bar chart of up to 30 raw numbers, heights are normalised for you; set "tone": "alert" on a bar to flag it; ' +
+        '{"kind": "callout", "tone": "brand|warn|alert", "text": "…"} — the one-line read under a chart; ' +
+        '{"kind": "ask", "label": "Cap next week", "question": "Cap next week for me"} — a tap that sends you the question. ' +
+        "Every number you draw must come from a tool result in this turn — " +
+        "a figure you did not read is one you invented, so leave it out. " +
         "Draws the card — underneath it, write the read, not the numbers " +
         "again.",
-      // `z.unknown()` on purpose, and further than `askAthlete` goes: the SDK
-      // validates input before `execute`, and *any* rejection there throws out
-      // of `streamText` and takes the athlete's whole turn — the first live
-      // call sent `spec` as a JSON string and did exactly that. Everything,
-      // shape included, is enforced by `buildDrawnCard`, which answers a
-      // broken spec with an `{ error }` the model can fix mid-turn.
+      // Everything here survives the SDK's pre-`execute` validation on
+      // purpose: `blocks` is `unknown`, and `buildDrawnCard` answers whatever
+      // arrives — a rejection at the schema layer throws out of `streamText`
+      // and takes the athlete's whole turn, which a live call already proved.
+      // A broken block costs that block, with a note back; only a card with
+      // nothing left is an error.
       inputSchema: z.object({
-        spec: z
+        title: z.unknown().describe("The card's heading, a few words."),
+        aside: z
           .unknown()
           .describe(
-            "The card as a flat element tree — a JSON object, not a string. " +
-              'Shape: {"root": "card", "elements": {"card": {"type": ' +
-              '"Card", "props": {"title": "…"}, "children": ["chart"]}, ' +
-              '"chart": {"type": "Bars", "props": {"bars": [{"value": 12}' +
-              "]}}}}. Every element's own settings live under its `props`, " +
-              "never beside `type`.",
+            "A short uppercase stamp for the heading's right edge, e.g. " +
+              '"JUN 27 VS AUG 3". Optional.',
+          ),
+        blocks: z
+          .unknown()
+          .describe(
+            "The card's content, top to bottom: a JSON array of blocks, " +
+              'each an object with a "kind" and that kind\'s fields. ' +
+              'Example: [{"kind": "stats", "items": [{"label": "PACE", ' +
+              '"value": "5:32 /km"}]}, {"kind": "callout", "tone": "brand", ' +
+              '"text": "Same effort, faster pace."}]',
           ),
       }),
-      execute: async ({ spec }) => buildDrawnCard(spec),
+      execute: async ({ title, aside, blocks }) =>
+        buildDrawnCard({ title, aside, blocks }),
     }),
   };
 }
