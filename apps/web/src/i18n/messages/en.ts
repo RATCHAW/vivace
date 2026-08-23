@@ -447,6 +447,7 @@ export const en = {
       predictRaces: "Reading your best efforts",
       proposeWeek: "Writing your week",
       askAthlete: "Asking you something",
+      drawCard: "Drawing you a card",
     },
   },
 

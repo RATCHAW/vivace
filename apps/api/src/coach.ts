@@ -28,6 +28,7 @@ import {
   type BestEffort,
 } from "./strava.js";
 import { fetchRunWeather, type RunWeather } from "./weather.js";
+import { buildDrawnCard } from "./coach-draw.js";
 import { getContext, getPlan, saveContext } from "./coach-store.js";
 import { getFeatureVariantFor } from "./posthog.js";
 import {
@@ -213,7 +214,9 @@ Some tools draw something the athlete can see:
 - \`getRunDebrief\` and \`getRunSplits\` draw the run, its splits and its heart
   rate. \`summariseTraining\` draws the weekly volume chart. \`predictRaces\`
   draws the best-effort table. \`proposeWeek\` draws the week as seven session
-  cards with an Accept button.
+  cards with an Accept button. \`drawCard\` composes a one-off card out of
+  stats, bars and text for the chart no other tool makes — a comparison, a
+  trend, a recap.
 - When you have drawn one, do not repeat it as a markdown table or a list of the
   same numbers. Write the read the chart cannot: what it means and what to do.
   Two or three sentences, naming at most a couple of specific figures.
@@ -358,7 +361,7 @@ export function coachSystemPrompt(
     // one thing it puts on screen as an interface, and an English form inside a
     // French screen reads as a bug rather than as an accent.
     lines.push(
-      `The athlete is reading the app in ${LANGUAGE_NAMES[language]}. \`askAthlete\` draws an interface rather than something you said, so write its questions, hints and choices in ${LANGUAGE_NAMES[language]}. Everything you write yourself stays in English.`,
+      `The athlete is reading the app in ${LANGUAGE_NAMES[language]}. \`askAthlete\` and \`drawCard\` draw interfaces rather than something you said, so write their questions, hints, labels and text in ${LANGUAGE_NAMES[language]}. Everything you write yourself stays in English.`,
     );
   }
   return lines.join("\n\n");
@@ -1445,6 +1448,55 @@ export function createCoachTools(ctx: CoachToolContext): ToolSet {
           accepted: accepted !== null,
         };
       },
+    }),
+
+    drawCard: tool({
+      description:
+        "Draw a one-off card when no other tool draws what the athlete " +
+        "needs — a comparison of two runs, a trend over time, a season " +
+        "recap. The dedicated tools win whenever one fits; this is for the " +
+        "chart they cannot make. Compose a spec from these components only: " +
+        "Card (title?, aside?) — the frame, always the root; " +
+        "Stack (direction: row|column, gap: tight|cozy|loose) — layout; " +
+        "Text (text, look: body|strong|caption|muted|mono); " +
+        "Stats (items: [{label, value}], up to 8) — labels are short and " +
+        "uppercase, values arrive formatted, e.g. '5:12 /km'; " +
+        "Bars (bars: [{label?, value, tone?: brand|alert}], unit?, up to " +
+        "30) — raw numbers, heights are normalised for you; " +
+        "Callout (tone: brand|warn|alert, text) — the one-line read under a " +
+        "chart; " +
+        "AskButton (label, question) — a tap that sends you the question. " +
+        "Card and Stack take children; everything else is a leaf. Every " +
+        "number you draw must come from a tool result in this turn — a " +
+        "figure you did not read is one you invented, so leave it out. " +
+        "Draws the card — underneath it, write the read, not the numbers " +
+        "again.",
+      // Loosely typed on purpose, like `askAthlete`'s counts: the component
+      // whitelist and per-component props are enforced by `buildDrawnCard`,
+      // which answers a broken spec with an `{ error }` the model can fix —
+      // an enum here would fail validation before `execute` and take the
+      // athlete's whole turn with it.
+      inputSchema: z.object({
+        spec: z
+          .object({
+            root: z.string().describe("The id of the root element — a Card."),
+            elements: z
+              .record(
+                z.string(),
+                z.object({
+                  type: z.string().describe("One of the component names."),
+                  props: z.record(z.string(), z.unknown()).optional(),
+                  children: z
+                    .array(z.string())
+                    .optional()
+                    .describe("Child element ids — Card and Stack only."),
+                }),
+              )
+              .describe("Every element in the card, keyed by id."),
+          })
+          .describe("The card as a flat element tree."),
+      }),
+      execute: async ({ spec }) => buildDrawnCard(spec),
     }),
   };
 }

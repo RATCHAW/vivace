@@ -116,6 +116,13 @@ const NEXT_QUESTIONS: Record<CoachCard["card"], readonly TranslationKey[]> = {
     "coach.suggestions.planWeek",
     "coach.followUps.paceSunday",
   ],
+  // A drawn card could be about anything, so its follow-ups are the general
+  // ones rather than a guess at what the model composed.
+  drawn: [
+    "coach.suggestions.planWeek",
+    "coach.followUps.raceToday",
+    "coach.followUps.rampingTooFast",
+  ],
 };
 
 const DEFAULT_QUESTIONS = [
@@ -138,6 +145,7 @@ const TOOL_NAMES = [
   "getTrainingSignals",
   "predictRaces",
   "proposeWeek",
+  "drawCard",
 ] as const;
 
 type ToolName = (typeof TOOL_NAMES)[number];
