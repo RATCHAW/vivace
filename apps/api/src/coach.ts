@@ -1471,30 +1471,23 @@ export function createCoachTools(ctx: CoachToolContext): ToolSet {
         "figure you did not read is one you invented, so leave it out. " +
         "Draws the card — underneath it, write the read, not the numbers " +
         "again.",
-      // Loosely typed on purpose, like `askAthlete`'s counts: the component
-      // whitelist and per-component props are enforced by `buildDrawnCard`,
-      // which answers a broken spec with an `{ error }` the model can fix —
-      // an enum here would fail validation before `execute` and take the
-      // athlete's whole turn with it.
+      // `z.unknown()` on purpose, and further than `askAthlete` goes: the SDK
+      // validates input before `execute`, and *any* rejection there throws out
+      // of `streamText` and takes the athlete's whole turn — the first live
+      // call sent `spec` as a JSON string and did exactly that. Everything,
+      // shape included, is enforced by `buildDrawnCard`, which answers a
+      // broken spec with an `{ error }` the model can fix mid-turn.
       inputSchema: z.object({
         spec: z
-          .object({
-            root: z.string().describe("The id of the root element — a Card."),
-            elements: z
-              .record(
-                z.string(),
-                z.object({
-                  type: z.string().describe("One of the component names."),
-                  props: z.record(z.string(), z.unknown()).optional(),
-                  children: z
-                    .array(z.string())
-                    .optional()
-                    .describe("Child element ids — Card and Stack only."),
-                }),
-              )
-              .describe("Every element in the card, keyed by id."),
-          })
-          .describe("The card as a flat element tree."),
+          .unknown()
+          .describe(
+            "The card as a flat element tree — a JSON object, not a string. " +
+              'Shape: {"root": "card", "elements": {"card": {"type": ' +
+              '"Card", "props": {"title": "…"}, "children": ["chart"]}, ' +
+              '"chart": {"type": "Bars", "props": {"bars": [{"value": 12}' +
+              "]}}}}. Every element's own settings live under its `props`, " +
+              "never beside `type`.",
+          ),
       }),
       execute: async ({ spec }) => buildDrawnCard(spec),
     }),

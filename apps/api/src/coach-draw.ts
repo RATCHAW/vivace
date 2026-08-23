@@ -99,16 +99,48 @@ function isComponentType(value: string): value is ComponentType {
   return value in COMPONENT_PROPS;
 }
 
-/** One element as the model proposes it, before any of it is trusted. */
-export interface ProposedElement {
-  type: string;
-  props?: Record<string, unknown>;
-  children?: string[];
-}
+/**
+ * The spec's coarse shape, checked here rather than by the tool's input
+ * schema. The SDK validates input *before* `execute`, and a rejection there
+ * throws out of `streamText` and takes the athlete's whole turn — which is
+ * exactly what happened the first time a model sent `spec` as a JSON string.
+ * So the tool accepts `unknown` and this file answers whatever arrives.
+ *
+ * `looseObject` keeps the keys the schema doesn't name: models flatten an
+ * element's props onto the element itself often enough ("title" beside "type"
+ * rather than under "props") that `walk` treats those spare keys as the props.
+ */
+const proposedSpecSchema = z.object({
+  root: z.string(),
+  elements: z.record(
+    z.string(),
+    z.looseObject({
+      type: z.string(),
+      props: z.record(z.string(), z.unknown()).nullish(),
+      children: z.array(z.string()).nullish(),
+    }),
+  ),
+});
 
-export interface ProposedSpec {
-  root: string;
-  elements: Record<string, ProposedElement>;
+/** Exported for the tests, which build specs the way a model would. */
+export type ProposedSpec = z.infer<typeof proposedSpecSchema>;
+
+type ProposedElement = ProposedSpec["elements"][string];
+
+/** The keys of an element that are structure, not flattened props. */
+const ELEMENT_KEYS = new Set(["type", "props", "children"]);
+
+/**
+ * An element's props, wherever the model put them: under `props`, or spread
+ * across the element beside `type` — accepted the way `mondayFirst` accepts a
+ * week numbered 1…7, because rejecting it costs the athlete a round trip.
+ */
+function propsOf(element: ProposedElement): Record<string, unknown> {
+  if (element.props) return element.props;
+  const flat = Object.entries(element).filter(
+    ([key]) => !ELEMENT_KEYS.has(key),
+  );
+  return Object.fromEntries(flat);
 }
 
 /** One element as the browser renders it. */
@@ -141,8 +173,35 @@ export interface DrawnCard {
  * without a model.
  */
 export function buildDrawnCard(
-  spec: ProposedSpec,
+  proposed: unknown,
 ): DrawnCard | { error: string } {
+  // A spec that arrives as a string is a model that serialised twice; parsed
+  // rather than rejected, because the JSON inside is usually the right one.
+  let raw = proposed;
+  if (typeof raw === "string") {
+    try {
+      raw = JSON.parse(raw);
+    } catch {
+      return {
+        error:
+          "`spec` arrived as a string that isn't valid JSON. Pass `spec` as " +
+          'a JSON object: {"root": "card", "elements": {…}}.',
+      };
+    }
+  }
+
+  const parsed = proposedSpecSchema.safeParse(raw);
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    return {
+      error:
+        `\`spec\` must be {"root": string, "elements": {id: {"type", ` +
+        `"props", "children"}}}. Invalid at ${issue.path.join(".") || "root"}` +
+        ` — ${issue.message}.`,
+    };
+  }
+  const spec = parsed.data;
+
   const notes: string[] = [];
   const elements: Record<string, DrawnElement> = {};
 
@@ -188,7 +247,7 @@ export function buildDrawnCard(
       };
     }
 
-    const props = COMPONENT_PROPS[element.type].safeParse(element.props ?? {});
+    const props = COMPONENT_PROPS[element.type].safeParse(propsOf(element));
     if (!props.success) {
       const issue = props.error.issues[0];
       return {

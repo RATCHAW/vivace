@@ -32,6 +32,47 @@ function validSpec(): ProposedSpec {
 }
 
 describe("buildDrawnCard", () => {
+  it("rejects what isn't a spec at all, with the shape in the error", () => {
+    const card = buildDrawnCard({ elements: {} }) as { error: string };
+    expect(card.error).toContain('"root"');
+  });
+
+  it("parses a spec that arrived as a JSON string", () => {
+    const card = buildDrawnCard(JSON.stringify(validSpec()));
+    expect(card).toMatchObject({ card: "drawn" });
+  });
+
+  it("answers a string that isn't JSON with an error, not a dead turn", () => {
+    const card = buildDrawnCard('{"root": "card", "elements": {]') as {
+      error: string;
+    };
+    expect(card.error).toContain("isn't valid JSON");
+  });
+
+  it("reads props flattened onto the element, the way models write them", () => {
+    // The first live call: `props` spread beside `type` rather than under it.
+    const card = buildDrawnCard({
+      root: "card",
+      elements: {
+        card: {
+          type: "Card",
+          title: "Long runs compared",
+          aside: "Jun 27 vs Aug 3",
+          children: ["s1"],
+        },
+        s1: {
+          type: "Stats",
+          items: [{ label: "PACE", value: "5:32 /km" }],
+        },
+      },
+    });
+    if ("error" in card) throw new Error(card.error);
+    expect(card.spec.elements.card.props.title).toBe("Long runs compared");
+    expect(card.spec.elements.s1.props.items).toEqual([
+      { label: "PACE", value: "5:32 /km" },
+    ]);
+  });
+
   it("returns the card for a valid spec, children always arrays", () => {
     const card = buildDrawnCard(validSpec());
     expect(card).toMatchObject({ card: "drawn" });
