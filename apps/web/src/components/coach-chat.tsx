@@ -145,6 +145,7 @@ const TOOL_NAMES = [
   "getRunSplits",
   "getTrainingSignals",
   "predictRaces",
+  "getWeekPlan",
   "proposeWeek",
   "drawCard",
 ] as const;

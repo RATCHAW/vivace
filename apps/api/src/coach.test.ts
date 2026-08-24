@@ -24,11 +24,12 @@ import {
   dropUnannouncedToolInput,
   MAX_ATTACHED_RUNS,
   mondayFirst,
+  toPlanCard,
   type QuestionnaireCard,
 } from "./coach.js";
 import { titleFrom } from "./chat-store.js";
 import type { BestEffort } from "./strava.js";
-import type { Run, RunStreams } from "./schemas.js";
+import type { PlannedSession, Run, RunStreams } from "./schemas.js";
 
 /** A run on `date`, with everything the analysis reads and nothing else. */
 function run(date: string, km: number, over: Partial<Run> = {}): Run {
@@ -850,6 +851,66 @@ describe("mondayFirst", () => {
         expect(session.day).toBeLessThanOrEqual(6);
       }
     }
+  });
+});
+
+describe("toPlanCard", () => {
+  /** One stored session, with only the fields a case cares about spelled out. */
+  function session(day: number, over: Partial<PlannedSession> = {}) {
+    return { day, type: "Easy", km: 10, pace: "6:00 /km", key: false, ...over };
+  }
+
+  it("draws a stored week as the same card proposeWeek draws", () => {
+    const card = toPlanCard({
+      week_starting: "2026-08-17",
+      label: "Build 4 of 9",
+      sessions: [session(0), session(1)],
+    });
+
+    expect(card.card).toBe("week-plan");
+    expect(card.week_starting).toBe("2026-08-17");
+    expect(card.label).toBe("Build 4 of 9");
+  });
+
+  it("is always accepted — the row is the acceptance", () => {
+    expect(
+      toPlanCard({
+        week_starting: "2026-08-17",
+        label: null,
+        sessions: [session(0)],
+      }).accepted,
+    ).toBe(true);
+  });
+
+  it("totals the week and counts its key sessions", () => {
+    const card = toPlanCard({
+      week_starting: "2026-08-17",
+      label: null,
+      sessions: [
+        session(0, { km: 0, type: "Rest" }),
+        session(1, { km: 8.4, key: true }),
+        session(2, { km: 12.3, key: true }),
+      ],
+    });
+
+    expect(card.total_km).toBe(20.7);
+    expect(card.quality).toBe(2);
+  });
+
+  it("draws the days in week order however they were stored", () => {
+    expect(
+      toPlanCard({
+        week_starting: "2026-08-17",
+        label: null,
+        sessions: [session(6), session(0), session(3)],
+      }).sessions.map((s) => s.day),
+    ).toEqual([0, 3, 6]);
+  });
+
+  it("leaves the stored sessions untouched", () => {
+    const sessions = [session(6), session(0)];
+    toPlanCard({ week_starting: "2026-08-17", label: null, sessions });
+    expect(sessions.map((s) => s.day)).toEqual([6, 0]);
   });
 });
 

@@ -401,6 +401,7 @@ export const fr: Translated<Messages> = {
       getRunSplits: "Lecture split par split",
       getTrainingSignals: "Mesure de votre entraînement",
       predictRaces: "Lecture de vos meilleurs efforts",
+      getWeekPlan: "Lecture de votre semaine",
       proposeWeek: "Rédaction de votre semaine",
       askAthlete: "Une question pour vous",
       drawCard: "Dessin d’une carte pour vous",
