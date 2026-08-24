@@ -10,6 +10,7 @@
 import {
   APICallError,
   createGateway,
+  jsonSchema,
   RetryError,
   tool,
   type LanguageModel,
@@ -28,6 +29,7 @@ import {
   type BestEffort,
 } from "./strava.js";
 import { fetchRunWeather, type RunWeather } from "./weather.js";
+import { buildDrawnCard } from "./coach-draw.js";
 import { getContext, getPlan, saveContext } from "./coach-store.js";
 import { getFeatureVariantFor } from "./posthog.js";
 import {
@@ -214,7 +216,9 @@ Some tools draw something the athlete can see:
 - \`getRunDebrief\` and \`getRunSplits\` draw the run, its splits and its heart
   rate. \`summariseTraining\` draws the weekly volume chart. \`predictRaces\`
   draws the best-effort table. \`proposeWeek\` draws the week as seven session
-  cards with an Accept button.
+  cards with an Accept button. \`drawCard\` composes a one-off card out of
+  stats, bars and text for the chart no other tool makes — a comparison, a
+  trend, a recap.
 - When you have drawn one, do not repeat it as a markdown table or a list of the
   same numbers. Write the read the chart cannot: what it means and what to do.
   Two or three sentences, naming at most a couple of specific figures.
@@ -359,7 +363,7 @@ export function coachSystemPrompt(
     // one thing it puts on screen as an interface, and an English form inside a
     // French screen reads as a bug rather than as an accent.
     lines.push(
-      `The athlete is reading the app in ${LANGUAGE_NAMES[language]}. \`askAthlete\` draws an interface rather than something you said, so write its questions, hints and choices in ${LANGUAGE_NAMES[language]}. Everything you write yourself stays in English.`,
+      `The athlete is reading the app in ${LANGUAGE_NAMES[language]}. \`askAthlete\` and \`drawCard\` draw interfaces rather than something you said, so write their questions, hints, labels and text in ${LANGUAGE_NAMES[language]}. Everything you write yourself stays in English.`,
     );
   }
   return lines.join("\n\n");
@@ -1454,6 +1458,128 @@ export function createCoachTools(ctx: CoachToolContext): ToolSet {
             planSignature(accepted.sessions) === planSignature(planned),
         };
       },
+    }),
+
+    drawCard: tool({
+      description:
+        "Draw a one-off card when no other tool draws what the athlete " +
+        "needs — a comparison of two runs, a trend over time, a season " +
+        "recap. The dedicated tools win whenever one fits; this is for the " +
+        "chart they cannot make. A card is a title, an optional aside " +
+        "stamp, and a flat list of blocks drawn top to bottom. Block " +
+        "kinds: text is a line in one of the card's type styles; stats is " +
+        "a grid of up to 8 labelled figures, labels short and uppercase, " +
+        "values already formatted the way a runner reads them; bars is a " +
+        "chart of up to 30 raw numbers whose heights are normalised for " +
+        "you, with tone alert flagging a bar; callout is the one-line read " +
+        "under a chart; ask is a tap that sends you its question. Every " +
+        "number you draw must come from a tool result in this turn — a " +
+        "figure you did not read is one you invented, so leave it out. " +
+        "Draws the card — underneath it, write the read, not the numbers " +
+        "again.",
+      // Hand-written JSON schema, and deliberately *not* zod. Two live
+      // failures shaped this: a strict schema throws out of `streamText`
+      // before `execute` and takes the athlete's whole turn, and `z.unknown()`
+      // fields emit empty property schemas — no `type` at all — which broke
+      // the default model's tool-call template so thoroughly it stopped being
+      // able to call *any* tool. `jsonSchema` without a validator is the pair
+      // this tool needs: the model sees every field fully typed, and nothing
+      // validates before `buildDrawnCard`, which answers a broken block with
+      // a note and a broken card with an `{ error }` the model can fix
+      // mid-turn.
+      inputSchema: jsonSchema<{
+        title?: unknown;
+        aside?: unknown;
+        blocks?: unknown;
+      }>({
+        type: "object",
+        properties: {
+          title: {
+            type: "string",
+            description: "The card's heading, a few words.",
+          },
+          aside: {
+            type: "string",
+            description:
+              "A short uppercase stamp for the heading's right edge, " +
+              "naming the window or the comparison.",
+          },
+          blocks: {
+            type: "array",
+            description:
+              "The card's content, top to bottom. Each block is an object " +
+              "with a kind and that kind's own fields.",
+            items: {
+              type: "object",
+              required: ["kind"],
+              additionalProperties: false,
+              properties: {
+                kind: {
+                  type: "string",
+                  enum: ["text", "stats", "bars", "callout", "ask"],
+                },
+                text: {
+                  type: "string",
+                  description: "For text and callout: what it says.",
+                },
+                look: {
+                  type: "string",
+                  enum: ["body", "strong", "caption", "muted", "mono"],
+                  description: "For text: the type style.",
+                },
+                items: {
+                  type: "array",
+                  description: "For stats: the labelled figures.",
+                  items: {
+                    type: "object",
+                    required: ["label", "value"],
+                    additionalProperties: false,
+                    properties: {
+                      label: { type: "string" },
+                      value: { type: "string" },
+                    },
+                  },
+                },
+                bars: {
+                  type: "array",
+                  description: "For bars: the values to chart.",
+                  items: {
+                    type: "object",
+                    required: ["value"],
+                    additionalProperties: false,
+                    properties: {
+                      label: { type: "string" },
+                      value: { type: "number" },
+                      tone: { type: "string", enum: ["brand", "alert"] },
+                    },
+                  },
+                },
+                unit: {
+                  type: "string",
+                  description: "For bars: what the values are in, e.g. km.",
+                },
+                tone: {
+                  type: "string",
+                  enum: ["brand", "warn", "alert"],
+                  description: "For callout: the rule's colour.",
+                },
+                label: {
+                  type: "string",
+                  description: "For ask: the words on the button.",
+                },
+                question: {
+                  type: "string",
+                  description: "For ask: the question the tap sends you.",
+                },
+              },
+            },
+          },
+        },
+        required: ["blocks"],
+        additionalProperties: false,
+      }),
+      execute: async ({ title, aside, blocks }) =>
+        buildDrawnCard({ title, aside, blocks }),
     }),
   };
 }

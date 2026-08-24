@@ -4,7 +4,6 @@
 // outputs carry a `card` discriminator and every number already formatted for a
 // runner, so nothing here computes training — it lays out what the API measured.
 // Change a tool's output shape and the matching card has to move with it.
-import { type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
@@ -14,7 +13,16 @@ import { useMessages } from "@/i18n";
 import { useFormatters } from "@/i18n/format";
 import { MonoLabel } from "@/components/mono";
 import { Button } from "@/components/ui/button";
-import { CardHelp, type CardHelpId } from "@/components/coach/card-help";
+import {
+  Callout,
+  CardHeading,
+  CardShell,
+} from "@/components/coach/coach-card-shell";
+import {
+  asDrawnCard,
+  CoachDrawnCard,
+  type DrawnCard,
+} from "@/components/coach/coach-drawn-card";
 import { cn } from "@/lib/utils";
 
 // --- the shapes the API draws -------------------------------------------------
@@ -120,7 +128,7 @@ export interface PlanCard {
 // take, so it lives in the composer rather than in the transcript — see
 // coach-questionnaire.tsx.
 export type CoachCard =
-  DebriefCard | SplitsCard | VolumeCard | PredictionCard | PlanCard;
+  DebriefCard | SplitsCard | VolumeCard | PredictionCard | PlanCard | DrawnCard;
 
 /**
  * A tool result, if it is one of ours.
@@ -135,6 +143,10 @@ export function asCoachCard(output: unknown): CoachCard | null {
     return null;
   }
   const kind = (output as { card: unknown }).card;
+  // A drawn card is the one kind whose shape isn't guaranteed by its
+  // discriminator alone — the spec inside it is model-authored, so it gets its
+  // own validator rather than a cast.
+  if (kind === "drawn") return asDrawnCard(output);
   return kind === "run-debrief" ||
     kind === "run-splits" ||
     kind === "training-volume" ||
@@ -192,76 +204,8 @@ function planSignature(
   }).join("\n");
 }
 
-// --- shared furniture ---------------------------------------------------------
-
-/** The frame every card shares: elevated surface, hairline, 20px radius. */
-function CardShell({
-  children,
-  className,
-}: {
-  children: ReactNode;
-  className?: string;
-}) {
-  return (
-    <div
-      className={cn(
-        "bg-card border-border max-w-[660px] overflow-hidden rounded-lg border",
-        className,
-      )}
-    >
-      {children}
-    </div>
-  );
-}
-
-function CardHeading({
-  title,
-  aside,
-  help,
-}: {
-  title: string;
-  aside?: ReactNode;
-  /** Which entry of `help` explains this card, if any explains it. */
-  help?: CardHelpId;
-}) {
-  return (
-    <div className="flex items-baseline justify-between gap-4">
-      <span className="text-body-sm font-semibold">{title}</span>
-      {aside || help ? (
-        <span className="flex shrink-0 items-center gap-2.5">
-          {aside}
-          {help ? <CardHelp id={help} /> : null}
-        </span>
-      ) : null}
-    </div>
-  );
-}
-
-/**
- * The sentence under a chart, with a coloured rule beside it. DESIGN.md keeps
- * accents out of button surfaces; a 3px rule beside a reading is illustration.
- */
-function Callout({
-  tone = "brand",
-  children,
-}: {
-  tone?: "brand" | "warn" | "alert";
-  children: ReactNode;
-}) {
-  return (
-    <div className="border-border flex items-stretch gap-2.5 border-t pt-4">
-      <span
-        className={cn(
-          "w-[3px] shrink-0 rounded-full",
-          tone === "alert" && "bg-chart-3",
-          tone === "warn" && "bg-chart-5",
-          tone === "brand" && "bg-brand",
-        )}
-      />
-      <span className="text-caption leading-relaxed">{children}</span>
-    </div>
-  );
-}
+// The shared furniture — CardShell, CardHeading, Callout — lives in
+// coach-card-shell.tsx, where the drawn card can reach it too.
 
 // --- the run debrief ----------------------------------------------------------
 
@@ -873,5 +817,7 @@ export function CoachCardView({
       return <RacePrediction actions={actions} card={card} />;
     case "week-plan":
       return <WeekPlan actions={actions} card={card} />;
+    case "drawn":
+      return <CoachDrawnCard actions={actions} card={card} />;
   }
 }

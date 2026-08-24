@@ -403,6 +403,7 @@ export const fr: Translated<Messages> = {
       predictRaces: "Lecture de vos meilleurs efforts",
       proposeWeek: "Rédaction de votre semaine",
       askAthlete: "Une question pour vous",
+      drawCard: "Dessin d’une carte pour vous",
     },
   },
 
