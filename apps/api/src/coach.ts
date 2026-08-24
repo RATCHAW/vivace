@@ -52,7 +52,7 @@ import {
   weeklyVolume,
   weekStart,
 } from "./training.js";
-import type { Run } from "./schemas.js";
+import type { CoachPlan, Run } from "./schemas.js";
 
 // The pure helpers moved to training.ts, where they are unit-tested. Re-exported
 // here because they are the coach's own vocabulary and callers import them from
@@ -216,9 +216,9 @@ Some tools draw something the athlete can see:
 - \`getRunDebrief\` and \`getRunSplits\` draw the run, its splits and its heart
   rate. \`summariseTraining\` draws the weekly volume chart. \`predictRaces\`
   draws the best-effort table. \`proposeWeek\` draws the week as seven session
-  cards with an Accept button. \`drawCard\` composes a one-off card out of
-  stats, bars and text for the chart no other tool makes — a comparison, a
-  trend, a recap.
+  cards with an Accept button, and \`getWeekPlan\` draws the week they have
+  already accepted. \`drawCard\` composes a one-off card out of stats, bars and
+  text for the chart no other tool makes — a comparison, a trend, a recap.
 - When you have drawn one, do not repeat it as a markdown table or a list of the
   same numbers. Write the read the chart cannot: what it means and what to do.
   Two or three sentences, naming at most a couple of specific figures.
@@ -240,10 +240,14 @@ Call \`setAthleteContext\` the moment the athlete tells you any of it — a race
 a date, a target, an injury, the days they can run — so the next thread starts
 knowing. Never ask for something the context already holds.
 
-Planning: when the athlete asks for a week, a plan or a taper, write it with
-\`proposeWeek\`. Seven days numbered 0 = Monday … 6 = Sunday, never 1 to 7, rest
-days included with 0 km. Build
-it around the goal race and the load numbers, not around a template.
+Planning: \`getWeekPlan\` is the week the athlete has already accepted, and it
+is the answer to "what is my plan", "what am I doing on Thursday" and "what is
+left this week" — read it, don't write them a new week they never asked for.
+Read it before proposing one too: a week you rewrite without looking is a week
+they had already planned around. When they do ask for a week, a plan or a taper,
+write it with \`proposeWeek\`. Seven days numbered 0 = Monday … 6 = Sunday,
+never 1 to 7, rest days included with 0 km. Build it around the goal race and
+the load numbers, not around a template.
 
 Boundaries: you coach running, not medicine. Pain that persists, or anything
 that sounds like an injury, gets one sentence pointing at a physio or doctor —
@@ -958,6 +962,39 @@ export function mondayFirst<T extends { day: number }>(sessions: T[]): T[] {
     .sort((a, b) => a.day - b.day);
 }
 
+/**
+ * A week read back out of the accepted-weeks table, as the card that draws it.
+ *
+ * Written apart from the tool because this is the one place a *read* week has
+ * to become the same shape a *proposed* one has: the browser dispatches on the
+ * `card` field and not on which tool produced it (`asCoachCard`), so the two
+ * must agree field for field or a week the athlete accepted draws as a tool
+ * chip.
+ */
+export function toPlanCard(plan: CoachPlan) {
+  // Sorted, not normalised. `mondayFirst` exists to forgive a model that
+  // numbered the week 1…7; these sessions came through the accept route, which
+  // validated 0…6 on the way in, so the only thing left to guarantee is the
+  // order the card draws them in.
+  const sessions = [...plan.sessions].sort((a, b) => a.day - b.day);
+  const total = sessions.reduce((sum, session) => sum + session.km, 0);
+
+  return {
+    card: "week-plan" as const,
+    week_starting: plan.week_starting,
+    label: plan.label,
+    sessions,
+    total_km: Number(total.toFixed(1)),
+    quality: sessions.filter((session) => session.key).length,
+    /**
+     * Always true, and not a signature comparison like `proposeWeek`'s. There
+     * is nothing to compare against here — a row in this table *is* an accepted
+     * week, so the card draws it without an Accept button.
+     */
+    accepted: true,
+  };
+}
+
 /** The context to bind a set of tools to one athlete and one turn. */
 export interface CoachToolContext {
   accessToken: string;
@@ -1373,6 +1410,46 @@ export function createCoachTools(ctx: CoachToolContext): ToolSet {
         } catch (err) {
           return stravaFailure(err);
         }
+      },
+    }),
+
+    getWeekPlan: tool({
+      description:
+        "The week the athlete has already accepted, as the seven sessions " +
+        "they agreed to run. Read it before writing anything: 'what is my " +
+        "plan', 'what am I doing Thursday' and 'what is left this week' are " +
+        "this tool, not `proposeWeek`, and a week rewritten without reading " +
+        "is a week the athlete had already planned around. Draws the week as " +
+        "cards. Returns no plan when they never accepted one for that week — " +
+        "say so and offer to write it, never describe a week they don't have.",
+      inputSchema: z.object({
+        week_starting: z
+          .string()
+          .regex(/^\d{4}-\d{2}-\d{2}$/)
+          .optional()
+          .describe(
+            "A date in the week to read. Defaults to this week; it is " +
+              "snapped to that week's Monday.",
+          ),
+      }),
+      execute: async ({ week_starting }) => {
+        // Snapped for the same reason `proposeWeek` snaps: a week is stored
+        // under its Monday, so a mid-week date would look up a row that cannot
+        // exist and report the athlete has no plan.
+        const week = weekStart(week_starting ?? today);
+        const plan = await getPlan(userId, week);
+        if (plan === null) {
+          // No `card`, deliberately: there is nothing to draw, and an empty
+          // week card would read as "your week is seven rest days".
+          return {
+            week_starting: week,
+            plan: null,
+            note:
+              "No week accepted for this Monday. The athlete may have been " +
+              "offered one and not accepted it, so ask before assuming.",
+          };
+        }
+        return toPlanCard(plan);
       },
     }),
 

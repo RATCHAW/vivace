@@ -445,6 +445,7 @@ export const en = {
       getRunSplits: "Reading it split by split",
       getTrainingSignals: "Measuring your training",
       predictRaces: "Reading your best efforts",
+      getWeekPlan: "Reading your week",
       proposeWeek: "Writing your week",
       askAthlete: "Asking you something",
       drawCard: "Drawing you a card",
