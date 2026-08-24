@@ -12,6 +12,10 @@ export default defineConfig({
     },
   },
   server: {
+    // Listen on every interface so a phone on the same Wi-Fi can open the LAN
+    // URL Vite prints. The /api proxy below still runs on this machine, so the
+    // API stays on localhost.
+    host: true,
     port: 5173,
     proxy: {
       // Forward API + auth calls to the Hono server so everything is same-origin in dev
