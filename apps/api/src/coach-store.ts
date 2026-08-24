@@ -3,7 +3,7 @@
 //
 // Both are keyed by user and read on every coach turn, which is what stops each
 // new thread from opening by asking "so what's the goal?" again.
-import { and, eq, sql } from "drizzle-orm";
+import { and, asc, between, eq, sql } from "drizzle-orm";
 import { db } from "./db/index.js";
 import { coachContext, coachPlan } from "./db/schema/coach.js";
 import type { CoachContext, CoachPlan } from "./schemas.js";
@@ -107,6 +107,38 @@ export async function getPlan(
       ),
     );
   return row ?? null;
+}
+
+/**
+ * Every week the athlete accepted between two Mondays, oldest first.
+ *
+ * Both bounds are inclusive and arrive as Mondays because that is the only
+ * form a week is ever stored under — `savePlan` writes what the accept route
+ * validated, and the proposeWeek tool snaps to Monday before that. Weeks the
+ * athlete never accepted simply aren't rows, so a gap in the result is a gap
+ * in the training, not a query artefact.
+ */
+export async function listPlans(
+  userId: string,
+  fromWeek: string,
+  toWeek: string,
+): Promise<CoachPlan[]> {
+  return db
+    .select({
+      week_starting: coachPlan.weekStarting,
+      label: coachPlan.label,
+      sessions: coachPlan.sessions,
+    })
+    .from(coachPlan)
+    .where(
+      and(
+        eq(coachPlan.userId, userId),
+        // Text comparison is date comparison here: `YYYY-MM-DD` sorts the way
+        // the calendar does, which is the reason the column is text at all.
+        between(coachPlan.weekStarting, fromWeek, toWeek),
+      ),
+    )
+    .orderBy(asc(coachPlan.weekStarting));
 }
 
 /** Accepting a week, or accepting a revision of one already accepted. */

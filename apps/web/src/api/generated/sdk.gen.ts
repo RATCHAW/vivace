@@ -315,7 +315,7 @@ export const updateCoachThread = <ThrowOnError extends boolean = false>(options:
 /**
  * The coach's read on the athlete, before they ask anything
  *
- * Everything the Coach screen's rails show: the goal race the coach remembers, this week's accepted plan measured against what was actually run, the measured training signals (load ratio, easy-run intensity, aerobic decoupling, shoe mileage) and the queue of things worth asking about. Signals that cannot be computed from the athlete's data are omitted rather than returned empty.
+ * Everything the Coach screen's rails show: the goal race the coach remembers, the accepted weeks — recent past, current and one planned ahead — each measured against what was actually run, the measured training signals (load ratio, easy-run intensity, aerobic decoupling, shoe mileage) and the queue of things worth asking about. Signals that cannot be computed from the athlete's data are omitted rather than returned empty.
  */
 export const getCoachBriefing = <ThrowOnError extends boolean = false>(options?: Options<GetCoachBriefingData, ThrowOnError>): RequestResult<GetCoachBriefingResponses, GetCoachBriefingErrors, ThrowOnError> => (options?.client ?? client).get<GetCoachBriefingResponses, GetCoachBriefingErrors, ThrowOnError>({
     security: [{

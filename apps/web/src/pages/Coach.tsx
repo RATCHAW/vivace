@@ -411,7 +411,11 @@ export function Coach() {
             // Keyed so switching threads rebuilds the chat rather than replaying
             // one conversation's stream into another's transcript.
             <CoachChat
-              acceptedWeek={briefing?.plan?.week_starting ?? null}
+              acceptedWeeks={
+                briefing?.weeks.flatMap((week) =>
+                  week ? [week.week_starting] : [],
+                ) ?? []
+              }
               initialMentions={initialMentions}
               initialMessages={toUIMessages(thread.messages)}
               key={thread.thread.id}

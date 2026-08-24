@@ -185,6 +185,7 @@ export type UpdateCoachThread = {
 export type CoachBriefing = {
     context: CoachContext;
     plan: PlanProgress;
+    weeks: Array<PlanProgress>;
     signals: Array<CoachSignal>;
     queue: Array<CoachQueueItem>;
 };

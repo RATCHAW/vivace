@@ -629,6 +629,18 @@ export const fr: Translated<Messages> = {
     noWeek:
       "Aucune semaine acceptée. Demandez-en une et elle arrive ici en séances, pas en paragraphe.",
     planMyWeek: "Planifie ma semaine",
+    weekOf: "Semaine du {{date}}",
+    nextWeek: "Semaine prochaine",
+    nextWeekOpen:
+      "La semaine prochaine est libre. Demandez au coach de l’écrire avant qu’elle n’arrive.",
+    planNextWeek: "Planifier la semaine prochaine",
+    askPlanNextWeek: "Planifie ma semaine prochaine, la semaine du {{date}}",
+    earlierWeek: "Semaine précédente",
+    laterWeek: "Semaine suivante",
+    sessionsMissed_one: "{{count}} séance manquée",
+    sessionsMissed_other: "{{count}} séances manquées",
+    sessionsPlanned_one: "{{count}} séance prévue",
+    sessionsPlanned_other: "{{count}} séances prévues",
     adjust: "Ajuster",
     askAdjustWeek: "Ajuste ma semaine",
     weekProgress: "{{actual}} sur {{planned}} km",

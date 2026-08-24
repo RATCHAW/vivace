@@ -157,8 +157,9 @@ export interface CardActions {
    * once for a request that only concerns the card that was pressed.
    */
   acceptingWeek?: string | null;
-  /** The week already accepted, so a re-rendered card knows it is live. */
-  acceptedWeek?: string | null;
+  /** Every week already accepted, so a re-rendered card knows it is live —
+   *  a list because a card can be about next week, not only this one. */
+  acceptedWeeks?: string[];
 }
 
 // --- shared furniture ---------------------------------------------------------
@@ -699,7 +700,8 @@ export function WeekPlan({
   const dayNames = messages.days.long;
   // The card is stored in the transcript, so `accepted` is only true of the
   // week as it stood when the tool ran. The live answer is the briefing's.
-  const accepted = actions.acceptedWeek === card.week_starting || card.accepted;
+  const accepted =
+    (actions.acceptedWeeks ?? []).includes(card.week_starting) || card.accepted;
   // Accepting is a round trip to us and then a reload of the briefing behind
   // it, so the button has to say it is working — a disabled pill that only
   // greys out reads as a press that did nothing.
