@@ -270,6 +270,35 @@ describe("CoachComposer", () => {
     expect(field.hasAttribute("disabled")).toBe(true);
     expect(document.activeElement).not.toBe(field);
   });
+
+  it("sends on Enter where there is a shift to hold", async () => {
+    stubPointer(false);
+    const onSubmit = vi.fn();
+    render(<Composer initial="plan my week" onSubmit={onSubmit} />);
+
+    // `PromptInput` converts its attachments before handing the message over.
+    await act(async () => {
+      fireEvent.keyDown(box(), { key: "Enter" });
+    });
+
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({ text: "plan my week" }),
+    );
+  });
+
+  it("writes a newline on Enter where there isn't", () => {
+    stubPointer(true);
+    const onSubmit = vi.fn();
+    render(<Composer initial="plan my week" onSubmit={onSubmit} />);
+
+    const event = fireEvent.keyDown(box(), { key: "Enter" });
+
+    // The browser is left to insert the line break, and the send button — the
+    // only way out on a phone — is still there to take the question.
+    expect(event).toBe(true);
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(box().getAttribute("enterkeyhint")).toBe("enter");
+  });
 });
 
 describe("CoachComposer dictation", () => {

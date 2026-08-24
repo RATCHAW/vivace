@@ -26,6 +26,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useMediaQuery } from "@/lib/use-media-query";
 import { cn } from "@/lib/utils";
 import { i18n } from "@/i18n";
 import { useTranslation } from "react-i18next";
@@ -371,6 +372,18 @@ export const PromptInputTextarea = ({
 }: PromptInputTextareaProps) => {
   const attachments = usePromptInputAttachments();
   const [isComposing, setIsComposing] = useState(false);
+  /**
+   * Enter sends, *except* on a virtual keyboard — where there is no shift to
+   * hold, so "shift+Enter is the newline" leaves a phone with no newline at all
+   * and every paragraph break sends the message half-written. On a touch device
+   * the return key goes back to being a return key and the send button is the
+   * only way out, which is what it already looks like: it is the one thing under
+   * the box drawn as a filled circle.
+   *
+   * `(pointer: coarse)` rather than a width breakpoint, same as the composer's
+   * autofocus — a phone held sideways is still a phone.
+   */
+  const touch = useMediaQuery("(pointer: coarse)");
 
   const handleKeyDown: KeyboardEventHandler<HTMLTextAreaElement> = useCallback(
     (e) => {
@@ -380,6 +393,7 @@ export const PromptInputTextarea = ({
       if (e.key === "Enter") {
         // An IME candidate window is mid-word, and shift+enter is a newline.
         if (isComposing || e.nativeEvent.isComposing || e.shiftKey) return;
+        if (touch) return;
         e.preventDefault();
 
         const { form } = e.currentTarget;
@@ -401,7 +415,7 @@ export const PromptInputTextarea = ({
         if (last) attachments.remove(last.id);
       }
     },
-    [onKeyDown, isComposing, attachments],
+    [onKeyDown, isComposing, attachments, touch],
   );
 
   const handlePaste: ClipboardEventHandler<HTMLTextAreaElement> = useCallback(
@@ -423,6 +437,10 @@ export const PromptInputTextarea = ({
   return (
     <InputGroupTextarea
       className={cn("text-body-md max-h-48 min-h-16 px-4.5 py-3.5", className)}
+      // Only a virtual keyboard reads this, and it is the one that needs telling:
+      // the key has to say what it now does, or it is drawn as "send" and still
+      // writes a newline.
+      enterKeyHint={touch ? "enter" : undefined}
       name="message"
       onCompositionEnd={() => setIsComposing(false)}
       onCompositionStart={() => setIsComposing(true)}
