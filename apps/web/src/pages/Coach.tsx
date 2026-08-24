@@ -411,9 +411,25 @@ export function Coach() {
             // Keyed so switching threads rebuilds the chat rather than replaying
             // one conversation's stream into another's transcript.
             <CoachChat
-              acceptedWeeks={
+              acceptedPlans={
+                // The briefing sends an accepted week back as progress against
+                // it, so the sessions are read off the days — which is what
+                // tells a plan card whether it is the week that is live or a
+                // revision of it still waiting to be accepted.
                 briefing?.weeks.flatMap((week) =>
-                  week ? [week.week_starting] : [],
+                  week
+                    ? [
+                        {
+                          week_starting: week.week_starting,
+                          sessions: week.days.map((day) => ({
+                            day: day.day,
+                            type: day.type,
+                            km: day.planned_km,
+                            pace: day.planned_pace,
+                          })),
+                        },
+                      ]
+                    : [],
                 ) ?? []
               }
               initialMentions={initialMentions}

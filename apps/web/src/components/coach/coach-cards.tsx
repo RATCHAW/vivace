@@ -144,6 +144,17 @@ export function asCoachCard(output: unknown): CoachCard | null {
     : null;
 }
 
+/**
+ * A week the athlete has accepted, as the briefing sends it back.
+ *
+ * The sessions and not just the date: a reworked week is proposed under the
+ * same Monday, so a card recognises itself by the days it draws.
+ */
+export interface AcceptedPlan {
+  week_starting: string;
+  sessions: Pick<PlannedSession, "day" | "type" | "km" | "pace">[];
+}
+
 export interface CardActions {
   /** Send a new message, optionally about one run. */
   onAsk: (text: string, runId?: number) => void;
@@ -157,9 +168,28 @@ export interface CardActions {
    * once for a request that only concerns the card that was pressed.
    */
   acceptingWeek?: string | null;
-  /** Every week already accepted, so a re-rendered card knows it is live —
-   *  a list because a card can be about next week, not only this one. */
-  acceptedWeeks?: string[];
+  /** Every week already accepted, so a re-rendered card knows whether it is
+   *  live — a list because a card can be about next week, not only this one. */
+  acceptedPlans?: AcceptedPlan[];
+}
+
+/**
+ * A week as the seven days it asks for, so two of them can be compared.
+ *
+ * Mirrors `planSignature` in apps/api/src/training.ts, over the four fields the
+ * card draws — the briefing writes every day out and a plan card need not, so a
+ * day nobody wrote is a rest day rather than a difference. `key` is out of it on
+ * both sides: the briefing doesn't send the star back.
+ */
+function planSignature(
+  sessions: Pick<PlannedSession, "day" | "type" | "km" | "pace">[],
+): string {
+  return Array.from({ length: 7 }, (_, day) => {
+    const session = sessions.find((entry) => entry.day === day);
+    return session
+      ? `${session.type}|${session.km}|${session.pace}`
+      : "Rest|0|";
+  }).join("\n");
 }
 
 // --- shared furniture ---------------------------------------------------------
@@ -699,9 +729,18 @@ export function WeekPlan({
   const dayStamps = messages.days.short;
   const dayNames = messages.days.long;
   // The card is stored in the transcript, so `accepted` is only true of the
-  // week as it stood when the tool ran. The live answer is the briefing's.
-  const accepted =
-    (actions.acceptedWeeks ?? []).includes(card.week_starting) || card.accepted;
+  // week as it stood when the tool ran. The live answer is the briefing's —
+  // and it is the week's *sessions* that answer, not its Monday: a plan the
+  // athlete asked the coach to adjust comes back under the same date, and it
+  // is a proposal to accept rather than the week they are already running.
+  const live = (actions.acceptedPlans ?? []).find(
+    (plan) => plan.week_starting === card.week_starting,
+  );
+  const accepted = live
+    ? planSignature(live.sessions) === planSignature(card.sessions)
+    : // Outside the briefing's window — a week too far back to measure — the
+      // card's own answer is all there is.
+      card.accepted;
   // Accepting is a round trip to us and then a reload of the briefing behind
   // it, so the button has to say it is working — a disabled pill that only
   // greys out reads as a press that did nothing.

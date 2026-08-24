@@ -8,6 +8,7 @@ import {
   loadRatio,
   pace,
   planProgress,
+  planSignature,
   predictRaces,
   routePath,
   toSplits,
@@ -406,6 +407,47 @@ describe("planProgress", () => {
       "2026-08-13",
     );
     expect(progress.actual_km).toBe(0);
+  });
+});
+
+describe("planSignature", () => {
+  const week = [
+    { day: 0, type: "Easy", km: 5, pace: "6:30 /km", key: false },
+    { day: 1, type: "8 × 400", km: 9, pace: "4:35 /km", key: true },
+    { day: 2, type: "Easy", km: 8, pace: "6:05 /km", key: false },
+    { day: 3, type: "Rest", km: 0, pace: "", key: false },
+    { day: 4, type: "Easy", km: 6, pace: "6:05 /km", key: false },
+    { day: 5, type: "Tempo", km: 10, pace: "5:15 /km", key: true },
+    { day: 6, type: "Long", km: 18, pace: "6:00 /km", key: true },
+  ];
+
+  it("tells a reworked week from the one that was accepted", () => {
+    // The whole point: an adjusted plan arrives under the same Monday, and it
+    // is a proposal to accept — not the week the athlete is already running.
+    const moved = week.map((session) =>
+      session.day === 5 ? { ...session, km: 12 } : session,
+    );
+    expect(planSignature(moved)).not.toBe(planSignature(week));
+  });
+
+  it("reads a week written in another order as the same week", () => {
+    expect(planSignature([...week].reverse())).toBe(planSignature(week));
+  });
+
+  it("reads a day nobody wrote as the rest day the briefing fills in", () => {
+    // A card may leave rest days out; `planProgress` writes all seven back.
+    // The two have to compare equal, or the week would never read as accepted.
+    expect(planSignature(week.filter((session) => session.day !== 3))).toBe(
+      planSignature(week),
+    );
+  });
+
+  it("ignores which sessions carry the star", () => {
+    // `key` is what the card highlights, not what the week asks for, and the
+    // briefing doesn't send it back — so it can't be part of the identity.
+    expect(planSignature(week.map((s) => ({ ...s, key: !s.key })))).toBe(
+      planSignature(week),
+    );
   });
 });
 

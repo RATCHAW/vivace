@@ -563,6 +563,27 @@ export interface PlanProgress {
 }
 
 /**
+ * A week as the seven days it asks for, for comparing one against another.
+ *
+ * Every day is written out, so a plan that left rest days implicit reads the
+ * same as one that spelled them — those are the defaults `planProgress` fills
+ * a missing day with, which is what lets an accepted week be compared to the
+ * week a card is drawing. `key` is deliberately not in it: the star says which
+ * sessions the week is built around, not what the week asks the athlete to run,
+ * and the briefing doesn't carry it back.
+ */
+export function planSignature(
+  sessions: Pick<PlannedSession, "day" | "type" | "km" | "pace">[],
+): string {
+  return Array.from({ length: 7 }, (_, day) => {
+    const session = sessions.find((entry) => entry.day === day);
+    return session
+      ? `${session.type}|${session.km}|${session.pace}`
+      : "Rest|0|";
+  }).join("\n");
+}
+
+/**
  * The accepted week against what the athlete actually ran.
  *
  * Matching is by day, not by session: a plan says "Tuesday, 9 km of intervals"
