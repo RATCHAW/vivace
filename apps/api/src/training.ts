@@ -5,7 +5,7 @@
 // is deliberate: a wrong split or a wrong ratio is a wrong answer in the
 // athlete's face, so all of it is unit-tested in coach.test.ts.
 import type { BestEffort } from "./strava.js";
-import type { Run, RunStreams } from "./schemas.js";
+import type { Run, RunStreams, SessionKind } from "./schemas.js";
 
 // --- formatting ---------------------------------------------------------------
 
@@ -530,11 +530,18 @@ export function predictRaces(efforts: BestEffort[]): RacePrediction[] {
 export interface PlannedSession {
   /** 0 = Monday … 6 = Sunday, so a week is always seven entries in order. */
   day: number;
-  /** "Easy", "8 × 400", "Long", "Rest". */
+  /** "Easy", "Intervals", "Hill repeats", "Long", "Rest". */
   type: string;
-  /** Kilometres; 0 for a rest day. */
+  /** What the session is beneath its label; absent on weeks that predate it. */
+  kind?: SessionKind;
+  /** Kilometres for the whole day, warm-up and cool-down included; 0 for rest. */
   km: number;
-  /** "6:05 /km", or a note like "legs up" on a rest day. */
+  /**
+   * The structure of a session that has one — "6 × 800 m · 400 m jog",
+   * "8 × 45s uphill · jog down". Absent on a plain run or a rest day.
+   */
+  workout?: string;
+  /** "6:05 /km", the pace of the work reps, or a note like "legs up" on a rest day. */
   pace: string;
   /** A session the week is built around — the two quality days and the long run. */
   key: boolean;
@@ -547,6 +554,8 @@ export interface PlanDayProgress {
   actual_km: number;
   /** The target pace as the coach wrote it — "4:35 /km", or "legs up". */
   planned_pace: string;
+  /** The session's structure as the coach wrote it; "" on a plain run. */
+  planned_workout: string;
   /** What the day was run at, `m:ss` per km; null when nothing was logged. */
   actual_pace: string | null;
   /** Runs logged on the day, for the tooltip and for "which run was that?". */
@@ -570,16 +579,19 @@ export interface PlanProgress {
  * a missing day with, which is what lets an accepted week be compared to the
  * week a card is drawing. `key` is deliberately not in it: the star says which
  * sessions the week is built around, not what the week asks the athlete to run,
- * and the briefing doesn't carry it back.
+ * and the briefing doesn't carry it back. `kind` is out for the same reason —
+ * it classifies the session, the workout line is what changes what is asked —
+ * and an absent workout reads as "", so a stored week from before the field
+ * still recognises itself.
  */
 export function planSignature(
-  sessions: Pick<PlannedSession, "day" | "type" | "km" | "pace">[],
+  sessions: Pick<PlannedSession, "day" | "type" | "km" | "pace" | "workout">[],
 ): string {
   return Array.from({ length: 7 }, (_, day) => {
     const session = sessions.find((entry) => entry.day === day);
     return session
-      ? `${session.type}|${session.km}|${session.pace}`
-      : "Rest|0|";
+      ? `${session.type}|${session.km}|${session.pace}|${session.workout ?? ""}`
+      : "Rest|0||";
   }).join("\n");
 }
 
@@ -615,6 +627,7 @@ export function planProgress(
       planned_km: session?.km ?? 0,
       actual_km: Number((metres / 1000).toFixed(1)),
       planned_pace: session?.pace ?? "",
+      planned_workout: session?.workout ?? "",
       // Distance over time across the whole day, never the mean of each run's
       // pace: a 3 km shakeout and a 15 km long run don't weigh the same.
       actual_pace: metres > 0 ? pace(seconds / (metres / 1000)) : null,

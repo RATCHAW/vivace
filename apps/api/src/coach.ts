@@ -52,6 +52,7 @@ import {
   weeklyVolume,
   weekStart,
 } from "./training.js";
+import { SESSION_KINDS } from "./schemas.js";
 import type { CoachPlan, Run } from "./schemas.js";
 
 // The pure helpers moved to training.ts, where they are unit-tested. Re-exported
@@ -247,7 +248,12 @@ Read it before proposing one too: a week you rewrite without looking is a week
 they had already planned around. When they do ask for a week, a plan or a taper,
 write it with \`proposeWeek\`. Seven days numbered 0 = Monday … 6 = Sunday,
 never 1 to 7, rest days included with 0 km. Build it around the goal race and
-the load numbers, not around a template.
+the load numbers, not around a template. A week is not just distances at a
+pace: intervals, fartlek and hill sessions carry their structure in the
+session's \`workout\` — the reps, the recoveries, the terrain — with \`km\` the
+day's whole distance including warm-up and cool-down, and \`pace\` the effort of
+the work, not an average of the day. Prescribe them when the athlete is ready
+for them: an athlete building for a race deserves more than seven steady runs.
 
 Boundaries: you coach running, not medicine. Pain that persists, or anything
 that sounds like an injury, gets one sentence pointing at a physio or doctor —
@@ -1487,17 +1493,38 @@ export function createCoachTools(ctx: CoachToolContext): ToolSet {
               type: z
                 .string()
                 .max(40)
-                .describe("Recovery, Easy, 8 × 400, Tempo, Long, Rest."),
+                .describe(
+                  "The label the card draws, in the athlete's language: " +
+                    "Recovery, Easy, Intervals, Fartlek, Hill repeats, " +
+                    "Tempo, Long, Rest.",
+                ),
+              kind: z
+                .enum(SESSION_KINDS)
+                .describe("What the session is, beneath the label."),
               km: z
                 .number()
                 .min(0)
                 .max(200)
-                .describe("Kilometres; 0 for rest."),
+                .describe(
+                  "The day's whole distance, warm-up and cool-down " +
+                    "included; 0 for rest.",
+                ),
+              workout: z
+                .string()
+                .max(80)
+                .optional()
+                .describe(
+                  "The structure of a session that has one: '6 × 800 m · " +
+                    "400 m jog', '8 × 45s uphill · jog down', '40 min with " +
+                    "10 × 1:00 on / 1:00 off'. Omit for plain runs and rest.",
+                ),
               pace: z
                 .string()
                 .max(40)
                 .describe(
-                  "Target pace like '6:05 /km', or a note like 'legs up'.",
+                  "Target pace like '6:05 /km' — for a structured session " +
+                    "the pace or effort of the work reps, not the day's " +
+                    "average — or a note like 'legs up' on a rest day.",
                 ),
               key: z
                 .boolean()
