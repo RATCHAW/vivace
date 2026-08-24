@@ -4,7 +4,9 @@
 // Everything here comes from GET /api/coach/briefing in one request — see
 // apps/api/src/briefing.ts. Nothing is computed twice: a signal shown here and
 // the same signal quoted in an answer are literally the same object.
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { ChevronLeftIcon, ChevronRightIcon, PlusIcon } from "lucide-react";
 import type {
   CoachBriefing,
   CoachSignal,
@@ -19,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatClock, formatPace } from "@repo/video";
+import { useMediaQuery } from "@/lib/use-media-query";
 import { cn } from "@/lib/utils";
 
 /** A measurement outside its band shouts; one drifting towards it murmurs. */
@@ -463,30 +466,106 @@ function GoalRace({
   );
 }
 
-function ThisWeek({
-  plan,
+/** The gap between the carousel's slides, in px — must match the track's `gap-3`. */
+const SLIDE_GAP = 12;
+
+/**
+ * Monday of the week the browser is living, `YYYY-MM-DD` — read off the local
+ * calendar rather than UTC, for the same reason `todayIndex` is.
+ */
+export function mondayOf(now = new Date()): string {
+  const day = new Date(
+    Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()),
+  );
+  day.setUTCDate(day.getUTCDate() - ((day.getUTCDay() + 6) % 7));
+  return day.toISOString().slice(0, 10);
+}
+
+/** `2026-08-17` plus n days, staying on the calendar. */
+function plusDays(date: string, days: number): string {
+  const day = new Date(`${date}T00:00:00Z`);
+  day.setUTCDate(day.getUTCDate() + days);
+  return day.toISOString().slice(0, 10);
+}
+
+/** A measured week. The generated `PlanProgress` carries the briefing's
+ *  `plan: null` in its own type, which the `weeks` array never holds. */
+type Week = NonNullable<PlanProgress>;
+
+export type WeekSlide =
+  | { kind: "week"; week: Week; current: boolean; past: boolean }
+  | { kind: "plan"; weekStarting: string; current: boolean };
+
+/**
+ * The planner's strip, oldest first: every accepted week the briefing could
+ * still measure, plus one slot to plan the first open week — this week while
+ * nothing is accepted for it, the next once something is, and nothing beyond
+ * that, because the coach writes one week at a time. There is always a slide
+ * for today: the current week is either accepted, or it is the open slot.
+ */
+export function weekSlides(
+  weeks: PlanProgress[],
+  monday = mondayOf(),
+): WeekSlide[] {
+  const measured = weeks.filter((week): week is Week => week !== null);
+  const slides: WeekSlide[] = measured.map((week) => ({
+    kind: "week",
+    week,
+    current: week.week_starting === monday,
+    past: week.week_starting < monday,
+  }));
+  const open = [monday, plusDays(monday, 7)].find(
+    (candidate) => !measured.some((week) => week.week_starting === candidate),
+  );
+  if (open) {
+    slides.push({ kind: "plan", weekStarting: open, current: open === monday });
+  }
+  return slides.sort((a, b) =>
+    (a.kind === "week" ? a.week.week_starting : a.weekStarting).localeCompare(
+      b.kind === "week" ? b.week.week_starting : b.weekStarting,
+    ),
+  );
+}
+
+/** The open week, as the invitation to plan it. */
+function PlanSlot({
+  slide,
   onAsk,
 }: {
-  plan: PlanProgress | null;
+  slide: Extract<WeekSlide, { kind: "plan" }>;
   onAsk: (text: string) => void;
 }) {
   const { t } = useTranslation();
-  const messages = useMessages();
 
-  if (!plan) {
-    return (
-      <RailSection title={t("rail.thisWeek")}>
-        <div className="border-border flex flex-col gap-3.5 rounded-md border p-5">
-          <p className="text-caption text-muted-foreground leading-relaxed">
-            {t("rail.noWeek")}
-          </p>
-          <Button onClick={() => onAsk(t("rail.planMyWeek"))} size="sm">
-            {t("rail.planMyWeek")}
-          </Button>
-        </div>
-      </RailSection>
-    );
-  }
+  return (
+    <div className="border-border flex h-full flex-col gap-3.5 rounded-md border p-5">
+      <p className="text-caption text-muted-foreground leading-relaxed">
+        {t(slide.current ? "rail.noWeek" : "rail.nextWeekOpen")}
+      </p>
+      {/* The ask carries the Monday in writing. "Next week" alone leaves the
+          coach to guess which week that is, and its planning tool defaults to
+          this one. */}
+      <Button
+        onClick={() =>
+          onAsk(
+            slide.current
+              ? t("rail.planMyWeek")
+              : t("rail.askPlanNextWeek", { date: slide.weekStarting }),
+          )
+        }
+        size="sm"
+      >
+        {slide.current ? null : <PlusIcon data-icon="inline-start" />}
+        {t(slide.current ? "rail.planMyWeek" : "rail.planNextWeek")}
+      </Button>
+    </div>
+  );
+}
+
+function WeekCard({ slide }: { slide: Extract<WeekSlide, { kind: "week" }> }) {
+  const { t } = useTranslation();
+  const messages = useMessages();
+  const { week: plan, past, current } = slide;
 
   const today = todayIndex(plan.week_starting);
   // What a day reports is decided once, here, and the mark, the distance and
@@ -523,180 +602,330 @@ function ThisWeek({
     actual: plan.actual_km,
     planned: plan.planned_km,
   });
+  // What the bottom line owes each tense. `remaining` counts from today, so a
+  // week gone by would always read "complete" — for one of those the honest
+  // number is the sessions that never happened.
+  const missed = plan.days.filter(
+    (day) => day.planned_km > 0 && day.actual_km === 0,
+  ).length;
+  const verdict = past
+    ? missed > 0
+      ? t("rail.sessionsMissed", { count: missed })
+      : t("rail.weekComplete")
+    : !current
+      ? t("rail.sessionsPlanned", { count: plan.remaining })
+      : plan.remaining === 0
+        ? t("rail.weekComplete")
+        : t("rail.sessionsLeft", { count: plan.remaining });
 
   return (
-    <RailSection
-      title={t("rail.thisWeek")}
-      help="week"
-      action={
-        <Button
-          className="h-auto px-0 font-semibold"
-          onClick={() => onAsk(t("rail.askAdjustWeek"))}
-          size="xs"
-          variant="ghost"
-        >
-          {t("rail.adjust")}
-        </Button>
-      }
-    >
-      <div className="border-border flex flex-col gap-5 rounded-md border p-5">
-        {/* The number first. It used to be a footnote under the chart, and it
+    <div className="border-border flex h-full flex-col gap-5 rounded-md border p-5">
+      {/* The number first. It used to be a footnote under the chart, and it
             was the only thing on the card a reader could act on. */}
-        <div className="flex flex-col gap-2.5">
-          <div className="flex flex-col gap-1.5">
-            {/* The coach names its weeks, and the names run long — "Rebuild 1
+      <div className="flex flex-col gap-2.5">
+        <div className="flex flex-col gap-1.5">
+          {/* The coach names its weeks, and the names run long — "Rebuild 1
                 of 10 · Easy re-entry". An eyebrow above the number rather than
                 a neighbour beside it, or the number is the thing that wraps. */}
-            {plan.label ? (
-              <MonoLabel className="text-mono-badge">{plan.label}</MonoLabel>
-            ) : null}
-            <span className="text-heading-sm font-semibold whitespace-nowrap tabular-nums">
-              {total}
-            </span>
-          </div>
-          <Progress aria-label={total} value={done} variant="brand" />
+          {plan.label ? (
+            <MonoLabel className="text-mono-badge">{plan.label}</MonoLabel>
+          ) : null}
+          <span className="text-heading-sm font-semibold whitespace-nowrap tabular-nums">
+            {total}
+          </span>
         </div>
+        <Progress aria-label={total} value={done} variant="brand" />
+      </div>
 
-        {/* The shape of the week, and only the shape — every number it draws is
+      {/* The shape of the week, and only the shape — every number it draws is
             spelled out in the sessions below, so there is nothing here for a
             screen reader that it is not about to be told in words. */}
-        <div aria-hidden className="flex flex-col">
-          <div className="flex h-[72px] items-end gap-1.5">
-            {cells.map(({ day, state }) => {
-              // A rest day keeps its place in the row and puts nothing in it:
-              // five of these is the normal mid-week state, and five marks
-              // saying "nothing happened" is what the card used to spend its
-              // width on.
-              if (state === "rest")
-                return (
-                  <div className="flex-1" data-day={day.day} key={day.day} />
-                );
-              const top = Math.max(day.planned_km, day.actual_km);
+      <div aria-hidden className="flex flex-col">
+        <div className="flex h-[72px] items-end gap-1.5">
+          {cells.map(({ day, state }) => {
+            // A rest day keeps its place in the row and puts nothing in it:
+            // five of these is the normal mid-week state, and five marks
+            // saying "nothing happened" is what the card used to spend its
+            // width on.
+            if (state === "rest")
               return (
-                // The plan is the outline; only what was run is filled in. The
-                // tallest solid mark on the card is therefore always an
-                // achievement — which is what a bar already promises a reader.
-                <div
-                  className={cn(
-                    "bg-muted/50 relative flex-1 overflow-hidden rounded-[4px] border transition-[height] duration-300 ease-out motion-reduce:transition-none",
-                    // Dashed is the plan's outline, and it is only worth
-                    // drawing while there is something left inside it: a day
-                    // run in full is one solid mark, not a bar in a box.
-                    day.actual_km >= top
-                      ? "border-brand"
-                      : "border-muted-foreground/55 border-dashed",
-                    state === "missed" && "border-chart-5/70 bg-chart-5/10",
-                  )}
-                  data-day={day.day}
-                  data-state={state}
-                  key={day.day}
-                  style={{ height: `${Math.round(18 + 82 * (top / peak))}%` }}
-                >
-                  <span
-                    className="bg-brand absolute inset-x-0 bottom-0 transition-[height] duration-300 ease-out motion-reduce:transition-none"
-                    style={{
-                      height: `${Math.round((day.actual_km / top) * 100)}%`,
-                    }}
-                  />
-                </div>
+                <div className="flex-1" data-day={day.day} key={day.day} />
               );
-            })}
-          </div>
-          {/* One rule under all seven, so a day with nothing on it reads as an
-              empty place on a line rather than as a mark of its own. */}
-          <div className="border-border mt-2 flex gap-1.5 border-t pt-2">
-            {cells.map(({ day, state }) => (
-              <MonoLabel
+            const top = Math.max(day.planned_km, day.actual_km);
+            return (
+              // The plan is the outline; only what was run is filled in. The
+              // tallest solid mark on the card is therefore always an
+              // achievement — which is what a bar already promises a reader.
+              <div
                 className={cn(
-                  "text-mono-badge flex-1 text-center",
-                  day.day === today && "text-foreground font-semibold",
-                  state === "missed" && "text-chart-5",
+                  "bg-muted/50 relative flex-1 overflow-hidden rounded-[4px] border transition-[height] duration-300 ease-out motion-reduce:transition-none",
+                  // Dashed is the plan's outline, and it is only worth
+                  // drawing while there is something left inside it: a day
+                  // run in full is one solid mark, not a bar in a box.
+                  day.actual_km >= top
+                    ? "border-brand"
+                    : "border-muted-foreground/55 border-dashed",
+                  state === "missed" && "border-chart-5/70 bg-chart-5/10",
                 )}
+                data-day={day.day}
+                data-state={state}
                 key={day.day}
+                style={{ height: `${Math.round(18 + 82 * (top / peak))}%` }}
               >
-                {messages.days.initial[day.day]}
-              </MonoLabel>
-            ))}
-          </div>
+                <span
+                  className="bg-brand absolute inset-x-0 bottom-0 transition-[height] duration-300 ease-out motion-reduce:transition-none"
+                  style={{
+                    height: `${Math.round((day.actual_km / top) * 100)}%`,
+                  }}
+                />
+              </div>
+            );
+          })}
         </div>
+        {/* One rule under all seven, so a day with nothing on it reads as an
+              empty place on a line rather than as a mark of its own. */}
+        <div className="border-border mt-2 flex gap-1.5 border-t pt-2">
+          {cells.map(({ day, state }) => (
+            <MonoLabel
+              className={cn(
+                "text-mono-badge flex-1 text-center",
+                day.day === today && "text-foreground font-semibold",
+                state === "missed" && "text-chart-5",
+              )}
+              key={day.day}
+            >
+              {messages.days.initial[day.day]}
+            </MonoLabel>
+          ))}
+        </div>
+      </div>
 
-        {/* Each session on its own line, because a distance and a pace do not
+      {/* Each session on its own line, because a distance and a pace do not
             both fit under a mark 28px wide — and a mark can't say "Tempo" at
             all. Every number carries its unit here, which is what the row of
             bare figures under the chart never did. */}
-        <ul className="flex flex-col gap-2.5">
-          {sessions.map(({ day, state, unplanned, name, distance, pace }) => (
-            <li className="flex items-baseline gap-2.5" key={day.day}>
-              <MonoLabel
-                aria-hidden
-                className={cn(
-                  "text-mono-badge w-7 shrink-0",
-                  day.day === today && "text-foreground font-semibold",
-                  state === "missed" && "text-chart-5",
-                )}
-              >
-                {messages.days.short[day.day]}
-              </MonoLabel>
-              {/* The one thing here allowed to lose characters: "8 × 400 with
+      <ul className="flex flex-col gap-2.5">
+        {sessions.map(({ day, state, unplanned, name, distance, pace }) => (
+          <li className="flex items-baseline gap-2.5" key={day.day}>
+            <MonoLabel
+              aria-hidden
+              className={cn(
+                "text-mono-badge w-7 shrink-0",
+                day.day === today && "text-foreground font-semibold",
+                state === "missed" && "text-chart-5",
+              )}
+            >
+              {messages.days.short[day.day]}
+            </MonoLabel>
+            {/* The one thing here allowed to lose characters: "8 × 400 with
                   90s float" is a name, and a number that truncates is a lie. */}
-              <span
-                aria-hidden
-                className={cn(
-                  "text-caption min-w-0 flex-1 truncate",
-                  unplanned && "text-muted-foreground",
-                )}
-                title={name}
-              >
-                {name}
-              </span>
-              {/* Solid ink is a session that happened, the same promise the
+            <span
+              aria-hidden
+              className={cn(
+                "text-caption min-w-0 flex-1 truncate",
+                unplanned && "text-muted-foreground",
+              )}
+              title={name}
+            >
+              {name}
+            </span>
+            {/* Solid ink is a session that happened, the same promise the
                   filled mark above it makes; grey is one the week is still
                   asking for. */}
-              <span
-                aria-hidden
-                className={cn(
-                  "text-mono-badge shrink-0 font-mono tracking-normal tabular-nums",
-                  state === "done" ? "text-foreground" : "text-stone",
-                  state === "missed" && "text-chart-5",
-                )}
-              >
-                {distance} {t("common.km")}
-                {pace ? ` · ${pace} ${t("common.perKm")}` : ""}
-              </span>
-              {/* Colour is the only thing separating a session that happened
+            <span
+              aria-hidden
+              className={cn(
+                "text-mono-badge shrink-0 font-mono tracking-normal tabular-nums",
+                state === "done" ? "text-foreground" : "text-stone",
+                state === "missed" && "text-chart-5",
+              )}
+            >
+              {distance} {t("common.km")}
+              {pace ? ` · ${pace} ${t("common.perKm")}` : ""}
+            </span>
+            {/* Colour is the only thing separating a session that happened
                   from one that hasn't, so the readout says it in words. */}
-              <span className="sr-only">
-                {unplanned
-                  ? t("rail.dayUnplanned", {
-                      day: messages.days.long[day.day],
-                      actual: day.actual_km,
-                    })
-                  : t(DAY_READOUT[state], {
-                      day: messages.days.long[day.day],
-                      type: day.type,
-                      actual: day.actual_km,
-                      planned: day.planned_km,
-                    })}
-                {pace
-                  ? ` · ${t(state === "done" ? "rail.dayRanAt" : "rail.dayAtPace", { pace })}`
-                  : ""}
-                {day.day === today ? ` — ${t("rail.today")}` : ""}
-              </span>
-            </li>
-          ))}
-        </ul>
+            <span className="sr-only">
+              {unplanned
+                ? t("rail.dayUnplanned", {
+                    day: messages.days.long[day.day],
+                    actual: day.actual_km,
+                  })
+                : t(DAY_READOUT[state], {
+                    day: messages.days.long[day.day],
+                    type: day.type,
+                    actual: day.actual_km,
+                    planned: day.planned_km,
+                  })}
+              {pace
+                ? ` · ${t(state === "done" ? "rail.dayRanAt" : "rail.dayAtPace", { pace })}`
+                : ""}
+              {day.day === today ? ` — ${t("rail.today")}` : ""}
+            </span>
+          </li>
+        ))}
+      </ul>
 
-        <p className="text-caption border-border border-t pt-3.5">
-          {plan.remaining === 0
-            ? t("rail.weekComplete")
-            : t("rail.sessionsLeft", { count: plan.remaining })}
-        </p>
+      {/* mt-auto: the strip stretches every card to the tallest slide, and the
+          verdict rides the bottom edge rather than leaving a void under it. */}
+      <p className="text-caption border-border mt-auto border-t pt-3.5">
+        {verdict}
+      </p>
+    </div>
+    /* The legend that used to sit here is behind the `?` now. It explained
+       an encoding — filled against outline — which is a thing to look up
+       once, not a paragraph to re-read under the card every single visit.
+       Nothing is lost by moving it: every session it keys is spelled out in
+       words in the list above. */
+  );
+}
+
+/**
+ * The week planner: the accepted weeks as a strip the athlete can walk —
+ * recent past on the left, today under the feet, and past the right edge the
+ * first week nobody has written yet, waiting to be planned.
+ *
+ * Scroll-snap does the moving: native momentum on touch, interruptible
+ * mid-gesture, and nothing animates on the main thread. The chevrons exist for
+ * the mouse, and the header names whichever week is under the viewport so a
+ * swipe is never silently lost.
+ */
+function WeekPlanner({
+  weeks,
+  onAsk,
+}: {
+  weeks: PlanProgress[];
+  onAsk: (text: string) => void;
+}) {
+  const { t } = useTranslation();
+  const format = useFormatters();
+  const reduceMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
+  const slides = useMemo(() => weekSlides(weeks), [weeks]);
+  const start = Math.max(
+    slides.findIndex((slide) => slide.current),
+    0,
+  );
+  const [index, setIndex] = useState(start);
+  const trackRef = useRef<HTMLDivElement>(null);
+
+  // Land on today rather than travel to it — before paint, and mount-only: a
+  // briefing refetch (accepting next week is one) must not yank the athlete
+  // off whatever card they are reading.
+  useLayoutEffect(() => {
+    const track = trackRef.current;
+    if (track) track.scrollLeft = start * (track.clientWidth + SLIDE_GAP);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const active = slides[Math.min(index, slides.length - 1)];
+
+  const goTo = (next: number) => {
+    const track = trackRef.current;
+    if (!track) return;
+    const clamped = Math.min(Math.max(next, 0), slides.length - 1);
+    // The header answers the press instantly; the strip settles on the same
+    // number, so the onScroll updates along the way change nothing.
+    setIndex(clamped);
+    const left = clamped * (track.clientWidth + SLIDE_GAP);
+    if (typeof track.scrollTo === "function") {
+      track.scrollTo({ left, behavior: reduceMotion ? "auto" : "smooth" });
+    } else {
+      // jsdom has no scrollTo on elements; the assignment is the same jump.
+      track.scrollLeft = left;
+    }
+  };
+
+  // A swipe never passes through goTo, so the header follows the strip here.
+  const onScroll = () => {
+    const track = trackRef.current;
+    if (!track || track.clientWidth === 0) return;
+    const seen = Math.round(track.scrollLeft / (track.clientWidth + SLIDE_GAP));
+    setIndex(Math.min(Math.max(seen, 0), slides.length - 1));
+  };
+
+  const stamp = (weekStarting: string) =>
+    t("rail.weekOf", { date: format.weekStamp(weekStarting) });
+  const title =
+    active.kind === "week"
+      ? active.current
+        ? t("rail.thisWeek")
+        : active.past
+          ? stamp(active.week.week_starting)
+          : t("rail.nextWeek")
+      : active.current
+        ? t("rail.thisWeek")
+        : t("rail.nextWeek");
+
+  return (
+    <RailSection
+      title={title}
+      // The `?` explains the chart, so it only stands where a chart does.
+      help={active.kind === "week" ? "week" : undefined}
+      action={
+        <>
+          {/* Adjusting is for the week being lived: a past week is a record,
+              and the open one has its own way of asking. */}
+          {active.kind === "week" && active.current ? (
+            <Button
+              className="h-auto px-0 font-semibold"
+              onClick={() => onAsk(t("rail.askAdjustWeek"))}
+              size="xs"
+              variant="ghost"
+            >
+              {t("rail.adjust")}
+            </Button>
+          ) : null}
+          {slides.length > 1 ? (
+            <>
+              <Button
+                aria-label={t("rail.earlierWeek")}
+                disabled={index === 0}
+                onClick={() => goTo(index - 1)}
+                size="icon-xs"
+                variant="ghost"
+              >
+                <ChevronLeftIcon />
+              </Button>
+              <Button
+                aria-label={t("rail.laterWeek")}
+                disabled={index === slides.length - 1}
+                onClick={() => goTo(index + 1)}
+                size="icon-xs"
+                variant="ghost"
+              >
+                <ChevronRightIcon />
+              </Button>
+            </>
+          ) : null}
+        </>
+      }
+    >
+      <div
+        // overscroll-x-contain: a swipe past either end must die at the strip's
+        // edge, not chain into the browser's own back gesture.
+        className="flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        onScroll={onScroll}
+        ref={trackRef}
+      >
+        {slides.map((slide) => (
+          <div
+            aria-label={stamp(
+              slide.kind === "week"
+                ? slide.week.week_starting
+                : slide.weekStarting,
+            )}
+            className="w-full shrink-0 snap-center"
+            key={slide.kind === "week" ? slide.week.week_starting : "open"}
+            role="group"
+          >
+            {slide.kind === "week" ? (
+              <WeekCard slide={slide} />
+            ) : (
+              <PlanSlot onAsk={onAsk} slide={slide} />
+            )}
+          </div>
+        ))}
       </div>
-      {/* The legend that used to sit here is behind the `?` now. It explained
-          an encoding — filled against outline — which is a thing to look up
-          once, not a paragraph to re-read under the card every single visit.
-          Nothing is lost by moving it: every session it keys is spelled out in
-          words in the list above. */}
     </RailSection>
   );
 }
@@ -763,7 +992,7 @@ export function CoachRail({ briefing, onAsk }: CoachRailProps) {
   return (
     <div className="flex flex-col gap-7">
       <GoalRace context={briefing.context} onAsk={onAsk} />
-      <ThisWeek onAsk={onAsk} plan={briefing.plan} />
+      <WeekPlanner onAsk={onAsk} weeks={briefing.weeks} />
       <Signals onAsk={onAsk} signals={briefing.signals} />
     </div>
   );

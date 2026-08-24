@@ -770,6 +770,12 @@
           "plan": {
             "$ref": "#/components/schemas/PlanProgress"
           },
+          "weeks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlanProgress"
+            }
+          },
           "signals": {
             "type": "array",
             "items": {
@@ -786,6 +792,7 @@
         "required": [
           "context",
           "plan",
+          "weeks",
           "signals",
           "queue"
         ]
@@ -2572,7 +2579,7 @@
           "Coach"
         ],
         "summary": "The coach's read on the athlete, before they ask anything",
-        "description": "Everything the Coach screen's rails show: the goal race the coach remembers, this week's accepted plan measured against what was actually run, the measured training signals (load ratio, easy-run intensity, aerobic decoupling, shoe mileage) and the queue of things worth asking about. Signals that cannot be computed from the athlete's data are omitted rather than returned empty.",
+        "description": "Everything the Coach screen's rails show: the goal race the coach remembers, the accepted weeks — recent past, current and one planned ahead — each measured against what was actually run, the measured training signals (load ratio, easy-run intensity, aerobic decoupling, shoe mileage) and the queue of things worth asking about. Signals that cannot be computed from the athlete's data are omitted rather than returned empty.",
         "security": [
           {
             "sessionCookie": []

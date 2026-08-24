@@ -622,6 +622,13 @@ export const CoachBriefingSchema = z
   .object({
     context: CoachContextSchema,
     plan: PlanProgressSchema.nullable(),
+    /**
+     * Every accepted week the runs window can still measure, oldest first —
+     * recent past weeks, the current week, and a week planned ahead when one
+     * has been accepted. `plan` is the current week's entry, kept as its own
+     * field; weeks nobody accepted are absent rather than empty.
+     */
+    weeks: z.array(PlanProgressSchema),
     signals: z.array(CoachSignalSchema),
     queue: z.array(CoachQueueItemSchema),
   })

@@ -391,8 +391,8 @@ export interface CoachChatProps {
   runs: Run[] | undefined;
   /** The window selected in the thread header. */
   rangeWeeks: number;
-  /** The week already accepted, so a plan card knows it is live. */
-  acceptedWeek: string | null;
+  /** The weeks already accepted, so a plan card knows it is live. */
+  acceptedWeeks: string[];
   /** A run to attach on mount — how "Ask the coach" arrives from a replay. */
   initialMention?: RunMention | null;
   /** Hands the page a way to ask from the rails. */
@@ -417,7 +417,7 @@ export function CoachChat({
   initialMessages,
   runs,
   rangeWeeks,
-  acceptedWeek,
+  acceptedWeeks,
   initialMention = null,
   registerAsk,
   onOpenRun,
@@ -613,7 +613,7 @@ export function CoachChat({
         },
       }),
     accepting: accept.isPending,
-    acceptedWeek,
+    acceptedWeeks,
   };
 
   return (

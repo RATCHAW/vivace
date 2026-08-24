@@ -694,6 +694,24 @@ export const en = {
     noWeek:
       "No week accepted yet. Ask for one and it lands here as sessions, not a paragraph.",
     planMyWeek: "Plan my week",
+    /** The planner's strip: the header names the week under the viewport. */
+    weekOf: "Week of {{date}}",
+    nextWeek: "Next week",
+    nextWeekOpen:
+      "Next week is open. Ask the coach to write it before it arrives.",
+    planNextWeek: "Plan next week",
+    /** Sent to the coach, so the Monday travels in writing — its planning
+     *  tool would otherwise default to the week already underway. */
+    askPlanNextWeek: "Plan my next week, the week starting {{date}}",
+    /** The chevrons, for a screen reader — the strip itself swipes. */
+    earlierWeek: "Earlier week",
+    laterWeek: "Later week",
+    /** A past week's bottom line — `remaining` is 0 once the days are gone. */
+    sessionsMissed_one: "{{count}} session missed",
+    sessionsMissed_other: "{{count}} sessions missed",
+    /** A week planned ahead: nothing is "left" in a week not yet begun. */
+    sessionsPlanned_one: "{{count}} session planned",
+    sessionsPlanned_other: "{{count}} sessions planned",
     adjust: "Adjust",
     askAdjustWeek: "Adjust this week for me",
     weekProgress: "{{actual}} of {{planned}} km",

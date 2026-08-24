@@ -6,11 +6,13 @@ import {
   CoachRail,
   countdown,
   countdownWeeks,
+  mondayOf,
   paceValue,
   planDayState,
   raceDistanceKey,
   targetPace,
   todayIndex,
+  weekSlides,
   weeksToTaper,
 } from "./coach-rail";
 
@@ -56,7 +58,7 @@ function plan(over: Partial<NonNullable<PlanProgress>> = {}) {
 }
 
 function briefing(over: Partial<CoachBriefing> = {}): CoachBriefing {
-  return {
+  const merged: CoachBriefing = {
     context: {
       race_name: null,
       race_date: null,
@@ -67,10 +69,15 @@ function briefing(over: Partial<CoachBriefing> = {}): CoachBriefing {
       updated_at: null,
     },
     plan: plan(),
+    weeks: [],
     signals: [],
     queue: [],
     ...over,
   };
+  // The API sends every accepted week; `plan` is the current one's entry. A
+  // test that only names the plan means a briefing whose strip holds it alone.
+  if (over.weeks === undefined) merged.weeks = merged.plan ? [merged.plan] : [];
+  return merged;
 }
 
 /** A goal race with everything filled in; each test empties what it is about. */
@@ -667,5 +674,121 @@ describe("this week", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Plan my week" }));
     expect(onAsk).toHaveBeenCalledWith("Plan my week");
+  });
+});
+
+describe("weekSlides", () => {
+  const monday = "2026-08-17";
+
+  it("keeps a slide for today even with nothing accepted", () => {
+    expect(weekSlides([], monday)).toEqual([
+      { kind: "plan", weekStarting: monday, current: true },
+    ]);
+  });
+
+  it("opens next week once this one is accepted, and in order", () => {
+    const slides = weekSlides(
+      [plan({ week_starting: monday }), plan({ week_starting: "2026-08-10" })],
+      monday,
+    );
+
+    expect(
+      slides.map((slide) =>
+        slide.kind === "week" ? slide.week.week_starting : "open",
+      ),
+    ).toEqual(["2026-08-10", monday, "open"]);
+    expect(slides.at(-1)).toEqual({
+      kind: "plan",
+      weekStarting: "2026-08-24",
+      current: false,
+    });
+    expect(slides[0]).toMatchObject({ past: true, current: false });
+  });
+
+  it("offers nothing beyond a week already planned ahead", () => {
+    const slides = weekSlides(
+      [plan({ week_starting: monday }), plan({ week_starting: "2026-08-24" })],
+      monday,
+    );
+
+    expect(slides).toHaveLength(2);
+    expect(slides.every((slide) => slide.kind === "week")).toBe(true);
+  });
+
+  it("plans this week first when only past weeks are accepted", () => {
+    const slides = weekSlides([plan({ week_starting: "2026-08-10" })], monday);
+
+    expect(slides.at(-1)).toEqual({
+      kind: "plan",
+      weekStarting: monday,
+      current: true,
+    });
+  });
+});
+
+describe("the week planner strip", () => {
+  it("reads the browser's Monday off the local calendar", () => {
+    // Sunday 23:30 in the browser: UTC is already Monday the 24th.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 7, 23, 23, 30, 0));
+    expect(mondayOf()).toBe("2026-08-17");
+  });
+
+  it("walks back to a past week and names it instead of 'this week'", () => {
+    onDay(0);
+    render(
+      <CoachRail
+        briefing={briefing({
+          weeks: [plan({ week_starting: "2026-08-10" }), plan()],
+        })}
+        onAsk={vi.fn()}
+      />,
+    );
+
+    // The strip lands on today, with the past to the left.
+    expect(screen.getByText("This week")).toBeDefined();
+    fireEvent.click(screen.getByRole("button", { name: "Earlier week" }));
+
+    expect(screen.getByText(/Week of/)).toBeDefined();
+    expect(screen.queryByText("This week")).toBeNull();
+    // A past week is a record: nothing about it is left to adjust.
+    expect(screen.queryByRole("button", { name: "Adjust" })).toBeNull();
+    // Its bottom line counts what never happened, not "complete".
+    expect(screen.getByText("2 sessions missed")).toBeDefined();
+  });
+
+  it("asks the coach to plan next week, Monday in writing", () => {
+    onDay(0);
+    const onAsk = vi.fn();
+    render(<CoachRail briefing={briefing()} onAsk={onAsk} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Later week" }));
+    expect(screen.getByText("Next week")).toBeDefined();
+
+    fireEvent.click(screen.getByRole("button", { name: "Plan next week" }));
+    expect(onAsk).toHaveBeenCalledWith(
+      "Plan my next week, the week starting 2026-08-24",
+    );
+  });
+
+  it("shows a week planned ahead as sessions planned, not sessions left", () => {
+    onDay(0);
+    render(
+      <CoachRail
+        briefing={briefing({
+          weeks: [plan(), plan({ week_starting: "2026-08-24" })],
+        })}
+        onAsk={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Later week" }));
+    expect(screen.getByText("Next week")).toBeDefined();
+    expect(screen.getByText("2 sessions planned")).toBeDefined();
+    // Fully planned: there is no further slot to keep walking into.
+    expect(screen.getByRole("button", { name: "Later week" })).toHaveProperty(
+      "disabled",
+      true,
+    );
   });
 });

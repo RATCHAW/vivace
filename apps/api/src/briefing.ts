@@ -12,7 +12,7 @@ import type {
   CoachSignal,
   Run,
 } from "./schemas.js";
-import { getContext, getPlan } from "./coach-store.js";
+import { getContext, listPlans } from "./coach-store.js";
 import { findDebrief } from "./chat-store.js";
 import {
   fetchRunStreams,
@@ -21,6 +21,7 @@ import {
   StravaApiError,
 } from "./strava.js";
 import {
+  addDays,
   clock,
   daysBetween,
   decoupling,
@@ -329,21 +330,36 @@ export async function buildBriefing(
 
   const readout = await readTraining(accessToken, runs, today);
   const week = weekStart(today);
-  const [accepted, debrief] = await Promise.all([
-    getPlan(userId, week),
+  // How far back an accepted week is still worth showing. Twelve is a training
+  // block; anything older is history the volume chart already tells better.
+  const PAST_WEEKS = 12;
+  // A week measured against runs that were never fetched would read as "ran
+  // nothing", so the window is also clipped to the page Strava returned. The
+  // oldest run is the last one — Strava pages newest first.
+  const oldest = runs.length
+    ? weekStart(localDate(runs[runs.length - 1]))
+    : week;
+  const from =
+    oldest > addDays(week, -7 * PAST_WEEKS)
+      ? oldest
+      : addDays(week, -7 * PAST_WEEKS);
+  const [plans, debrief] = await Promise.all([
+    // Through next Monday: a week planned ahead is part of the same story.
+    listPlans(userId, from, addDays(week, 7)),
     // Only the latest run's debrief matters here — that is the only one the
     // queue offers to open.
     runs[0] ? findDebrief(userId, runs[0].id) : Promise.resolve(null),
   ]);
 
+  const weeks = plans.map((plan) => ({
+    ...planProgress(plan.sessions, runs, plan.week_starting, today),
+    label: plan.label,
+  }));
+
   return {
     context,
-    plan: accepted
-      ? {
-          ...planProgress(accepted.sessions, runs, week, today),
-          label: accepted.label,
-        }
-      : null,
+    plan: weeks.find((entry) => entry.week_starting === week) ?? null,
+    weeks,
     signals: toSignals(readout),
     queue: toQueue(readout, runs, context, today, debrief?.thread_id ?? null),
   };

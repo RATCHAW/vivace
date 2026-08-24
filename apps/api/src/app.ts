@@ -1838,7 +1838,8 @@ const coachBriefingRoute = createRoute({
   summary: "The coach's read on the athlete, before they ask anything",
   description:
     "Everything the Coach screen's rails show: the goal race the coach " +
-    "remembers, this week's accepted plan measured against what was actually " +
+    "remembers, the accepted weeks — recent past, current and one planned " +
+    "ahead — each measured against what was actually " +
     "run, the measured training signals (load ratio, easy-run intensity, " +
     "aerobic decoupling, shoe mileage) and the queue of things worth asking " +
     "about. Signals that cannot be computed from the athlete's data are " +
@@ -1881,6 +1882,7 @@ app.openapi(coachBriefingRoute, async (c) => {
         signals: briefing.signals.length,
         queue: briefing.queue.length,
         hasPlan: briefing.plan !== null,
+        weeks: briefing.weeks.length,
       },
       "Built the coach briefing",
     );
