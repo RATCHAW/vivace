@@ -1,14 +1,19 @@
 // The composer, shaped like the questions runners actually ask.
 //
-// Four things the plain box didn't have: `@` attaches a run so "why did I
-// fade?" names a session instead of hoping the model picks the right one, `/`
-// opens the handful of questions asked over and over, the microphone takes a
-// question asked out loud with a phone in a pocket after a run, and the chips
-// underneath follow whatever the coach just drew.
+// Four things the plain box didn't have: `@` attaches runs so "why did I fade?"
+// names a session instead of hoping the model picks the right one, `/` opens the
+// handful of questions asked over and over, the microphone takes a question
+// asked out loud with a phone in a pocket after a run, and the chips underneath
+// follow whatever the coach just drew.
 //
 // `@` is typed as often as it is clicked, so both open the same list, and the
 // list is driven from the keyboard either way — see composer-menu.tsx for why
 // the caret never leaves the box.
+//
+// The attached runs sit *inside* the box, on the same row as the files, because
+// that is what they are: part of the message being written, not a status line
+// above it. Which also settles what to do when there are several of them — they
+// wrap where any other attachment would.
 import {
   useEffect,
   useLayoutEffect,
@@ -80,6 +85,17 @@ const MAX_FILES = 4;
  *  the `@` narrows the whole history down to these, so it is a cap on the
  *  drawing and not on the search. */
 const PICKER_RUNS = 8;
+
+/**
+ * How many runs one question can carry.
+ *
+ * Each one is a line of the coach's system prompt and an invitation to read a
+ * run it did not ask for, so this is where "compare these three" stops and
+ * "read my season" starts — which is a question, not an attachment. The API
+ * holds the same number for a request that didn't come from here
+ * (`MAX_ATTACHED_RUNS` in apps/api/src/coach.ts).
+ */
+export const MAX_ATTACHED_RUNS = 5;
 
 /** The two lists' ids, so the box can name the one it is driving. */
 const RUN_LIST_ID = "coach-composer-runs";
@@ -166,26 +182,72 @@ export function useMentionLabel(): (mention: RunMention) => string {
     `${mention.name} · ${format.shortDate(`${mention.date}T00:00:00Z`)}`;
 }
 
-/** The attachments queued in the composer, above the textarea. */
-function ComposerAttachments() {
+/**
+ * Everything queued on the message, on one wrapping row inside the box.
+ *
+ * Runs first, then files: the runs are what the question is *about*, and they
+ * are the ones that arrive without being dropped in — from the `@` list, from
+ * the button, and from a replay handing one over on the way to this screen.
+ *
+ * One row rather than two headers. `PromptInputHeader` is an addon of the input
+ * group, so a second one would draw a second band inside the box for what is
+ * the same idea: this message carries these things.
+ */
+function ComposerHeader({
+  attached,
+  onDetach,
+}: {
+  attached: RunMention[];
+  onDetach: (id: number) => void;
+}) {
+  const { t } = useTranslation();
+  const mentionLabel = useMentionLabel();
   const attachments = usePromptInputAttachments();
-  if (attachments.files.length === 0) return null;
+  if (attached.length === 0 && attachments.files.length === 0) return null;
 
   return (
     <PromptInputHeader>
-      <Attachments variant="inline">
-        {attachments.files.map((file) => (
-          <Attachment
-            data={file}
-            key={file.id}
-            onRemove={() => attachments.remove(file.id)}
+      {attached.map((mention) => {
+        const label = mentionLabel(mention);
+        return (
+          <span
+            className="bg-brand/15 text-brand text-mono-badge animate-in fade-in-0 zoom-in-95 inline-flex h-8 max-w-full items-center gap-2.5 rounded-full py-0 pr-1.5 pl-3.5 font-mono uppercase duration-150 ease-entrance motion-reduce:animate-none"
+            key={mention.id}
           >
-            <AttachmentPreview />
-            <AttachmentInfo />
-            <AttachmentRemove />
-          </Attachment>
-        ))}
-      </Attachments>
+            <AtSignIcon className="size-3 shrink-0" />
+            {/* Truncated, not wrapped: five runs on a phone is a box that grows
+                taller than the transcript it is being typed under. */}
+            <span className="truncate">{label}</span>
+            <button
+              // Named for the run it takes off, because there is more than one
+              // of these now and "Remove the attached run" would be the name of
+              // all of them.
+              aria-label={t("composer.removeAttached", { run: label })}
+              className="bg-foreground/10 hover:bg-foreground/20 focus-visible:ring-ring/50 flex size-5 shrink-0 items-center justify-center rounded-full outline-none focus-visible:ring-2"
+              onClick={() => onDetach(mention.id)}
+              type="button"
+            >
+              <XIcon className="size-3" />
+            </button>
+          </span>
+        );
+      })}
+
+      {attachments.files.length > 0 && (
+        <Attachments variant="inline">
+          {attachments.files.map((file) => (
+            <Attachment
+              data={file}
+              key={file.id}
+              onRemove={() => attachments.remove(file.id)}
+            >
+              <AttachmentPreview />
+              <AttachmentInfo />
+              <AttachmentRemove />
+            </Attachment>
+          ))}
+        </Attachments>
+      )}
     </PromptInputHeader>
   );
 }
@@ -194,8 +256,9 @@ export interface CoachComposerProps {
   runs: Run[] | undefined;
   draft: string;
   onDraftChange: (draft: string) => void;
-  attached: RunMention | null;
-  onAttach: (mention: RunMention | null) => void;
+  /** The runs on the message, in the order the athlete attached them. */
+  attached: RunMention[];
+  onAttach: (attached: RunMention[]) => void;
   pickerOpen: boolean;
   onPickerOpenChange: (open: boolean) => void;
   onSubmit: (message: PromptInputMessage) => void;
@@ -221,8 +284,10 @@ export function CoachComposer({
 }: CoachComposerProps) {
   const { t } = useTranslation();
   const format = useFormatters();
-  const mentionLabel = useMentionLabel();
   const isBusy = status === "submitted" || status === "streaming";
+
+  const attachedIds = new Set(attached.map((mention) => mention.id));
+  const full = attached.length >= MAX_ATTACHED_RUNS;
 
   /** Where the caret is — what decides whether an `@` is being typed, and
    *  where the list ends up cutting one back out. Declared up here because
@@ -388,8 +453,22 @@ export function CoachComposer({
 
     const run = runMatches[index];
     if (!run) return;
-    onAttach(toMention(run));
-    onPickerOpenChange(false);
+
+    // The list is the same list whether a run is on the message or not, so it
+    // is also where one comes back off — a second Enter on a row wearing a tick
+    // undoes the first, without reaching for the chip's ×.
+    if (attachedIds.has(run.id)) {
+      onAttach(attached.filter((mention) => mention.id !== run.id));
+    } else {
+      // At the cap the row says so and does nothing. Silently dropping the
+      // sixth run would be a click that looks like it worked.
+      if (full) return;
+      onAttach([...attached, toMention(run)]);
+    }
+
+    // The picker stays open, because attaching one run is now rarely the whole
+    // gesture: "compare these three" is three rows of the same list. A typed
+    // `@` closes itself — the token it was opened by is cut out below.
     if (token) {
       // The chip carries the run now, so the `@morn` that found it comes back
       // out of the sentence — and the caret returns to where it was typed,
@@ -473,26 +552,6 @@ export function CoachComposer({
         </Suggestions>
       )}
 
-      {attached && (
-        <div className="flex">
-          {/* It arrives from three places — the list, the button, and a replay
-              handing the run over on the way in — so it says so on the way in
-              rather than simply being there when the athlete looks. */}
-          <span className="bg-brand/15 text-brand text-mono-badge animate-in fade-in-0 slide-in-from-bottom-1 inline-flex h-8 items-center gap-2.5 rounded-full py-0 pr-1.5 pl-3.5 font-mono uppercase duration-150 ease-entrance motion-reduce:animate-none">
-            <AtSignIcon className="size-3" />
-            {mentionLabel(attached)}
-            <button
-              aria-label={t("composer.removeAttached")}
-              className="bg-foreground/10 hover:bg-foreground/20 focus-visible:ring-ring/50 flex size-5 items-center justify-center rounded-full outline-none focus-visible:ring-2"
-              onClick={() => onAttach(null)}
-              type="button"
-            >
-              <XIcon className="size-3" />
-            </button>
-          </span>
-        </div>
-      )}
-
       {isCommands && (
         <ComposerMenuCard activeId={activeId} footer={keys}>
           <ComposerMenuList
@@ -524,13 +583,35 @@ export function CoachComposer({
         // three shortcuts over one sentence would read as the answer to it.
         <ComposerMenuCard
           activeId={activeId}
-          footer={runMatches.length > 0 ? keys : undefined}
+          footer={
+            runMatches.length > 0 ? (
+              <>
+                {/* Said where the sixth run would have been chosen, and only
+                    while it is true — a limit announced before it is reached is
+                    a rule nobody was about to break. */}
+                {full && (
+                  <p
+                    className="border-border text-caption text-muted-foreground shrink-0 border-t px-4 py-2"
+                    role="status"
+                  >
+                    {t("composer.runsFull", { max: MAX_ATTACHED_RUNS })}
+                  </p>
+                )}
+                {keys}
+              </>
+            ) : undefined
+          }
         >
           {runMatches.length > 0 ? (
             <ComposerMenuList id={RUN_LIST_ID} label={t("composer.runList")}>
               {runMatches.map((run, index) => (
                 <ComposerMenuOption
                   active={index === activeIndex}
+                  attached={attachedIds.has(run.id)}
+                  // At the cap the rows that would add a run stop being
+                  // choosable; the ones already on the message never do, or
+                  // there would be no way back down to four.
+                  disabled={full && !attachedIds.has(run.id)}
                   id={optionId(RUN_LIST_ID, index)}
                   key={run.id}
                   onHighlight={() => setHighlight({ key: menuKey, index })}
@@ -580,7 +661,12 @@ export function CoachComposer({
           onSubmit(message);
         }}
       >
-        <ComposerAttachments />
+        <ComposerHeader
+          attached={attached}
+          onDetach={(id) =>
+            onAttach(attached.filter((mention) => mention.id !== id))
+          }
+        />
         <PromptInputBody>
           {/* A combobox rather than a plain box, because that is what it now
               is: `@` and `/` open a list this drives without ever giving up

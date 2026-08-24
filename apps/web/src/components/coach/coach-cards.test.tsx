@@ -104,6 +104,40 @@ const plan: PlanCard = {
   accepted: false,
 };
 
+describe("accepting a week", () => {
+  function showPlan(card: PlanCard, extra: Partial<CardActions> = {}) {
+    return render(
+      <MemoryRouter>
+        <CoachCardView actions={{ ...actions, ...extra }} card={card} />
+      </MemoryRouter>,
+    );
+  }
+
+  it("says it is working while the accept is in flight", () => {
+    showPlan(plan, { acceptingWeek: plan.week_starting });
+
+    // Not just greyed out: a disabled pill with the same words on it reads as
+    // a press that did nothing, which is what sent the athlete to press again.
+    const button = screen.getByRole("button", {
+      name: "Adding it to your week…",
+    });
+    expect(button.hasAttribute("disabled")).toBe(true);
+    expect(button.querySelector(".animate-spin")).not.toBeNull();
+  });
+
+  it("leaves the other weeks in the conversation alone", () => {
+    // A thread that reworked a plan holds several of these. Only the one that
+    // was pressed is waiting on anything.
+    showPlan(plan, { acceptingWeek: "2026-08-24" });
+
+    expect(
+      screen
+        .getByRole("button", { name: "Accept this week" })
+        .hasAttribute("disabled"),
+    ).toBe(false);
+  });
+});
+
 describe("card help", () => {
   it.each([
     ["run-splits", splits, "Your splits", 3, /Decoupling compares pace/],

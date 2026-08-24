@@ -27,6 +27,7 @@ import {
   StravaApiError,
   type BestEffort,
 } from "./strava.js";
+import { fetchRunWeather, type RunWeather } from "./weather.js";
 import { getContext, getPlan, saveContext } from "./coach-store.js";
 import { getFeatureVariantFor } from "./posthog.js";
 import {
@@ -304,12 +305,18 @@ function isPromptVersion(value: string): value is CoachPromptVersion {
 
 /** What the athlete's message is folded into, when no variant says otherwise. */
 export interface CoachPromptOptions {
-  /** The run the composer's `@` picker put on the message. */
-  attached?: AttachedRun;
+  /** The runs the composer's `@` picker put on the message, in the order the
+   *  athlete attached them. */
+  attached?: AttachedRun[];
   /** Which prompt in the catalogue answers this turn. */
   prompt?: CoachPromptVersion;
   /** The language the athlete is reading the app in. Defaults to English. */
   language?: CoachLanguage;
+}
+
+/** One attached run, as the prompt names it — enough for the model to fetch it. */
+function describeRun(run: AttachedRun): string {
+  return `"${run.name}" on ${run.date}, Strava activity id ${run.id}`;
 }
 
 /**
@@ -328,9 +335,21 @@ export function coachSystemPrompt(
     SYSTEM_PROMPTS[prompt ?? DEFAULT_PROMPT_VERSION],
     `Today is ${today}. The athlete is looking at the last ${rangeWeeks} weeks of training; prefer that window unless they ask for another.`,
   ];
-  if (attached) {
+  // One run and several are said differently on purpose: "this run" resolving
+  // to the one attached is the whole point of a single mention, and telling the
+  // model that while five are attached would have it answer about one of them.
+  if (attached?.length === 1) {
+    const [only] = attached;
     lines.push(
-      `The athlete attached a run to this message: "${attached.name}" on ${attached.date}, Strava activity id ${attached.id}. "This run", "it" and "that session" mean that one — read it rather than asking which.`,
+      `The athlete attached a run to this message: ${describeRun(only)}. "This run", "it" and "that session" mean that one — read it rather than asking which.`,
+    );
+  } else if (attached && attached.length > 1) {
+    lines.push(
+      `The athlete attached ${attached.length} runs to this message, in this order: ${attached
+        .map(describeRun)
+        .join(
+          "; ",
+        )}. "These runs", "them" and "the first one" mean those — read them rather than asking which, and compare them when the question is a comparison.`,
     );
   }
   if (language !== "en") {
@@ -459,12 +478,23 @@ export async function resolveCoachVariant(
   };
 }
 
-/** The run the composer's `@` picker put on a message. */
+/** A run the composer's `@` picker put on a message. */
 export interface AttachedRun {
   id: number;
   name: string;
   date: string;
 }
+
+/**
+ * How many runs one question is allowed to carry.
+ *
+ * Each one spends a line of the system prompt and invites a tool call, so a
+ * question with thirty runs on it is a question the model answers badly and
+ * slowly. The composer stops the athlete at the same number
+ * (`MAX_ATTACHED_RUNS` in apps/web/src/components/coach/coach-composer.tsx);
+ * this is the half that holds when the request doesn't come from it.
+ */
+export const MAX_ATTACHED_RUNS = 5;
 
 /**
  * Metadata is only validated when a schema is supplied, and an unvalidated
@@ -473,22 +503,45 @@ export interface AttachedRun {
  * Optional at the top level because `validateUIMessages` runs this against
  * every message's metadata whether or not it has any, and most messages don't.
  */
+const runMention = z.object({
+  id: z.number().int(),
+  name: z.string(),
+  date: z.string(),
+});
+
 export const coachMessageMetadataSchema = z
   .object({
-    run: z
-      .object({ id: z.number().int(), name: z.string(), date: z.string() })
-      .optional(),
+    /** What transcripts written before a question could carry more than one
+     *  run hold. Read, never written — see CoachMessageMetadataSchema. */
+    run: runMention.optional(),
+    runs: z.array(runMention).optional(),
   })
   .optional();
 
-/** The run attached to the newest message in a transcript, if there is one. */
-export function attachedRun(
+/**
+ * The runs attached to the newest message in a transcript.
+ *
+ * Deduplicated because the same run reaching the list twice would be described
+ * to the model twice, and capped because the browser is not the only thing that
+ * can post a message.
+ */
+export function attachedRuns(
   messages: { metadata?: unknown }[],
-): AttachedRun | undefined {
+): AttachedRun[] {
   const parsed = coachMessageMetadataSchema.safeParse(
     messages.at(-1)?.metadata,
   );
-  return parsed.success ? parsed.data?.run : undefined;
+  if (!parsed.success || !parsed.data) return [];
+  const { run, runs } = parsed.data;
+  const seen = new Set<number>();
+  const attached: AttachedRun[] = [];
+  for (const mention of runs ?? (run ? [run] : [])) {
+    if (seen.has(mention.id)) continue;
+    seen.add(mention.id);
+    attached.push(mention);
+    if (attached.length === MAX_ATTACHED_RUNS) break;
+  }
+  return attached;
 }
 
 // --- tool output shaping ------------------------------------------------------
@@ -535,6 +588,26 @@ function stravaFailure(err: unknown): { error: string } {
       : { error: `Strava is unavailable right now (${err.status}).` };
   }
   throw err;
+}
+
+/**
+ * The conditions the run happened in, as one readable line — averaged between
+ * the start and the end of the run, because a long run that leaves at dawn
+ * finishes in different weather than it started in. Null when the run has no
+ * GPS or the weather service didn't answer; the card simply omits the line.
+ */
+function weatherLine(weather: RunWeather | null): string | null {
+  if (!weather) return null;
+  const parts = [
+    `${weather.description}, ${Math.round(weather.temperature_c)}°C`,
+    `feels like ${Math.round(weather.apparent_c)}°C`,
+    `${Math.round(weather.humidity_pct)}% humidity`,
+    `wind ${Math.round(weather.wind_kph)} km/h`,
+  ];
+  if (weather.precipitation_mm >= 0.1) {
+    parts.push(`${weather.precipitation_mm.toFixed(1)} mm precipitation`);
+  }
+  return parts.join(" · ");
 }
 
 /**
@@ -625,6 +698,7 @@ export async function buildRunDebriefCard(
   const detail = await fetchRunDetail(accessToken, target?.id ?? id!);
   const run = target ?? detail.run;
   const date = localDate(run);
+  const weather = await fetchRunWeather(run);
 
   return {
     card: "run-debrief" as const,
@@ -637,6 +711,7 @@ export async function buildRunDebriefCard(
         : run.workout_type.replace("_", " ").toUpperCase(),
     route_path: routePath(detail.polyline),
     line: comparisonLine(run, runs, today),
+    weather: weatherLine(weather),
     stats: [
       { label: "DISTANCE", value: `${(run.distance / 1000).toFixed(2)} km` },
       { label: "TIME", value: clock(run.moving_time) },
@@ -1093,8 +1168,11 @@ export function createCoachTools(ctx: CoachToolContext): ToolSet {
 
     getRunDebrief: tool({
       description:
-        "One run as a card the athlete can see: its numbers, its route, and " +
-        "how it compares to the four weeks behind it. Use it when they ask " +
+        "One run as a card the athlete can see: its numbers, its route, the " +
+        "weather it was run in (averaged between start and finish), and " +
+        "how it compares to the four weeks behind it. Weather explains an " +
+        "off pace — heat, humidity and wind slow a run down; factor it into " +
+        "the read. Use it when they ask " +
         "about a specific session, or to open a debrief of the latest run. " +
         "Draws the run — don't repeat its numbers underneath.",
       inputSchema: z.object({

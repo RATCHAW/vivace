@@ -8,7 +8,7 @@ import { type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
-import { ArrowRightIcon, CheckIcon } from "lucide-react";
+import { ArrowRightIcon, CheckIcon, Loader2Icon } from "lucide-react";
 import type { PlannedSession } from "@/api";
 import { useMessages } from "@/i18n";
 import { useFormatters } from "@/i18n/format";
@@ -33,6 +33,12 @@ export interface DebriefCard {
   /** An SVG path in a 100-square viewBox, or null for a treadmill run. */
   route_path: string | null;
   line: string;
+  /**
+   * The conditions the run happened in, averaged between start and finish.
+   * Absent on cards stored before weather existed; null when the run has no
+   * GPS or the weather service didn't answer.
+   */
+  weather?: string | null;
   stats: Stat[];
   elevation_m: number;
   calories: number | null;
@@ -143,8 +149,14 @@ export interface CardActions {
   onAsk: (text: string, runId?: number) => void;
   /** Accept a proposed week. */
   onAcceptPlan: (card: PlanCard) => void;
-  /** True while the accept request is in flight. */
-  accepting?: boolean;
+  /**
+   * The week whose accept is in flight, by `week_starting`.
+   *
+   * The week rather than a boolean: a conversation that reworked a plan has
+   * several of these cards in it, and a flag would spin every one of them at
+   * once for a request that only concerns the card that was pressed.
+   */
+  acceptingWeek?: string | null;
   /** Every week already accepted, so a re-rendered card knows it is live —
    *  a list because a card can be about next week, not only this one. */
   acceptedWeeks?: string[];
@@ -284,6 +296,11 @@ export function RunDebrief({
             <span className="text-caption text-muted-foreground">
               {card.line}
             </span>
+            {card.weather ? (
+              <span className="text-caption text-muted-foreground">
+                {card.weather}
+              </span>
+            ) : null}
           </div>
           <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {card.stats.map((stat) => (
@@ -685,6 +702,10 @@ export function WeekPlan({
   // week as it stood when the tool ran. The live answer is the briefing's.
   const accepted =
     (actions.acceptedWeeks ?? []).includes(card.week_starting) || card.accepted;
+  // Accepting is a round trip to us and then a reload of the briefing behind
+  // it, so the button has to say it is working — a disabled pill that only
+  // greys out reads as a press that did nothing.
+  const accepting = actions.acceptingWeek === card.week_starting;
 
   // The buttons name real days rather than a fixed "Swap Tuesday": the first
   // quality session that isn't the long run, and wherever the long run landed.
@@ -753,11 +774,12 @@ export function WeekPlan({
           </span>
         ) : (
           <Button
-            disabled={actions.accepting}
+            disabled={accepting}
             onClick={() => actions.onAcceptPlan(card)}
             size="sm"
           >
-            {t("cards.acceptWeek")}
+            {accepting && <Loader2Icon className="animate-spin" />}
+            {accepting ? t("cards.acceptingWeek") : t("cards.acceptWeek")}
           </Button>
         )}
         {quality && (

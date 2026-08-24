@@ -11,6 +11,8 @@ function run(overrides: Partial<Run> & Pick<Run, "id">): Run {
     total_elevation_gain: 0,
     sport_type: "Run",
     start_date_local: "2026-08-15T07:00:00Z",
+    start_latlng: null,
+    end_latlng: null,
     average_speed: 3.33,
     average_heartrate: null,
     max_heartrate: null,

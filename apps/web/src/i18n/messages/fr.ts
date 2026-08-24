@@ -438,7 +438,9 @@ export const fr: Translated<Messages> = {
     attachRun: "Joindre une course",
     runShort: "Course",
     attachFile: "Joindre un fichier",
-    removeAttached: "Retirer la course jointe",
+    removeAttached: "Retirer {{run}}",
+    runsFull:
+      "{{max}} courses, c’est le maximum pour une question. Retirez-en une pour en ajouter une autre.",
     noRunsSynced: "Aucune course synchronisée depuis Strava.",
     noRunsMatch: "Aucune course ne correspond à « {{query}} ».",
     runList: "Courses à joindre",
@@ -573,6 +575,7 @@ export const fr: Translated<Messages> = {
     weekTotals: "{{km}} km · {{quality}} clés",
     accepted: "Acceptée · dans votre semaine",
     acceptWeek: "Accepter cette semaine",
+    acceptingWeek: "Ajout à votre semaine…",
     swapDay: "Changer {{day}}",
     askSwapDay: "Remplace {{day}} par autre chose",
     longRunTo: "Sortie longue → {{day}}",

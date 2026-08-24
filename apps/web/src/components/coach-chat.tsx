@@ -146,18 +146,19 @@ function isToolName(value: string): value is ToolName {
   return (TOOL_NAMES as readonly string[]).includes(value);
 }
 
-/** The run attached to a message, if the athlete attached one. */
-function mentionOf(message: UIMessage): RunMention | null {
+/**
+ * The runs attached to a message, in the order the athlete attached them.
+ *
+ * `run` is read as well as `runs` because it is what every transcript written
+ * before a question could carry more than one holds — the same two fields the
+ * API reads, for the same reason (`attachedRuns` in apps/api/src/coach.ts).
+ */
+function mentionsOf(message: UIMessage): RunMention[] {
   const metadata = message.metadata;
-  if (
-    typeof metadata !== "object" ||
-    metadata === null ||
-    !("run" in metadata)
-  ) {
-    return null;
-  }
-  const run = (metadata as { run?: RunMention }).run;
-  return run && typeof run.id === "number" ? run : null;
+  if (typeof metadata !== "object" || metadata === null) return [];
+  const { run, runs } = metadata as { run?: RunMention; runs?: RunMention[] };
+  const attached = Array.isArray(runs) ? runs : run ? [run] : [];
+  return attached.filter((mention) => typeof mention?.id === "number");
 }
 
 /**
@@ -393,8 +394,8 @@ export interface CoachChatProps {
   rangeWeeks: number;
   /** The weeks already accepted, so a plan card knows it is live. */
   acceptedWeeks: string[];
-  /** A run to attach on mount — how "Ask the coach" arrives from a replay. */
-  initialMention?: RunMention | null;
+  /** Runs to attach on mount — how "Ask the coach" arrives from a replay. */
+  initialMentions?: RunMention[];
   /** Hands the page a way to ask from the rails. */
   registerAsk?: (ask: (text: string, runId?: number) => void) => void;
   /** Opening a run from a source chip or a card. */
@@ -418,7 +419,7 @@ export function CoachChat({
   runs,
   rangeWeeks,
   acceptedWeeks,
-  initialMention = null,
+  initialMentions,
   registerAsk,
   onOpenRun,
 }: CoachChatProps) {
@@ -426,21 +427,21 @@ export function CoachChat({
   const mentionLabel = useMentionLabel();
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState("");
-  const [attached, setAttached] = useState<RunMention | null>(initialMention);
+  const [attached, setAttached] = useState<RunMention[]>(initialMentions ?? []);
   const [pickerOpen, setPickerOpen] = useState(false);
   /** The question being rewritten, if one is — one at a time. */
   const [editingId, setEditingId] = useState<string | null>(null);
 
   // The runs list is a Strava round trip, so it is often still in flight when
   // the conversation opens and the run "Ask the coach" arrived with lands a
-  // moment after this mounted. Taken exactly once, and never over a run the
+  // moment after this mounted. Taken exactly once, and never over runs the
   // athlete has chosen for themselves since.
-  const tookMention = useRef(initialMention !== null);
+  const tookMentions = useRef((initialMentions?.length ?? 0) > 0);
   useEffect(() => {
-    if (tookMention.current || !initialMention) return;
-    tookMention.current = true;
-    setAttached(initialMention);
-  }, [initialMention]);
+    if (tookMentions.current || !initialMentions?.length) return;
+    tookMentions.current = true;
+    setAttached(initialMentions);
+  }, [initialMentions]);
 
   const chat = coachChatFor(threadId, initialMessages);
   const { messages, sendMessage, regenerate, status, stop, error } = useChat({
@@ -498,19 +499,22 @@ export function CoachChat({
   /**
    * Ask something. Everything that can start a turn — the composer, a card
    * button, a signal in the rail, an item in the queue — comes through here, so
-   * an attached run is consumed exactly once wherever the question came from.
+   * the attached runs are consumed exactly once wherever the question came from.
    */
   const ask = (text: string, runId?: number) => {
     const trimmed = text.trim();
     if (!trimmed || isBusy) return;
-    const mention =
-      (runId ? toMentionFromRuns(runId, runs) : null) ?? attached ?? null;
+    // A caller that names a run means *that* run and nothing else: a rail
+    // asking about last Sunday's long run is not also asking about whatever is
+    // sitting in the composer.
+    const named = runId ? toMentionFromRuns(runId, runs) : null;
+    const mentions = named ? [named] : attached;
     void sendMessage({
       text: trimmed,
-      ...(mention ? { metadata: { run: mention } } : {}),
+      ...(mentions.length > 0 ? { metadata: { runs: mentions } } : {}),
     });
     setDraft("");
-    setAttached(null);
+    setAttached([]);
     setPickerOpen(false);
     // A question asked from anywhere else settles the one being rewritten:
     // leaving that box open over a message the conversation has moved past
@@ -538,7 +542,7 @@ export function CoachChat({
     setEditingId(null);
     void sendMessage({
       text,
-      // The attached run and any files travelled with the original question;
+      // The attached runs and any files travelled with the original question;
       // only the words are being rewritten, so they travel again.
       files: message.parts.filter((part) => part.type === "file"),
       ...(message.metadata ? { metadata: message.metadata } : {}),
@@ -551,10 +555,10 @@ export function CoachChat({
     void sendMessage({
       text: message.text,
       files: message.files,
-      ...(attached ? { metadata: { run: attached } } : {}),
+      ...(attached.length > 0 ? { metadata: { runs: attached } } : {}),
     });
     setDraft("");
-    setAttached(null);
+    setAttached([]);
     setEditingId(null);
   };
 
@@ -564,6 +568,14 @@ export function CoachChat({
    * Only for the gaps nothing else covers: a running tool draws its own, and a
    * streaming reasoning block draws the Reasoning component's, so showing one
    * here as well would put two spinners on screen for the same second.
+   *
+   * "Covered" is about what is moving *now*, not about what the turn has
+   * produced so far. A coach turn is up to eight steps, and between them the
+   * model thinks with nothing on the wire — text that has finished arriving
+   * (`state: "done"`) is an answer, not a sign of life, so counting it left the
+   * longest silences of a turn, the ones either side of a tool, with no
+   * indicator at all: the sentence stopped mid-thought and the rest appeared
+   * seconds later.
    */
   const { working, workingLabel } = useMemo(() => {
     if (status === "submitted") {
@@ -578,7 +590,11 @@ export function CoachChat({
 
     const covered = latest.parts.some(
       (part) =>
-        (part.type === "text" && part.text.length > 0) ||
+        // A transcript written before the SDK stamped a state on text parts
+        // has none; there, any text still counts, as it used to.
+        (part.type === "text" &&
+          part.text.length > 0 &&
+          part.state !== "done") ||
         (part.type === "reasoning" && part.state === "streaming") ||
         (isToolUIPart(part) &&
           part.state !== "output-available" &&
@@ -612,7 +628,9 @@ export function CoachChat({
           sessions: card.sessions,
         },
       }),
-    accepting: accept.isPending,
+    acceptingWeek: accept.isPending
+      ? (accept.variables?.body.week_starting ?? null)
+      : null,
     acceptedWeeks,
   };
 
@@ -650,7 +668,7 @@ export function CoachChat({
           )}
 
           {messages.map((message, position) => {
-            const mention = mentionOf(message);
+            const mentions = mentionsOf(message);
             const sources = sourcesOf(message, runs);
             const editing = editingId === message.id;
             const traceId = traceOf(message);
@@ -765,6 +783,9 @@ export function CoachChat({
             const steps = parts.filter(({ part }) => isStepPart(part));
             const answer = parts.filter(({ part }) => !isStepPart(part));
 
+            /** The turn being written, right now. */
+            const live = isBusy && isLast;
+
             /**
              * Fold the working away once it is working no longer.
              *
@@ -775,15 +796,27 @@ export function CoachChat({
              */
             const collapsed =
               steps.length > 0 &&
-              !(isBusy && isLast) &&
+              !live &&
               !(isLast && pending?.messageId === message.id);
 
             return (
               <Message from={message.role} key={message.id}>
-                {mention && message.role === "user" && (
-                  <span className="bg-brand/15 text-brand text-mono-badge inline-flex h-7 items-center gap-2 self-end rounded-full px-3 font-mono uppercase">
-                    @ {mentionLabel(mention)}
-                  </span>
+                {/* Wrapping, and still ending at the athlete's edge: a
+                    question can name five runs, and five chips on one line
+                    would run off the side of a phone. */}
+                {mentions.length > 0 && message.role === "user" && (
+                  <div className="flex flex-wrap justify-end gap-1.5 self-end">
+                    {mentions.map((mention) => (
+                      <span
+                        className="bg-brand/15 text-brand text-mono-badge inline-flex h-7 max-w-full items-center gap-2 rounded-full px-3 font-mono uppercase"
+                        key={mention.id}
+                      >
+                        <span className="truncate">
+                          @ {mentionLabel(mention)}
+                        </span>
+                      </span>
+                    ))}
+                  </div>
                 )}
 
                 <MessageAttachments message={message} />
@@ -796,19 +829,33 @@ export function CoachChat({
                   />
                 )}
 
-                {!editing && (
-                  <>
-                    {steps.length > 0 &&
-                      (collapsed ? (
-                        <CoachSteps count={steps.length}>
-                          {steps.map(renderPart)}
-                        </CoachSteps>
-                      ) : (
-                        steps.map(renderPart)
-                      ))}
-                    {answer.map(renderPart)}
-                  </>
-                )}
+                {/* While it is being written, in the order it happened; once it
+                    is written, working first and answer after — which is the
+                    order the folded row needs, and by then nothing is moving so
+                    nothing is lost by reordering it.
+
+                    Chronological is not a nicety mid-turn: a tool called after
+                    a card was drawn is the *last* thing in the message, and
+                    hoisting its indicator to the top put it above a 190px chart
+                    and off the bottom of the viewport the thread is pinned to.
+                    The athlete watched a finished sentence sit there with no
+                    sign that anything was still running. */}
+                {!editing &&
+                  (live ? (
+                    parts.map(renderPart)
+                  ) : (
+                    <>
+                      {steps.length > 0 &&
+                        (collapsed ? (
+                          <CoachSteps count={steps.length}>
+                            {steps.map(renderPart)}
+                          </CoachSteps>
+                        ) : (
+                          steps.map(renderPart)
+                        ))}
+                      {answer.map(renderPart)}
+                    </>
+                  ))}
 
                 {/* Copy and rewrite, on the athlete's own turn. Hidden while
                     an answer is arriving for the same reason the coach's own

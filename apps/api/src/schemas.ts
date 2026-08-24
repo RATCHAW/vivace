@@ -81,6 +81,13 @@ export const RunSchema = z
     start_date_local: z.iso
       .datetime()
       .openapi({ example: "2026-08-09T07:12:00Z" }),
+    /** `[lat, lng]` where the run started, or null for treadmill and manual entries. */
+    start_latlng: z
+      .array(z.number())
+      .nullable()
+      .openapi({ example: [48.8566, 2.3522] }),
+    /** `[lat, lng]` where the run ended, or null for treadmill and manual entries. */
+    end_latlng: z.array(z.number()).nullable(),
     /** Meters per second. */
     average_speed: z.number(),
     /** Beats per minute, or null when recorded without a heart-rate monitor. */
@@ -368,25 +375,32 @@ export type UpdateCoachThread = z.infer<typeof UpdateCoachThreadSchema>;
  * on every SDK release. The browser casts this back to `UIMessage` in one
  * documented place — see `coachMessages()` in apps/web/src/api.
  */
+/** One run named on a message — enough to draw its chip without re-reading it. */
+const RunMentionSchema = z.object({
+  id: z.number().int(),
+  name: z.string(),
+  /** `YYYY-MM-DD`, the run's own local day. */
+  date: z.string(),
+});
+
 /**
  * What a message carries besides what was said.
  *
- * `run` is the athlete attaching a run to a question with the composer's `@`
+ * `runs` is the athlete attaching runs to a question with the composer's `@`
  * picker — it is what makes "why did I fade?" answerable without the model
- * guessing which run "I" meant. It rides on the message rather than in its text
- * so the transcript reads as a question, not as a question with an id stapled
- * to it, and so a reload still knows which run was meant.
+ * guessing which run "I" meant, and what makes "which of these went better?" a
+ * question at all. They ride on the message rather than in its text so the
+ * transcript reads as a question, not as a question with a list of ids stapled
+ * to it, and so a reload still knows which runs were meant.
+ *
+ * `run` is the singular field this started as, kept because it is what every
+ * transcript written before then holds. Nothing sends it now; `attachedRuns` in
+ * coach.ts folds it into the list, and a message never carries both.
  */
 export const CoachMessageMetadataSchema = z
   .object({
-    run: z
-      .object({
-        id: z.number().int(),
-        name: z.string(),
-        /** `YYYY-MM-DD`, the run's own local day. */
-        date: z.string(),
-      })
-      .optional(),
+    run: RunMentionSchema.optional(),
+    runs: z.array(RunMentionSchema).optional(),
     /**
      * The PostHog trace this answer was written under, on assistant messages.
      *
