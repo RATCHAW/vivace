@@ -9,6 +9,7 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { useMediaQuery } from "@/lib/use-media-query";
 
 export interface CoachMessageEditProps {
   /** The question as it stands — what the box opens with. */
@@ -26,6 +27,9 @@ export function CoachMessageEdit({
   const { t } = useTranslation();
   const [draft, setDraft] = useState(text);
   const [composing, setComposing] = useState(false);
+  // No shift to hold on a virtual keyboard, so Enter goes back to being a
+  // newline there and the button below is what sends — as in the composer.
+  const touch = useMediaQuery("(pointer: coarse)");
   const field = useRef<HTMLTextAreaElement>(null);
 
   // The caret lands after the last character rather than over the whole
@@ -56,6 +60,7 @@ export function CoachMessageEdit({
       <Textarea
         aria-label={t("coach.editLabel")}
         className="text-body-md md:text-body-md max-h-48 min-h-0 resize-none border-0 bg-transparent px-1 py-0 leading-relaxed focus-visible:border-0 focus-visible:ring-0"
+        enterKeyHint={touch ? "enter" : undefined}
         onChange={(event) => setDraft(event.target.value)}
         onCompositionEnd={() => setComposing(false)}
         onCompositionStart={() => setComposing(true)}
@@ -63,7 +68,12 @@ export function CoachMessageEdit({
           // Enter sends and Escape leaves, as in the composer — including its
           // guard: an IME candidate window is mid-word, and shift is a newline.
           if (event.key === "Enter") {
-            if (composing || event.nativeEvent.isComposing || event.shiftKey) {
+            if (
+              composing ||
+              event.nativeEvent.isComposing ||
+              event.shiftKey ||
+              touch
+            ) {
               return;
             }
             event.preventDefault();
