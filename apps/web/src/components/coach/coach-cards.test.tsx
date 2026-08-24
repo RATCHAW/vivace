@@ -136,6 +136,43 @@ describe("accepting a week", () => {
         .hasAttribute("disabled"),
     ).toBe(false);
   });
+
+  it("badges the week that is live rather than the date it falls on", () => {
+    showPlan(plan, { acceptedPlans: [{ ...plan }] });
+
+    expect(
+      screen.queryByRole("button", { name: "Accept this week" }),
+    ).toBeNull();
+    expect(screen.getByText("Accepted · in your week")).not.toBeNull();
+  });
+
+  it("offers the accept again on a week the coach adjusted", () => {
+    // The bug this guards: an adjusted plan is proposed under the same Monday,
+    // so matching on the date badged the revision as already in the athlete's
+    // week — with no way left to accept the week they had just asked for.
+    showPlan(
+      {
+        ...plan,
+        sessions: plan.sessions.map((session) =>
+          session.day === 5 ? { ...session, km: 22 } : session,
+        ),
+      },
+      { acceptedPlans: [{ ...plan }] },
+    );
+
+    expect(
+      screen.getByRole("button", { name: "Accept this week" }),
+    ).not.toBeNull();
+    expect(screen.queryByText("Accepted · in your week")).toBeNull();
+  });
+
+  it("keeps the card's own answer for a week the briefing can't reach", () => {
+    // Weeks older than the runs window aren't in the briefing at all, so the
+    // card that was stored is the only thing that knows.
+    showPlan({ ...plan, accepted: true }, { acceptedPlans: [] });
+
+    expect(screen.getByText("Accepted · in your week")).not.toBeNull();
+  });
 });
 
 describe("card help", () => {

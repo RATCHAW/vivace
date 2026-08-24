@@ -52,6 +52,7 @@ import { CoachTyping } from "@/components/coach/coach-typing";
 import {
   asCoachCard,
   CoachCardView,
+  type AcceptedPlan,
   type CardActions,
   type CoachCard,
   type PlanCard,
@@ -392,8 +393,8 @@ export interface CoachChatProps {
   runs: Run[] | undefined;
   /** The window selected in the thread header. */
   rangeWeeks: number;
-  /** The weeks already accepted, so a plan card knows it is live. */
-  acceptedWeeks: string[];
+  /** The weeks already accepted, so a plan card knows whether it is live. */
+  acceptedPlans: AcceptedPlan[];
   /** Runs to attach on mount — how "Ask the coach" arrives from a replay. */
   initialMentions?: RunMention[];
   /** Hands the page a way to ask from the rails. */
@@ -418,7 +419,7 @@ export function CoachChat({
   initialMessages,
   runs,
   rangeWeeks,
-  acceptedWeeks,
+  acceptedPlans,
   initialMentions,
   registerAsk,
   onOpenRun,
@@ -631,7 +632,7 @@ export function CoachChat({
     acceptingWeek: accept.isPending
       ? (accept.variables?.body.week_starting ?? null)
       : null,
-    acceptedWeeks,
+    acceptedPlans,
   };
 
   return (

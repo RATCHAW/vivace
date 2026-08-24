@@ -43,6 +43,7 @@ import {
   decoupling,
   localDate,
   pace,
+  planSignature,
   predictRaces,
   routePath,
   toSplits,
@@ -1441,8 +1442,16 @@ export function createCoachTools(ctx: CoachToolContext): ToolSet {
           sessions: planned,
           total_km: Number(total.toFixed(1)),
           quality: planned.filter((session) => session.key).length,
-          /** True when this exact week has already been accepted. */
-          accepted: accepted !== null,
+          /**
+           * True when these sessions are the ones already accepted — not merely
+           * when something was accepted for this Monday. A reworked week is
+           * proposed under the same date, so matching on the date alone told
+           * the athlete their revision was already in their week and took the
+           * Accept button away with it.
+           */
+          accepted:
+            accepted !== null &&
+            planSignature(accepted.sessions) === planSignature(planned),
         };
       },
     }),
