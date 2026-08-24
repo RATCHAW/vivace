@@ -21,7 +21,9 @@ import {
 import {
   adoptTranscript,
   coachChatFor,
+  coachQuestionsDismissed,
   setCoachChatRange,
+  setCoachQuestionsDismissed,
 } from "@/lib/coach-chats";
 import { coachFeedbackEnabled } from "@/lib/posthog";
 import { CoachFeedback } from "@/components/coach/coach-feedback";
@@ -68,6 +70,7 @@ import {
   CoachQuestionnaire,
   CoachQuestionnaireStatus,
   type QuestionnaireCard,
+  type QuestionnaireStatus,
 } from "@/components/coach/coach-questionnaire";
 import { CoachSteps } from "@/components/coach/coach-steps";
 import { MonoLabel } from "@/components/mono";
@@ -487,12 +490,31 @@ export function CoachChat({
   }, [messages]);
 
   /**
+   * The asks the athlete waved off, by the id of the message that asked.
+   *
+   * Held here so the screen redraws, and in the chat store so the decision
+   * survives leaving the thread. A set rather than one id because the line
+   * each dismissed ask leaves in the transcript has to keep saying so — a
+   * second questionnaire, dismissed later, must not turn the first one's line
+   * into "answered".
+   */
+  const [dismissed, setDismissed] = useState<ReadonlySet<string>>(() =>
+    coachQuestionsDismissed(threadId),
+  );
+
+  const setAskDismissed = (messageId: string, gone: boolean) =>
+    setDismissed(setCoachQuestionsDismissed(threadId, messageId, gone));
+
+  /**
    * Whether the form stands where the composer usually does.
    *
    * Not while an answer is arriving: `ask` drops a send mid-turn, so a form
-   * that accepted answers then would swallow them without a word.
+   * that accepted answers then would swallow them without a word. And not once
+   * the athlete has waved it off — that is the whole of what Dismiss does, and
+   * the composer underneath is what they asked for.
    */
-  const asking = pending && !isBusy ? pending : null;
+  const asking =
+    pending && !isBusy && !dismissed.has(pending.messageId) ? pending : null;
 
   const accept = useMutation({
     ...acceptCoachPlanMutation(),
@@ -737,16 +759,30 @@ export function CoachChat({
                 }
 
                 // The questions themselves are in the composer, or they have
-                // been answered and the answers are the message below. Either
-                // way what belongs in the transcript is one line saying so.
+                // been answered and the answers are the message below, or they
+                // were waved off. Either way what belongs in the transcript is
+                // one line saying so — and while the ask is still the coach's
+                // last word, that line is also the way back to it.
                 if (
                   name === QUESTIONNAIRE_TOOL &&
                   asQuestionnaire(part.output)
                 ) {
+                  // Still the last thing said, so the form could stand back up.
+                  const open = pending?.messageId === message.id;
+                  const asked: QuestionnaireStatus = dismissed.has(message.id)
+                    ? "dismissed"
+                    : open
+                      ? "awaiting"
+                      : "answered";
                   return (
                     <CoachQuestionnaireStatus
-                      answered={pending?.messageId !== message.id}
                       key={key}
+                      onRestore={
+                        open && asked === "dismissed"
+                          ? () => setAskDismissed(message.id, false)
+                          : undefined
+                      }
+                      status={asked}
                     />
                   );
                 }
@@ -799,9 +835,10 @@ export function CoachChat({
              * Fold the working away once it is working no longer.
              *
              * Never while the turn is live — the steps are the only evidence
-             * anything is happening — and never while a questionnaire is
-             * waiting, because its "awaiting your answer" line is the label on
-             * the form standing in the composer.
+             * anything is happening — and never while a questionnaire is still
+             * the coach's last word, because that line is either the label on
+             * the form standing in the composer or, once the form has been
+             * waved off, the only way back to it.
              */
             const collapsed =
               steps.length > 0 &&
@@ -954,6 +991,7 @@ export function CoachChat({
             card={asking.card}
             key={asking.messageId}
             onAnswer={ask}
+            onDismiss={() => setAskDismissed(asking.messageId, true)}
           />
         ) : (
           <CoachComposer

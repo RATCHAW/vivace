@@ -33,6 +33,8 @@ interface CoachChatEntry {
   /** Mutable on purpose: the transport reads it at send time, so the window
    *  picked in the thread header applies to a chat built before it was. */
   options: { rangeWeeks: number };
+  /** The ids of the messages whose questions the athlete waved off. */
+  dismissed: Set<string>;
 }
 
 /** One entry per conversation opened this session — bounded by the thread
@@ -153,7 +155,7 @@ function createEntry(
     onError: (err) => trackError("coach.chat_failed", err, { threadId }),
   });
 
-  const entry = { chat, options };
+  const entry = { chat, options, dismissed: new Set<string>() };
   entries.set(threadId, entry);
   return entry;
 }
@@ -173,6 +175,35 @@ export function coachChatFor(
 export function setCoachChatRange(threadId: string, rangeWeeks: number): void {
   const entry = entries.get(threadId);
   if (entry) entry.options.rangeWeeks = rangeWeeks;
+}
+
+/**
+ * Wave a questionnaire off, or put it back — keyed by the message that asked.
+ *
+ * Here rather than in `useState` for the same reason the transcript is: a form
+ * the athlete dismissed and then left, for another thread or another page,
+ * must not be standing in the composer's place again on their return. A
+ * dismissal is a decision about the conversation, and it outlives the mount
+ * that took it.
+ *
+ * Returns the set as it now stands, freshly copied, so the caller can hold it
+ * as state and have React see the change. The entry keeps the original.
+ */
+export function setCoachQuestionsDismissed(
+  threadId: string,
+  messageId: string,
+  dismissed: boolean,
+): ReadonlySet<string> {
+  const entry = entries.get(threadId);
+  if (!entry) return new Set();
+  if (dismissed) entry.dismissed.add(messageId);
+  else entry.dismissed.delete(messageId);
+  return new Set(entry.dismissed);
+}
+
+/** The questionnaires already waved off in a conversation. */
+export function coachQuestionsDismissed(threadId: string): ReadonlySet<string> {
+  return new Set(entries.get(threadId)?.dismissed);
 }
 
 /**
