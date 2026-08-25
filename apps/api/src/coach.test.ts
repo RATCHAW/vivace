@@ -400,6 +400,20 @@ describe("planProgress", () => {
     });
   });
 
+  it("carries the workout line, and writes '' where a session has none", () => {
+    const structured = week.map((session) =>
+      session.day === 1
+        ? { ...session, type: "Intervals", workout: "8 × 400 m · 200 m jog" }
+        : session,
+    );
+    const progress = planProgress(structured, [], "2026-08-10", "2026-08-13");
+    expect(progress.days[1]).toMatchObject({
+      planned_workout: "8 × 400 m · 200 m jog",
+    });
+    // A plain run and a week stored before the field both read as "".
+    expect(progress.days[0]).toMatchObject({ planned_workout: "" });
+  });
+
   it("ignores runs from a neighbouring week", () => {
     const progress = planProgress(
       week,
@@ -449,6 +463,24 @@ describe("planSignature", () => {
     expect(planSignature(week.map((s) => ({ ...s, key: !s.key })))).toBe(
       planSignature(week),
     );
+  });
+
+  it("tells a restructured session from the one that was accepted", () => {
+    // Same day, same distance, same pace — but 8 × 400 became 6 × 800. That
+    // is a different week, and the athlete gets the Accept button back.
+    const restructured = week.map((session) =>
+      session.day === 1
+        ? { ...session, workout: "6 × 800 m · 400 m jog" }
+        : session,
+    );
+    expect(planSignature(restructured)).not.toBe(planSignature(week));
+  });
+
+  it("reads a week stored before the workout field as itself", () => {
+    // The briefing writes planned_workout back as "", never undefined; the
+    // two must compare equal or every old week re-offers its Accept button.
+    const roundTripped = week.map((session) => ({ ...session, workout: "" }));
+    expect(planSignature(roundTripped)).toBe(planSignature(week));
   });
 });
 

@@ -581,7 +581,12 @@ function WeekCard({ slide }: { slide: Extract<WeekSlide, { kind: "week" }> }) {
       day,
       state,
       unplanned,
-      name: unplanned ? t("rail.unplanned") : day.type,
+      // A structured session brings its workout along — "Intervals · 6 × 800 m
+      // · 400 m jog" — because "Intervals" alone tells the athlete nothing
+      // they can run. The line truncates and carries a title, like any name.
+      name: unplanned
+        ? t("rail.unplanned")
+        : [day.type, day.planned_workout].filter(Boolean).join(" · "),
       distance: km(state === "done" ? day.actual_km : day.planned_km),
       pace:
         state === "done" ? day.actual_pace : paceValue(day.planned_pace ?? ""),
@@ -753,7 +758,11 @@ function WeekCard({ slide }: { slide: Extract<WeekSlide, { kind: "week" }> }) {
                   })
                 : t(DAY_READOUT[state], {
                     day: messages.days.long[day.day],
-                    type: day.type,
+                    // The workout rides with the type — colour-blind or not,
+                    // "Intervals, 6 × 800 m" is the session being described.
+                    type: [day.type, day.planned_workout]
+                      .filter(Boolean)
+                      .join(", "),
                     actual: day.actual_km,
                     planned: day.planned_km,
                   })}

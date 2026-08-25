@@ -164,7 +164,7 @@ export function asCoachCard(output: unknown): CoachCard | null {
  */
 export interface AcceptedPlan {
   week_starting: string;
-  sessions: Pick<PlannedSession, "day" | "type" | "km" | "pace">[];
+  sessions: Pick<PlannedSession, "day" | "type" | "km" | "pace" | "workout">[];
 }
 
 export interface CardActions {
@@ -188,19 +188,21 @@ export interface CardActions {
 /**
  * A week as the seven days it asks for, so two of them can be compared.
  *
- * Mirrors `planSignature` in apps/api/src/training.ts, over the four fields the
+ * Mirrors `planSignature` in apps/api/src/training.ts, over the fields the
  * card draws — the briefing writes every day out and a plan card need not, so a
  * day nobody wrote is a rest day rather than a difference. `key` is out of it on
- * both sides: the briefing doesn't send the star back.
+ * both sides: the briefing doesn't send the star back. An absent workout reads
+ * as "", which is how a card sent before the field matches the briefing's
+ * empty string.
  */
 function planSignature(
-  sessions: Pick<PlannedSession, "day" | "type" | "km" | "pace">[],
+  sessions: Pick<PlannedSession, "day" | "type" | "km" | "pace" | "workout">[],
 ): string {
   return Array.from({ length: 7 }, (_, day) => {
     const session = sessions.find((entry) => entry.day === day);
     return session
-      ? `${session.type}|${session.km}|${session.pace}`
-      : "Rest|0|";
+      ? `${session.type}|${session.km}|${session.pace}|${session.workout ?? ""}`
+      : "Rest|0||";
   }).join("\n");
 }
 
@@ -692,9 +694,13 @@ export function WeekPlan({
 
   // The buttons name real days rather than a fixed "Swap Tuesday": the first
   // quality session that isn't the long run, and wherever the long run landed.
-  const longRun = card.sessions.find((session) =>
-    session.type.toLowerCase().includes("long"),
-  );
+  // `kind` answers when the card carries it; the label sniff stays for cards
+  // drawn before the field existed, still sitting in old transcripts.
+  const longRun =
+    card.sessions.find((session) => session.kind === "long") ??
+    card.sessions.find((session) =>
+      session.type.toLowerCase().includes("long"),
+    );
   const quality = card.sessions.find(
     (session) => session.key && session.day !== longRun?.day,
   );
@@ -739,7 +745,14 @@ export function WeekPlan({
             <span className="text-caption leading-tight font-semibold">
               {session.type}
             </span>
-            <span className="text-body-md leading-none font-semibold tabular-nums">
+            {/* The structure is only there on the days that have one — a rest
+                day earns no empty line, and the numbers keep their row. */}
+            {session.workout ? (
+              <span className="text-caption text-muted-foreground leading-tight tabular-nums">
+                {session.workout}
+              </span>
+            ) : null}
+            <span className="text-body-md mt-auto leading-none font-semibold tabular-nums">
               {session.km > 0
                 ? `${session.km} ${t("common.km")}`
                 : t("common.dash")}

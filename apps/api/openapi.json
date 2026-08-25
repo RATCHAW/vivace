@@ -953,6 +953,9 @@
                 "planned_pace": {
                   "type": "string"
                 },
+                "planned_workout": {
+                  "type": "string"
+                },
                 "actual_pace": {
                   "type": [
                     "string",
@@ -972,6 +975,7 @@
                 "planned_km",
                 "actual_km",
                 "planned_pace",
+                "planned_workout",
                 "actual_pace",
                 "run_ids"
               ]
@@ -1160,12 +1164,20 @@
           "type": {
             "type": "string",
             "maxLength": 40,
-            "example": "8 × 400"
+            "example": "Intervals"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/SessionKind"
           },
           "km": {
             "type": "number",
             "minimum": 0,
             "maximum": 200
+          },
+          "workout": {
+            "type": "string",
+            "maxLength": 80,
+            "example": "6 × 800 m · 400 m jog"
           },
           "pace": {
             "type": "string",
@@ -1182,6 +1194,20 @@
           "km",
           "pace",
           "key"
+        ]
+      },
+      "SessionKind": {
+        "type": "string",
+        "enum": [
+          "easy",
+          "recovery",
+          "long",
+          "tempo",
+          "intervals",
+          "fartlek",
+          "hills",
+          "race",
+          "rest"
         ]
       },
       "CoachChatRequest": {

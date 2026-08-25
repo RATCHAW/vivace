@@ -166,6 +166,61 @@ describe("accepting a week", () => {
     expect(screen.queryByText("Accepted · in your week")).toBeNull();
   });
 
+  it("offers the accept again on a session the coach restructured", () => {
+    // Same day, distance and pace — but the intervals changed shape. The
+    // workout line is part of what the athlete is being asked to run.
+    showPlan(
+      {
+        ...plan,
+        sessions: plan.sessions.map((session) =>
+          session.day === 0
+            ? {
+                ...session,
+                type: "Intervals",
+                workout: "6 × 800 m · 400 m jog",
+              }
+            : session,
+        ),
+      },
+      { acceptedPlans: [{ ...plan }] },
+    );
+
+    expect(
+      screen.getByRole("button", { name: "Accept this week" }),
+    ).not.toBeNull();
+  });
+
+  it("reads the briefing's empty workout as a card that never wrote one", () => {
+    // The briefing sends planned_workout back as "", never undefined; a week
+    // accepted before the field must still badge itself as live.
+    showPlan(plan, {
+      acceptedPlans: [
+        {
+          ...plan,
+          sessions: plan.sessions.map((session) => ({
+            ...session,
+            workout: "",
+          })),
+        },
+      ],
+    });
+
+    expect(screen.getByText("Accepted · in your week")).not.toBeNull();
+  });
+
+  it("draws the workout line on the days that have one", () => {
+    showPlan({
+      ...plan,
+      sessions: plan.sessions.map((session) =>
+        session.day === 0
+          ? { ...session, type: "Intervals", workout: "8 × 400 m · 200 m jog" }
+          : session,
+      ),
+    });
+
+    expect(screen.getByText("8 × 400 m · 200 m jog")).not.toBeNull();
+  });
+
   it("keeps the card's own answer for a week the briefing can't reach", () => {
     // Weeks older than the runs window aren't in the briefing at all, so the
     // card that was stored is the only thing that knows.
