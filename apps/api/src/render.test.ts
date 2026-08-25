@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { DEFAULT_TEMPLATE_ID, getTemplate } from "@repo/video";
+import { DEFAULT_PULSE, DEFAULT_TEMPLATE_ID, getTemplate } from "@repo/video";
 import {
   renderPropsHash,
   resolveRenderTarget,
@@ -101,6 +101,7 @@ describe("renderPropsHash", () => {
     showAvatar: false,
     theme: "charcoal",
     greenscreen: false,
+    pulse: DEFAULT_PULSE,
     ...options,
   });
 
@@ -168,6 +169,23 @@ describe("renderPropsHash", () => {
     expect(
       renderPropsHash(TEMPLATE, cut({ theme: "cream", greenscreen: true })),
     ).not.toBe(renderPropsHash(TEMPLATE, cut({ theme: "cream" })));
+  });
+
+  it("separates the heartbeat's tempo, and leaves every silent film alone", () => {
+    // The same run beating at its peak is a different file from the same run
+    // beating at its average — a different audio track is a different video.
+    expect(renderPropsHash("heartbeat", cut({ pulse: "peak" }))).not.toBe(
+      renderPropsHash("heartbeat", cut({ pulse: "average" })),
+    );
+    // The important half: every other template has its pulse forced to the
+    // default in the route, and the default is left out of the hash — so
+    // adding a sound to the catalogue marked no existing MP4 stale.
+    expect(renderPropsHash(TEMPLATE, cut())).toBe(
+      createHash("sha256")
+        .update(JSON.stringify({ template: TEMPLATE, show_avatar: false }))
+        .digest("hex")
+        .slice(0, 32),
+    );
   });
 
   it("ignores where the render ran", () => {

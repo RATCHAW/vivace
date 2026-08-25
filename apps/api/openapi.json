@@ -412,6 +412,9 @@
           "greenscreen": {
             "type": "boolean"
           },
+          "pulse": {
+            "$ref": "#/components/schemas/VideoPulse"
+          },
           "progress": {
             "type": "number",
             "minimum": 0,
@@ -447,6 +450,7 @@
           "show_avatar",
           "theme",
           "greenscreen",
+          "pulse",
           "progress",
           "output_url",
           "error",
@@ -461,6 +465,7 @@
           "duo-replay",
           "split-rush",
           "living-poster",
+          "heartbeat",
           "minimal-numbers"
         ],
         "example": "run-video"
@@ -473,6 +478,14 @@
           "accent"
         ],
         "example": "charcoal"
+      },
+      "VideoPulse": {
+        "type": "string",
+        "enum": [
+          "average",
+          "peak"
+        ],
+        "example": "average"
       },
       "RunRenderOptions": {
         "type": "object",
@@ -492,6 +505,9 @@
             "type": "boolean",
             "default": false,
             "example": true
+          },
+          "pulse": {
+            "$ref": "#/components/schemas/VideoPulse"
           }
         }
       },

@@ -87,6 +87,7 @@ export type RunRender = {
     show_avatar: boolean;
     theme: VideoTheme;
     greenscreen: boolean;
+    pulse: VideoPulse;
     progress: number;
     output_url: string | null;
     error: string | null;
@@ -94,15 +95,18 @@ export type RunRender = {
     updated_at: string;
 } | null;
 
-export type VideoTemplate = 'run-video' | 'duo-replay' | 'split-rush' | 'living-poster' | 'minimal-numbers';
+export type VideoTemplate = 'run-video' | 'duo-replay' | 'split-rush' | 'living-poster' | 'heartbeat' | 'minimal-numbers';
 
 export type VideoTheme = 'charcoal' | 'cream' | 'accent';
+
+export type VideoPulse = 'average' | 'peak';
 
 export type RunRenderOptions = {
     template?: VideoTemplate;
     show_avatar?: boolean;
     theme?: VideoTheme;
     greenscreen?: boolean;
+    pulse?: VideoPulse;
 };
 
 export type RunInvite = {

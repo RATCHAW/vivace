@@ -161,6 +161,8 @@ export const en = {
     seek: "Seek",
     enterTheatre: "Enter theatre mode",
     leaveTheatre: "Leave theatre mode",
+    mute: "Mute the heartbeat",
+    unmute: "Hear the heartbeat",
     askCoach: "Ask the coach",
     share: "Share",
     linkCopied: "Link copied",
@@ -171,6 +173,23 @@ export const en = {
   videoOptions: {
     section: "Video options",
     themeGroup: "Video theme",
+    pulseGroup: "Heartbeat",
+    /** What the film's heartbeat keeps time to. One word on the pill, the whole
+     *  explanation in the line underneath — see `<PulsePicker>`. Both say "real
+     *  time", because that is the thing worth knowing: this is the tempo your
+     *  heart actually kept, not a recording sped up to fit the video. */
+    pulse: {
+      average: {
+        label: "Average",
+        description:
+          "Beats in real time at your average heart rate for the run.",
+      },
+      peak: {
+        label: "Peak",
+        description:
+          "Beats in real time at the highest heart rate of the run. The fastest, loudest one.",
+      },
+    },
     templateSelect: "Video template",
     runAsAvatar: "Run as your avatar",
     avatarReady: "Your Strava photo leads the route instead of the dot.",
@@ -220,6 +239,11 @@ export const en = {
         description:
           "The route drawn on a bare plate, north up, then held still. The last two and a half seconds are a frame you could print.",
       },
+      heartbeat: {
+        label: "Heartbeat",
+        description:
+          "Your heart rate drawn as a curve and played as a pulse, in real time. The only film here with a sound — beating at the run's average, or at its peak.",
+      },
       "minimal-numbers": {
         label: "Minimal numbers",
         description:
@@ -247,6 +271,7 @@ export const en = {
       "needs-two-km": "Needs at least 2 km",
       "needs-distance-time": "Needs distance and time from the watch",
       "needs-partner": "Needs someone you ran with to accept",
+      "needs-heart-rate": "Needs heart rate from the watch",
     },
   },
 

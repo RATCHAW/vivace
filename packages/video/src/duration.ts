@@ -15,6 +15,7 @@
 import { secondsToFrames } from "./core/timing";
 import { getTemplate, type TemplateId } from "./registry";
 import type { TemplateInput } from "./eligibility";
+import { heartbeatSeconds } from "./templates/heartbeat/pulse";
 import { minimalNumbersSeconds } from "./templates/minimal-numbers/moments";
 import { POSTER_SECONDS } from "./templates/living-poster/poster";
 import { splitRushSeconds } from "./templates/split-rush/splits";
@@ -39,6 +40,8 @@ function estimateSeconds(id: TemplateId, input: TemplateInput): number | null {
       return minimalNumbersSeconds(input.activity);
     case "living-poster":
       return POSTER_SECONDS;
+    case "heartbeat":
+      return heartbeatSeconds(input.activity, input.streams);
     default:
       return null;
   }

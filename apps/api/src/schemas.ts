@@ -6,8 +6,10 @@
 // `z` must come from @hono/zod-openapi — it is Zod extended with `.openapi()`.
 import { z } from "@hono/zod-openapi";
 import {
+  DEFAULT_PULSE,
   DEFAULT_TEMPLATE_ID,
   DEFAULT_THEME,
+  PULSE_MODES,
   TEMPLATE_IDS,
   THEME_NAMES,
 } from "@repo/video";
@@ -156,6 +158,12 @@ export const VideoThemeSchema = z
   .enum(THEME_NAMES)
   .openapi("VideoTheme", { example: DEFAULT_THEME });
 
+/** What the heartbeat in a film with sound keeps time to: the run as it
+ *  happened, its average, or its peak. */
+export const VideoPulseSchema = z
+  .enum(PULSE_MODES)
+  .openapi("VideoPulse", { example: DEFAULT_PULSE });
+
 /**
  * What the athlete chose in the replay's options panel, sent when a render is
  * started. Part of a render's identity, not a display setting: the same run as
@@ -176,6 +184,9 @@ export const RunRenderOptionsSchema = z
      *  put their own footage behind the run. Honoured by every template — it is
      *  a delivery format rather than a look, so it has no `supports…` flag. */
     greenscreen: z.boolean().default(false).openapi({ example: true }),
+    /** What the film's heartbeat keeps time to. Ignored by a template whose
+     *  `supportsPulse` is false — a film with no sound has no tempo. */
+    pulse: VideoPulseSchema.default(DEFAULT_PULSE),
   })
   .openapi("RunRenderOptions");
 
@@ -201,6 +212,7 @@ export const RunRenderSchema = z
     show_avatar: z.boolean(),
     theme: VideoThemeSchema,
     greenscreen: z.boolean(),
+    pulse: VideoPulseSchema,
     /** Overall Lambda render progress, 0–1. */
     progress: z.number().min(0).max(1).openapi({ example: 0.42 }),
     output_url: z.string().nullable().openapi({

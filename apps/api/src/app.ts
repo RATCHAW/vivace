@@ -15,6 +15,7 @@ import {
 } from "ai";
 import {
   avatarSource,
+  DEFAULT_PULSE,
   DEFAULT_TEMPLATE_ID,
   DEFAULT_THEME,
   getTemplate,
@@ -813,7 +814,12 @@ app.openapi(startRunRenderRoute, async (c) => {
   // No `supportsGreenscreen` to check: the key plate is a delivery format, not
   // a look, and every template in the catalogue cuts one.
   const greenscreen = body?.greenscreen ?? false;
-  const options = { showAvatar, theme, greenscreen };
+  // …and the same rule once more for the heartbeat's tempo: a silent film has
+  // no tempo, so it stores the default rather than an answer nobody can hear.
+  const pulse = entry.supportsPulse
+    ? (body?.pulse ?? DEFAULT_PULSE)
+    : DEFAULT_PULSE;
+  const options = { showAvatar, theme, greenscreen, pulse };
 
   const target = resolveRenderTarget(template);
   if (!target) {
@@ -873,6 +879,7 @@ app.openapi(startRunRenderRoute, async (c) => {
         showAvatar,
         theme,
         greenscreen,
+        pulse,
       },
       "Returned the existing render",
     );
@@ -913,6 +920,7 @@ app.openapi(startRunRenderRoute, async (c) => {
       athleteName: athlete?.firstname ?? "You",
       theme,
       greenscreen,
+      pulse,
       partner: found?.partner ?? null,
     });
     const row = await saveStartedRender({
@@ -938,6 +946,7 @@ app.openapi(startRunRenderRoute, async (c) => {
         showAvatar,
         theme,
         greenscreen,
+        pulse,
         retry: Boolean(existing),
       },
       "Started a Lambda render",

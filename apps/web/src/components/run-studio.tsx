@@ -11,11 +11,13 @@ import {
 } from "lucide-react";
 import {
   avatarSource,
+  DEFAULT_PULSE,
   DEFAULT_THEME,
   formatClock,
   getTemplate,
   recommendTemplate,
   templateEligibility,
+  type PulseMode,
   type TemplateId,
   type TemplateInput,
   type ThemeName,
@@ -125,6 +127,8 @@ export function RunStudio({
   onShowAvatarChange,
   greenscreen,
   onGreenscreenChange,
+  pulse,
+  onPulseChange,
   narrow,
   expanded,
   onToggleExpanded,
@@ -142,6 +146,8 @@ export function RunStudio({
   onShowAvatarChange: (next: boolean) => void;
   greenscreen: boolean;
   onGreenscreenChange: (next: boolean) => void;
+  pulse: PulseMode;
+  onPulseChange: (next: PulseMode) => void;
   /** Below the breakpoint this is a screen of its own, over the list. */
   narrow: boolean;
   expanded: boolean;
@@ -230,6 +236,9 @@ export function RunStudio({
   const entry = getTemplate(template);
   const avatarSupported = entry.supportsAvatar;
   const filmTheme = entry.supportsTheme ? theme : DEFAULT_THEME;
+  // Same rule again for the heartbeat's tempo, so the player and the render are
+  // handed the same answer as the API will store.
+  const filmPulse = entry.supportsPulse ? pulse : DEFAULT_PULSE;
   // Bringing the person you ran with is only a question a cut with a second
   // lane can ask — `needsPartner` on the catalogue entry, which today is the
   // duo replay and nothing else. On every other template the run's invitations
@@ -316,6 +325,7 @@ export function RunStudio({
         partner={filmPartner}
         theme={filmTheme}
         greenscreen={greenscreen}
+        pulse={filmPulse}
         fit={fit}
         chrome={narrow ? "player" : "studio"}
         frameRef={frameRef}
@@ -351,6 +361,8 @@ export function RunStudio({
       onShowAvatarChange={onShowAvatarChange}
       greenscreen={greenscreen}
       onGreenscreenChange={onGreenscreenChange}
+      pulse={pulse}
+      onPulseChange={onPulseChange}
     />
   );
 
@@ -378,6 +390,7 @@ export function RunStudio({
       showAvatar={showAvatar && avatarSupported}
       theme={filmTheme}
       greenscreen={greenscreen}
+      pulse={filmPulse}
       layout={layout}
       blocked={missingPartner ? t("video.eligibility.needs-partner") : null}
     />

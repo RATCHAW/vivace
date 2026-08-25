@@ -19,10 +19,12 @@ import { trackEvent } from "@/lib/logger";
 import { useMediaQuery } from "@/lib/use-media-query";
 import { cn } from "@/lib/utils";
 import {
+  DEFAULT_PULSE,
   DEFAULT_TEMPLATE_ID,
   DEFAULT_THEME,
   formatClock,
   formatPace,
+  type PulseMode,
   type TemplateId,
   type ThemeName,
 } from "@repo/video";
@@ -66,6 +68,7 @@ export function Replays() {
   const [greenscreen, setGreenscreen] = useState(false);
   const [chosen, setChosen] = useState<TemplateId>(DEFAULT_TEMPLATE_ID);
   const [theme, setTheme] = useState<ThemeName>(DEFAULT_THEME);
+  const [pulse, setPulse] = useState<PulseMode>(DEFAULT_PULSE);
 
   const wide = useMediaQuery(WIDE);
   // Narrow is master-detail: the list, then the studio over it. A link that
@@ -321,6 +324,14 @@ export function Replays() {
                 setGreenscreen(next);
                 trackEvent("ui.video_option_changed", {
                   option: "greenscreen",
+                  value: next,
+                });
+              }}
+              pulse={pulse}
+              onPulseChange={(next) => {
+                setPulse(next);
+                trackEvent("ui.video_option_changed", {
+                  option: "pulse",
                   value: next,
                 });
               }}

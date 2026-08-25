@@ -1,6 +1,7 @@
 import type { ComponentType } from "react";
 import { Composition } from "remotion";
 import { DEFAULT_THEME } from "./core/theme";
+import { DEFAULT_PULSE } from "./templates/heartbeat/pulse";
 import { estimateDurationInFrames } from "./duration";
 import { VIDEO_TEMPLATES, type TemplateId } from "./registry";
 import type { VideoActivity, VideoStreams } from "./types";
@@ -42,6 +43,10 @@ export const TEMPLATE_COMPONENTS: Record<
   "living-poster": () =>
     import("./templates/living-poster/LivingPoster").then((module) => ({
       default: module.LivingPoster as AnyVideo,
+    })),
+  heartbeat: () =>
+    import("./templates/heartbeat/Heartbeat").then((module) => ({
+      default: module.Heartbeat as AnyVideo,
     })),
   "minimal-numbers": () =>
     import("./templates/minimal-numbers/MinimalNumbers").then((module) => ({
@@ -98,6 +103,16 @@ export const TEMPLATE_DEFAULT_PROPS: Record<
     streams: {},
     theme: DEFAULT_THEME,
     greenscreen: false,
+  },
+  // No streams in Studio, so this opens on the honest degraded path: a run
+  // that carries an average heart rate and no curve gets the pulse and the
+  // card, and no trace.
+  heartbeat: {
+    activity: placeholderRun,
+    streams: {},
+    theme: DEFAULT_THEME,
+    greenscreen: false,
+    pulse: DEFAULT_PULSE,
   },
   "minimal-numbers": {
     activity: placeholderRun,

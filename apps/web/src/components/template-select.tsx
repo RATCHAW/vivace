@@ -26,8 +26,13 @@ import {
  * deleting an id from here, not a change to the contract three packages read.
  *
  * Keep it to one. The cobalt is a stamp; two of them is a colour scheme.
+ *
+ * Exported for the test, which asserts the rule — one stamp, on the row it
+ * marks — rather than which template currently holds it. Naming the template
+ * there would make moving the badge a two-file edit, and this list is meant to
+ * be moved.
  */
-const NEW_TEMPLATES: readonly TemplateId[] = ["duo-replay"];
+export const NEW_TEMPLATES: readonly TemplateId[] = ["heartbeat"];
 
 /**
  * Which cut of the run is playing — above the film, because it is the film's

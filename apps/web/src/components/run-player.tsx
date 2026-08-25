@@ -9,11 +9,14 @@ import {
   PlayIcon,
   Share2Icon,
   SparklesIcon,
+  Volume2Icon,
+  VolumeXIcon,
 } from "lucide-react";
 import {
   estimateDurationInFrames,
   formatClock,
   getTemplate,
+  type PulseMode,
   type TemplateId,
   type ThemeName,
   type VideoPartner,
@@ -81,6 +84,7 @@ export function RunPlayer({
   partner = null,
   theme,
   greenscreen,
+  pulse,
   fit = "width",
   chrome = "studio",
   frameRef,
@@ -107,6 +111,9 @@ export function RunPlayer({
    *  player shows it as it will be exported — green and all, because what the
    *  athlete is judging is whether the type still reads once it is keyed. */
   greenscreen: boolean;
+  /** What the heartbeat keeps time to, on the one cut that has one. Ignored by
+   *  every silent template, the same way the theme is by the replay. */
+  pulse: PulseMode;
   /** Whether the frame is measured off its column or off the space left in the
    *  column. See `filmFrame`. */
   fit?: FilmFit;
@@ -122,7 +129,7 @@ export function RunPlayer({
   onToggleExpanded?: () => void;
 }) {
   const { t } = useTranslation();
-  const { fps, width, height } = getTemplate(template);
+  const { fps, width, height, hasAudio } = getTemplate(template);
   // The length of the film is a property of the *run*: a marathon's Split Rush
   // is longer than a parkrun's. Lambda gets the same number from the same
   // function through the composition's `calculateMetadata`, so what plays here
@@ -134,6 +141,9 @@ export function RunPlayer({
   const player = useRef<PlayerRef>(null);
   const [frame, setFrame] = useState(0);
   const [playing, setPlaying] = useState(false);
+  // Films with sound open muted — see `initiallyMuted` below — so this starts
+  // where the player starts and is mirrored from it afterwards.
+  const [muted, setMuted] = useState(hasAudio);
   const share = useShareRun(activity);
 
   // The player owns playback; this component only mirrors it, so the transport
@@ -157,14 +167,21 @@ export function RunPlayer({
       setPlaying(current.isPlaying());
     };
     const onPause = () => setPlaying(false);
+    // Volume is the player's state, not this component's: it also moves from
+    // the keyboard and from the browser's own media controls.
+    const onMute = (e: { detail: { isMuted: boolean } }) =>
+      setMuted(e.detail.isMuted);
 
     current.addEventListener("frameupdate", onFrame);
     current.addEventListener("pause", onPause);
+    current.addEventListener("mutechange", onMute);
     setPlaying(current.isPlaying());
+    setMuted(current.isMuted());
 
     return () => {
       current.removeEventListener("frameupdate", onFrame);
       current.removeEventListener("pause", onPause);
+      current.removeEventListener("mutechange", onMute);
     };
   }, [chrome]);
 
@@ -188,6 +205,7 @@ export function RunPlayer({
           athleteName,
           partner,
           greenscreen,
+          pulse,
         }}
         durationInFrames={durationInFrames}
         fps={fps}
@@ -197,6 +215,17 @@ export function RunPlayer({
         autoPlay
         acknowledgeRemotionLicense
         controls={chrome === "player"}
+        // A browser will not autoplay a film with sound in it, and refusing to
+        // start is a worse first impression than starting quiet: the heartbeat
+        // is one tap away, and the file that comes off Lambda carries it either
+        // way. Static, and the player is keyed on the template, so switching to
+        // a silent cut and back opens muted again rather than shouting.
+        initiallyMuted={hasAudio}
+        // The heartbeat is one short clip played once per beat, so at most two
+        // are ever mounted at once — but Remotion throws rather than drops a
+        // tag when the pool runs out, and a hard throw here would take the
+        // whole player down over a thud.
+        numberOfSharedAudioTags={hasAudio ? 10 : undefined}
         // Left to show themselves for good, Remotion's controls land on the
         // film's own bottom row — every template ends in one, and `run-video`'s
         // is a live clock, so the transport's `0:18 / 0:20` prints straight
@@ -207,9 +236,11 @@ export function RunPlayer({
         // one gesture the way back to them — the same one every video on a
         // phone answers to.
         //
-        // Nothing in the catalogue has an audio track, and a mute button that
-        // silences silence is a control that can only lie.
-        showVolumeControls={false}
+        // One template in the catalogue has an audio track and the rest do not,
+        // so the volume control is offered exactly where it can do something —
+        // a mute button that silences silence is a control that can only lie.
+        // The wide layout draws its own; this is the phone's.
+        showVolumeControls={hasAudio}
         style={{ width: "100%", height: "100%" }}
       />
     </div>
@@ -256,6 +287,29 @@ export function RunPlayer({
             player.current?.seekTo(next);
           }}
         />
+
+        {/* Only on a cut that has something to hear. The wide layout draws its
+            own transport instead of Remotion's, so without this the one film
+            with a heartbeat in it would play silently on a desktop with no way
+            to turn it on. Beside the theatre toggle rather than next to Play:
+            this is a property of the film, not a transport control. */}
+        {hasAudio && (
+          <Button
+            size="icon"
+            variant="subtle"
+            aria-label={muted ? t("player.unmute") : t("player.mute")}
+            aria-pressed={!muted}
+            onClick={() => {
+              const current = player.current;
+              if (!current) return;
+              if (current.isMuted()) current.unmute();
+              else current.mute();
+              setMuted(current.isMuted());
+            }}
+          >
+            {muted ? <VolumeXIcon /> : <Volume2Icon />}
+          </Button>
+        )}
 
         {onToggleExpanded && (
           <Button

@@ -9,11 +9,13 @@ import {
   type AwsRegion,
 } from "@remotion/lambda/client";
 import {
+  DEFAULT_PULSE,
   DEFAULT_THEME,
   functionNameEnvVar,
   getProfile,
   getTemplate,
   serveUrlEnvVar,
+  type PulseMode,
   type TemplateId,
   type ThemeName,
   type VideoTemplate,
@@ -37,6 +39,8 @@ export interface RenderOptions {
   /** Cut the film's canvas as a chroma key plate, so the athlete can drop their
    *  own footage in behind it. Every template honours this one. */
   greenscreen: boolean;
+  /** What the heartbeat keeps time to, on the one template that has one. */
+  pulse: PulseMode;
 }
 
 const DEFAULT_REGION = "us-east-1";
@@ -104,6 +108,11 @@ export function renderPropsHash(
     // Same trick, and the same reason: a film nobody asked to key hashes
     // exactly as it did before the option existed.
     ...(options.greenscreen ? { greenscreen: true } : {}),
+    // And again — this one is load-bearing rather than tidy. Every template but
+    // the heartbeat has its pulse forced to the default in the route, so
+    // leaving the default out is what stopped adding the option from marking
+    // every already-rendered replay, poster and split rush stale at once.
+    ...(options.pulse === DEFAULT_PULSE ? {} : { pulse: options.pulse }),
     ...(partnerActivityId == null ? {} : { partner: partnerActivityId }),
   });
   return createHash("sha256").update(canonical).digest("hex").slice(0, 32);
@@ -128,6 +137,8 @@ export interface RenderInput {
   theme?: ThemeName;
   /** Cut it on the chroma key plate. Every template honours this one. */
   greenscreen?: boolean;
+  /** What the heartbeat keeps time to; a template with no sound ignores it. */
+  pulse?: PulseMode;
   /** The other runner, on a template that draws two. Null everywhere else. */
   partner?: RunPartner | null;
 }
@@ -143,6 +154,7 @@ export async function startLambdaRender(
     athleteName,
     theme = DEFAULT_THEME,
     greenscreen = false,
+    pulse = DEFAULT_PULSE,
     partner = null,
   }: RenderInput,
 ): Promise<{ renderId: string; bucketName: string }> {
@@ -164,6 +176,7 @@ export async function startLambdaRender(
       avatarUrl,
       theme,
       greenscreen,
+      pulse,
       athleteName,
       // The props contract is camelCase — `VideoPartner` in @repo/video — and
       // the API's own is snake_case, so the crossing happens here rather than

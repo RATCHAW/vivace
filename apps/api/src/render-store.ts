@@ -5,6 +5,7 @@
 import type { AwsRegion } from "@remotion/lambda/client";
 import {
   DEFAULT_THEME,
+  getPulseMode,
   isThemeName,
   type TemplateId,
   type ThemeName,
@@ -39,6 +40,9 @@ function fromDb(row: RunRenderSelect): RunRenderRow {
       theme: themeOf(row.options.theme),
       // Same for a row written before the key plate: it was cut on black.
       greenscreen: row.options.greenscreen ?? false,
+      // …and for one written before the catalogue had a sound in it: silent,
+      // which is what `DEFAULT_PULSE` means to every template but the heartbeat.
+      pulse: getPulseMode(row.options.pulse),
     },
   };
 }
@@ -52,6 +56,7 @@ export function toRunRender(row: RunRenderRow): RunRender {
     show_avatar: row.options.showAvatar,
     theme: row.options.theme,
     greenscreen: row.options.greenscreen,
+    pulse: row.options.pulse,
     progress: row.progress,
     output_url: row.outputUrl,
     error: row.error,
@@ -108,6 +113,7 @@ export async function saveStartedRender(input: {
       show_avatar: input.options.showAvatar,
       theme: input.options.theme,
       greenscreen: input.options.greenscreen,
+      pulse: input.options.pulse,
     },
     propsHash: input.propsHash,
   };
