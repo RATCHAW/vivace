@@ -39,6 +39,17 @@ export {
 // The picker paints its swatch with the colour the athlete will be keying out.
 export { KEY_COLOR, videoTheme } from "./core/greenscreen";
 
+// What the heartbeat keeps time to. Only the template whose `supportsPulse` is
+// true honours it; apps/api validates the athlete's choice against
+// `PULSE_MODES` and drops it for every other template before it is hashed.
+export {
+  DEFAULT_PULSE,
+  getPulseMode,
+  isPulseMode,
+  PULSE_MODES,
+  type PulseMode,
+} from "./templates/heartbeat/pulse";
+
 // The formatters double as the app's: a pace in the run list and a pace in the
 // video are the same string, and this is the one implementation of it.
 export {

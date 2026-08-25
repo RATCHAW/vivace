@@ -3,7 +3,7 @@
 // re-render — and a run can hold one of each template at the same time, so
 // choosing another cut doesn't throw away the last video.
 import type { AwsRegion } from "@remotion/lambda/client";
-import type { TemplateId, ThemeName } from "@repo/video";
+import type { PulseMode, TemplateId, ThemeName } from "@repo/video";
 import {
   bigint,
   jsonb,
@@ -24,6 +24,7 @@ export interface StoredRenderOptions {
   show_avatar?: boolean;
   theme?: ThemeName;
   greenscreen?: boolean;
+  pulse?: PulseMode;
 }
 
 export const runRender = pgTable(

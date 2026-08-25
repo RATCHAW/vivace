@@ -1,9 +1,12 @@
 import { useTranslation } from "react-i18next";
+import { ActivityIcon, HeartIcon } from "lucide-react";
 import {
   getTemplate,
   KEY_COLOR,
+  PULSE_MODES,
   THEMES,
   THEME_NAMES,
+  type PulseMode,
   type TemplateId,
   type ThemeName,
 } from "@repo/video";
@@ -43,6 +46,8 @@ export function VideoOptions({
   onShowAvatarChange,
   greenscreen,
   onGreenscreenChange,
+  pulse,
+  onPulseChange,
 }: {
   /** Which cut is playing — it decides which of these options it honours. */
   template: TemplateId;
@@ -58,6 +63,8 @@ export function VideoOptions({
   onShowAvatarChange: (next: boolean) => void;
   greenscreen: boolean;
   onGreenscreenChange: (next: boolean) => void;
+  pulse: PulseMode;
+  onPulseChange: (next: PulseMode) => void;
 }) {
   const { t } = useTranslation();
   const entry = getTemplate(template);
@@ -65,6 +72,12 @@ export function VideoOptions({
 
   return (
     <div className="flex flex-col gap-4">
+      {/* First, and above the look: on the one cut that has a heartbeat this is
+          what the film *is*, where the theme is what it wears. */}
+      {entry.supportsPulse && (
+        <PulsePicker value={pulse} onChange={onPulseChange} />
+      )}
+
       {themeSupported && (
         <ThemePicker
           theme={theme}
@@ -147,6 +160,73 @@ export function VideoOptions({
           onCheckedChange={onGreenscreenChange}
         />
       </div>
+    </div>
+  );
+}
+
+/** One glyph per tempo. Two words alone read as the same kind of thing — a
+ *  steady heart and a spike say the difference before the caption does. */
+const PULSE_ICONS: Record<PulseMode, typeof HeartIcon> = {
+  average: HeartIcon,
+  peak: ActivityIcon,
+};
+
+/**
+ * What the heartbeat keeps time to — the one option that changes what the film
+ * *sounds* like rather than what it looks like.
+ *
+ * Same shape as the theme picker below it on purpose: they are both "pick one
+ * of these", and giving the sound its own kind of control would make it read as
+ * a setting rather than as part of the cut. The caption underneath carries the
+ * whole explanation, because the pills have to stay one word each — and what it
+ * has to get across is that both of these are *real time*, which is the only
+ * reason the film is worth listening to.
+ */
+function PulsePicker({
+  value,
+  onChange,
+}: {
+  value: PulseMode;
+  onChange: (next: PulseMode) => void;
+}) {
+  const { t } = useTranslation();
+
+  return (
+    <div
+      role="group"
+      aria-label={t("videoOptions.pulseGroup")}
+      className="flex flex-col gap-2.5"
+    >
+      <div className="flex flex-wrap gap-2">
+        {PULSE_MODES.map((mode) => {
+          const Icon = PULSE_ICONS[mode];
+          return (
+            <button
+              key={mode}
+              type="button"
+              aria-pressed={mode === value}
+              onClick={() => onChange(mode)}
+              className={cn(
+                "text-body-sm focus-visible:ring-ring/50 inline-flex h-12 items-center gap-2 rounded-full border px-4 font-semibold transition-colors duration-100 ease-out outline-none active:translate-y-px focus-visible:ring-3",
+                mode === value
+                  ? "bg-muted border-transparent"
+                  : "text-muted-foreground hover:bg-muted/40",
+              )}
+            >
+              <Icon
+                className={cn(
+                  "size-4 shrink-0",
+                  mode === value && "text-brand",
+                )}
+              />
+              {t(`videoOptions.pulse.${mode}.label`)}
+            </button>
+          );
+        })}
+      </div>
+      <p className="text-caption text-muted-foreground">
+        {t(`videoOptions.pulse.${value}.description`)}
+      </p>
     </div>
   );
 }

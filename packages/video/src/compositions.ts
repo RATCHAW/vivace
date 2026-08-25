@@ -9,6 +9,7 @@
 import type { ComponentType } from "react";
 import type { TemplateId } from "./registry";
 import { DuoReplay } from "./templates/duo-replay/DuoReplay";
+import { Heartbeat } from "./templates/heartbeat/Heartbeat";
 import { LivingPoster } from "./templates/living-poster/LivingPoster";
 import { MinimalNumbers } from "./templates/minimal-numbers/MinimalNumbers";
 import { RunVideo } from "./templates/run-video/RunVideo";
@@ -31,6 +32,10 @@ export {
   MinimalNumbers,
   type MinimalNumbersProps,
 } from "./templates/minimal-numbers/MinimalNumbers";
+export {
+  Heartbeat,
+  type HeartbeatProps,
+} from "./templates/heartbeat/Heartbeat";
 // Exported for the drift test in apps/web, not for the app to render — the app
 // has its own copy, and this is the one the watermark is stamped with.
 export { VivaceMark } from "./brand/vivace-mark";
@@ -59,6 +64,9 @@ export interface VideoProps extends Record<string, unknown> {
   /** Cut the canvas as a chroma key plate. Every template honours this one —
    *  see `core/greenscreen.ts`. */
   greenscreen: boolean;
+  /** One of `PULSE_MODES` — what the heartbeat keeps time to. Only the template
+   *  with a heartbeat reads it. */
+  pulse: string;
 }
 
 export const VIDEO_COMPONENTS: Record<TemplateId, ComponentType<VideoProps>> = {
@@ -69,5 +77,6 @@ export const VIDEO_COMPONENTS: Record<TemplateId, ComponentType<VideoProps>> = {
   "duo-replay": DuoReplay as ComponentType<VideoProps>,
   "split-rush": SplitRush as ComponentType<VideoProps>,
   "living-poster": LivingPoster as ComponentType<VideoProps>,
+  heartbeat: Heartbeat as ComponentType<VideoProps>,
   "minimal-numbers": MinimalNumbers as ComponentType<VideoProps>,
 };

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_THEME } from "./core/theme";
+import { DEFAULT_PULSE } from "./templates/heartbeat/pulse";
 import { TEMPLATE_COMPONENTS, TEMPLATE_DEFAULT_PROPS } from "./Root";
 import {
   DEFAULT_TEMPLATE_ID,
@@ -100,6 +101,34 @@ describe("the catalogue", () => {
         DEFAULT_THEME,
       );
     }
+  });
+
+  it("only lets a template be pulsed when it has a heartbeat to keep time", () => {
+    for (const template of VIDEO_TEMPLATES) {
+      // The option is dropped in the route for anything that answers false, so
+      // a template claiming it without reading it would store an answer that
+      // changed nothing — and split two identical films across two renders.
+      if (template.supportsPulse) {
+        expect(template.hasAudio, template.id).toBe(true);
+        expect(TEMPLATE_DEFAULT_PROPS[template.id].pulse, template.id).toBe(
+          DEFAULT_PULSE,
+        );
+      } else {
+        expect(
+          TEMPLATE_DEFAULT_PROPS[template.id].pulse,
+          template.id,
+        ).toBeUndefined();
+      }
+    }
+  });
+
+  it("keeps the catalogue silent apart from the one film that isn't", () => {
+    // `hasAudio` is what puts a mute button on the player. A template that
+    // claimed it without an audio track would offer a control that can only
+    // silence silence; one that has sound and doesn't claim it plays muted with
+    // no way back. Both are worth failing a test over.
+    const loud = VIDEO_TEMPLATES.filter((template) => template.hasAudio);
+    expect(loud.map((template) => template.id)).toEqual(["heartbeat"]);
   });
 
   it("hands every template the key plate", () => {

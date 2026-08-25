@@ -44,6 +44,7 @@ function rendering(progress = 0.42): RunRenderState {
       show_avatar: false,
       theme: "charcoal",
       greenscreen: false,
+      pulse: "average",
       progress,
       output_url: null,
       error: null,
@@ -85,6 +86,7 @@ function renderControls(
         showAvatar={false}
         theme="charcoal"
         greenscreen={false}
+        pulse="average"
         layout="tile"
         blocked={blocked}
       />

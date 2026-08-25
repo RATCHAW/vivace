@@ -165,6 +165,8 @@ export const fr: Translated<Messages> = {
     seek: "Se déplacer dans le replay",
     enterTheatre: "Passer en mode cinéma",
     leaveTheatre: "Quitter le mode cinéma",
+    mute: "Couper le battement de cœur",
+    unmute: "Écouter le battement de cœur",
     askCoach: "Demander au coach",
     share: "Partager",
     linkCopied: "Lien copié",
@@ -175,6 +177,19 @@ export const fr: Translated<Messages> = {
   videoOptions: {
     section: "Options de la vidéo",
     themeGroup: "Thème de la vidéo",
+    pulseGroup: "Battement de cœur",
+    pulse: {
+      average: {
+        label: "Moyenne",
+        description:
+          "Bat en temps réel à votre fréquence cardiaque moyenne sur la course.",
+      },
+      peak: {
+        label: "Maximum",
+        description:
+          "Bat en temps réel à la fréquence cardiaque la plus haute de la course. Le plus rapide, le plus fort.",
+      },
+    },
     templateSelect: "Modèle de vidéo",
     runAsAvatar: "Courir avec votre avatar",
     avatarReady: "Votre photo Strava ouvre le tracé à la place du point.",
@@ -211,6 +226,11 @@ export const fr: Translated<Messages> = {
         description:
           "Le tracé dessiné sur une plaque nue, nord en haut, puis figé. Les deux dernières secondes et demie sont une image à encadrer.",
       },
+      heartbeat: {
+        label: "Battement de cœur",
+        description:
+          "Votre fréquence cardiaque tracée en courbe et jouée en pulsation, en temps réel. Le seul film ici avec du son — battant à la moyenne de la course ou à son maximum.",
+      },
       "minimal-numbers": {
         label: "Chiffres essentiels",
         description:
@@ -239,6 +259,7 @@ export const fr: Translated<Messages> = {
       "needs-two-km": "Nécessite au moins 2 km",
       "needs-distance-time": "Nécessite distance et temps de la montre",
       "needs-partner": "Nécessite qu’un partenaire accepte l’invitation",
+      "needs-heart-rate": "Nécessite la fréquence cardiaque de la montre",
     },
   },
 

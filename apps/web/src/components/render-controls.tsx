@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { DownloadIcon, Loader2Icon, RotateCcwIcon } from "lucide-react";
-import type { TemplateId, ThemeName } from "@repo/video";
+import type { PulseMode, TemplateId, ThemeName } from "@repo/video";
 import {
   getRunRenderOptions,
   getRunRenderQueryKey,
@@ -59,8 +59,8 @@ type RenderLayout = "panel" | "tile";
  *
  * It draws no margin of its own — `<RunStudio>` owns the box it sits in.
  *
- * `template`, `showAvatar`, `theme` and `greenscreen` are what the film in the
- * player is playing, and they travel with the render request. A run holds one
+ * `template`, `showAvatar`, `theme`, `greenscreen` and `pulse` are what the film
+ * in the player is playing, and they travel with the render request. A run holds one
  * render per template, so switching template swaps which one this is about rather
  * than replacing it; within a template, a finished render made with a different
  * answer is a different video, so the same button renders that answer instead
@@ -74,6 +74,7 @@ export function RenderControls({
   showAvatar,
   theme,
   greenscreen,
+  pulse,
   layout = "panel",
   blocked = null,
 }: {
@@ -82,6 +83,7 @@ export function RenderControls({
   showAvatar: boolean;
   theme: ThemeName;
   greenscreen: boolean;
+  pulse: PulseMode;
   layout?: RenderLayout;
   /**
    * Why no new render can be started, in the athlete's own words — the duo cut
@@ -109,7 +111,8 @@ export function RenderControls({
     render != null &&
     (render.show_avatar !== showAvatar ||
       render.theme !== theme ||
-      render.greenscreen !== greenscreen);
+      render.greenscreen !== greenscreen ||
+      render.pulse !== pulse);
 
   const start = useMutation({
     ...startRunRenderMutation(),
@@ -168,10 +171,11 @@ export function RenderControls({
       showAvatar,
       theme,
       greenscreen,
+      pulse,
     });
     start.mutate({
       path,
-      body: { template, show_avatar: showAvatar, theme, greenscreen },
+      body: { template, show_avatar: showAvatar, theme, greenscreen, pulse },
     });
   };
   const noteDownload = () =>

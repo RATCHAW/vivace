@@ -10,6 +10,7 @@
  * picker, and nothing here may reach for a component.
  */
 import { cleanRoute } from "./core/geo";
+import { hasHeartRate } from "./templates/heartbeat/pulse";
 import { MIN_ROUTE_POINTS } from "./templates/living-poster/poster";
 import { SPLIT_METERS } from "./templates/split-rush/splits";
 import {
@@ -44,7 +45,11 @@ export interface TemplateInput {
  * translation still says something true.
  */
 export type EligibilityReason =
-  "needs-route" | "needs-two-km" | "needs-distance-time" | "needs-partner";
+  | "needs-route"
+  | "needs-two-km"
+  | "needs-distance-time"
+  | "needs-partner"
+  | "needs-heart-rate";
 
 export interface Eligibility {
   eligible: boolean;
@@ -113,6 +118,15 @@ const RULES: Record<TemplateId, (input: TemplateInput) => Eligibility> = {
     MIN_ROUTE_POINTS
       ? OK
       : no("needs-route", "Needs a GPS route — this run has none"),
+
+  // One number is enough to beat at — a run that carries an average but no
+  // stream gets the pulse and the closing card, and simply no curve. What it
+  // cannot survive is a watch that recorded no heart rate at all: there is
+  // nothing to draw, nothing to count and, more to the point, nothing to hear.
+  heartbeat: ({ activity, streams }) =>
+    hasHeartRate(activity, streams)
+      ? OK
+      : no("needs-heart-rate", "Needs heart rate from the watch"),
 
   // The universal fallback. This one must never be ineligible: it is what
   // renders when a run has nothing, and something always has to render.

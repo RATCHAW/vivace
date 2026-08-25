@@ -87,6 +87,21 @@ export interface VideoTemplate {
    *  re-tint — the replay's plate is a Mapbox style, and a cream video over a
    *  dark map is not a theme, it is a different template. */
   supportsTheme: boolean;
+  /** Honours the `pulse` option — what the heartbeat keeps time to. Only a film
+   *  that *has* a heartbeat can answer it, so like the avatar and the theme it
+   *  is dropped in the route before it reaches `renderPropsHash`; otherwise two
+   *  identical films would hash differently and each pay for its own render. */
+  supportsPulse: boolean;
+  /**
+   * The film has an audio track.
+   *
+   * Read by the browser, not by Lambda: the `<Player>` has to draw a mute
+   * button on a template with sound and must not draw one on a template
+   * without — a control that can only silence silence is a control that lies.
+   * It also decides whether the film opens muted, because a browser refuses to
+   * autoplay audio and would otherwise leave the athlete on a frozen frame.
+   */
+  hasAudio: boolean;
   /**
    * Needs a second runner: the film cannot be cut without an accepted
    * invitation on the run.
@@ -116,6 +131,8 @@ export const VIDEO_TEMPLATES = [
     usesMap: true,
     supportsAvatar: true,
     supportsTheme: false,
+    supportsPulse: false,
+    hasAudio: false,
     needsPartner: false,
   },
   {
@@ -134,6 +151,8 @@ export const VIDEO_TEMPLATES = [
     usesMap: true,
     supportsAvatar: true,
     supportsTheme: false,
+    supportsPulse: false,
+    hasAudio: false,
     needsPartner: true,
   },
   {
@@ -154,6 +173,8 @@ export const VIDEO_TEMPLATES = [
     usesMap: false,
     supportsAvatar: false,
     supportsTheme: true,
+    supportsPulse: false,
+    hasAudio: false,
     needsPartner: false,
   },
   {
@@ -171,6 +192,30 @@ export const VIDEO_TEMPLATES = [
     usesMap: false,
     supportsAvatar: false,
     supportsTheme: true,
+    supportsPulse: false,
+    hasAudio: false,
+    needsPartner: false,
+  },
+  {
+    id: "heartbeat",
+    compositionId: "heartbeat",
+    label: "Heartbeat",
+    description:
+      "Your heart rate drawn as a curve and played as a pulse, in real time. " +
+      "The only film here with a sound — beating at the run's average, or at " +
+      "its peak.",
+    profile: "light",
+    width: 1080,
+    height: 1920,
+    fps: FPS,
+    // Typical, not fixed: the real length is `estimateDurationInFrames`, which
+    // rounds to a whole number of the athlete's own heartbeats.
+    durationInFrames: 11 * FPS,
+    usesMap: false,
+    supportsAvatar: false,
+    supportsTheme: true,
+    supportsPulse: true,
+    hasAudio: true,
     needsPartner: false,
   },
   {
@@ -188,6 +233,8 @@ export const VIDEO_TEMPLATES = [
     usesMap: false,
     supportsAvatar: false,
     supportsTheme: true,
+    supportsPulse: false,
+    hasAudio: false,
     needsPartner: false,
   },
 ] as const satisfies readonly VideoTemplate[];
