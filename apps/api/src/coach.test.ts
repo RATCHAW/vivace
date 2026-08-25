@@ -12,6 +12,8 @@ import {
   predictRaces,
   routePath,
   toSplits,
+  weekdayIndex,
+  weekdayName,
   weeklyVolume,
   weekStart,
 } from "./training.js";
@@ -95,6 +97,21 @@ describe("clock", () => {
     expect(clock(1724)).toBe("28:44");
     expect(clock(5053)).toBe("1:24:13");
     expect(clock(59)).toBe("0:59");
+  });
+});
+
+describe("weekdayName", () => {
+  it("names the day a date falls on", () => {
+    expect(weekdayName("2026-08-24")).toBe("Monday");
+    expect(weekdayName("2026-08-25")).toBe("Tuesday");
+    expect(weekdayName("2026-08-30")).toBe("Sunday");
+  });
+
+  it("numbers the week Monday first, the way a plan is stored", () => {
+    expect(weekdayIndex("2026-08-24")).toBe(0);
+    expect(weekdayIndex("2026-08-25")).toBe(1);
+    // Sunday is 6, not JavaScript's 0 — a plan's seventh card, not its first.
+    expect(weekdayIndex("2026-08-30")).toBe(6);
   });
 });
 
@@ -947,6 +964,21 @@ describe("toPlanCard", () => {
 });
 
 describe("coachSystemPrompt", () => {
+  // The model has no calendar: handed the stamp alone it answers "today
+  // (Monday)" on a Tuesday and reshapes a week around a day already run.
+  it("names the weekday rather than leaving it as arithmetic", () => {
+    expect(coachSystemPrompt("2026-08-25", 6)).toContain(
+      "Today is Tuesday, 2026-08-25",
+    );
+  });
+
+  it("places today in the week's own numbering", () => {
+    expect(coachSystemPrompt("2026-08-25", 6)).toContain(
+      "day 1 of this week, counting 0 = Monday",
+    );
+    expect(coachSystemPrompt("2026-08-30", 6)).toContain("day 6 of this week");
+  });
+
   it("says nothing about language for an English athlete", () => {
     expect(coachSystemPrompt("2026-08-18", 6)).not.toContain(
       "askAthlete` draws",
