@@ -979,6 +979,24 @@ describe("coachSystemPrompt", () => {
     expect(coachSystemPrompt("2026-08-30", 6)).toContain("day 6 of this week");
   });
 
+  // Asked for a week on a Tuesday, the coach wrote Monday a fresh recovery
+  // run — a prescription for a day the athlete had already spent on a 10 k of
+  // their own. Past days are the record of what happened, not a plan.
+  it("tells the coach past days record what was run, not new work", () => {
+    const prompt = coachSystemPrompt("2026-08-25", 6);
+    expect(prompt).toContain("read `listRuns` and fill each one");
+    expect(prompt).toContain("never a new session on a day that is over");
+  });
+
+  // The prompt carries the date and never the hour, so a coach answering at
+  // 10:30pm plans a run for an evening that is already gone. Only the athlete
+  // knows whether today still has room.
+  it("tells the coach to ask whether today can still hold a run", () => {
+    expect(coachSystemPrompt("2026-08-25", 6)).toContain(
+      "ask with `askAthlete` whether today has room",
+    );
+  });
+
   it("says nothing about language for an English athlete", () => {
     expect(coachSystemPrompt("2026-08-18", 6)).not.toContain(
       "askAthlete` draws",
