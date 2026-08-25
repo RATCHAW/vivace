@@ -33,12 +33,36 @@ export function localDate(run: Run): string {
   return run.start_date_local.slice(0, 10);
 }
 
+/** 0 = Monday … 6 = Sunday — the numbering a week is planned and stored in. */
+export function weekdayIndex(date: string): number {
+  // getUTCDay(): 0 = Sunday, so Sunday belongs to the week that began 6 days ago.
+  return (new Date(`${date}T00:00:00Z`).getUTCDay() + 6) % 7;
+}
+
+const WEEKDAYS = [
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+  "Sunday",
+] as const;
+
+/**
+ * The day of the week a date falls on, named.
+ *
+ * English, because the only thing that reads it is the system prompt — every
+ * weekday an athlete sees is drawn by apps/web from its own catalogue.
+ */
+export function weekdayName(date: string): string {
+  return WEEKDAYS[weekdayIndex(date)];
+}
+
 /** Monday of the ISO week a date falls in, as `YYYY-MM-DD`. */
 export function weekStart(date: string): string {
   const day = new Date(`${date}T00:00:00Z`);
-  // getUTCDay(): 0 = Sunday, so Sunday belongs to the week that began 6 days ago.
-  const offset = (day.getUTCDay() + 6) % 7;
-  day.setUTCDate(day.getUTCDate() - offset);
+  day.setUTCDate(day.getUTCDate() - weekdayIndex(date));
   return day.toISOString().slice(0, 10);
 }
 

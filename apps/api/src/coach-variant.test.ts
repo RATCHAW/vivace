@@ -213,7 +213,7 @@ describe("coachSystemPrompt", () => {
     const prompt = coachSystemPrompt("2026-08-18", 6);
 
     expect(prompt).toContain("You are Vivace's running coach.");
-    expect(prompt).toContain("Today is 2026-08-18.");
+    expect(prompt).toContain("Today is Tuesday, 2026-08-18");
     expect(prompt).toContain("the last 6 weeks");
     expect(prompt).not.toContain("two sentences, three at the very most");
   });
@@ -224,7 +224,7 @@ describe("coachSystemPrompt", () => {
     // A variant is the same coach with different rules, not a different app —
     // it still has the tools and still knows what day it is.
     expect(terse).toContain("You are Vivace's running coach.");
-    expect(terse).toContain("Today is 2026-08-18.");
+    expect(terse).toContain("Today is Tuesday, 2026-08-18");
     expect(terse).toContain("two sentences, three at the very most");
   });
 

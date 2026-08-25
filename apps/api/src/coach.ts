@@ -49,6 +49,8 @@ import {
   predictRaces,
   routePath,
   toSplits,
+  weekdayIndex,
+  weekdayName,
   weeklyVolume,
   weekStart,
 } from "./training.js";
@@ -349,6 +351,14 @@ function describeRun(run: AttachedRun): string {
  *
  * The date matters more than it looks: the model has no clock, and "last week"
  * is the single most common thing an athlete asks about.
+ *
+ * The weekday is spelled out rather than left as arithmetic on the stamp. A
+ * model handed `2026-08-25` will say "today (Monday)" with no hesitation, and
+ * the day of the week is not decoration here — "I can't run Friday" is answered
+ * by reshaping the days that are left, so a coach one day out moves sessions
+ * the athlete has already run. Its index says the same thing in the numbering
+ * `proposeWeek` writes a week in, so today can be located in the seven cards
+ * without counting from Monday.
  */
 export function coachSystemPrompt(
   today: string,
@@ -357,7 +367,7 @@ export function coachSystemPrompt(
 ): string {
   const lines = [
     SYSTEM_PROMPTS[prompt ?? DEFAULT_PROMPT_VERSION],
-    `Today is ${today}. The athlete is looking at the last ${rangeWeeks} weeks of training; prefer that window unless they ask for another.`,
+    `Today is ${weekdayName(today)}, ${today} — day ${weekdayIndex(today)} of this week, counting 0 = Monday. Never work the weekday out from the date yourself, and never call an earlier day today: the days before it have already been run or missed, and only today and the days after it can still be planned. The athlete is looking at the last ${rangeWeeks} weeks of training; prefer that window unless they ask for another.`,
   ];
   // One run and several are said differently on purpose: "this run" resolving
   // to the one attached is the whole point of a single mention, and telling the
