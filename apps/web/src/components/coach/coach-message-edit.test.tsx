@@ -6,11 +6,22 @@ import { CoachMessageEdit } from "./coach-message-edit";
 afterEach(async () => {
   // Vitest runs without globals, so RTL never registered its own auto-cleanup.
   cleanup();
+  vi.unstubAllGlobals();
   await i18n.changeLanguage("en");
 });
 
 function field(): HTMLTextAreaElement {
   return screen.getByRole("textbox");
+}
+
+/** A device that answers a media query however this test needs it to. */
+function stubPointer(coarse: boolean) {
+  vi.stubGlobal("matchMedia", (query: string) => ({
+    matches: query.includes("pointer: coarse") ? coarse : !coarse,
+    media: query,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+  }));
 }
 
 describe("CoachMessageEdit", () => {
@@ -41,6 +52,23 @@ describe("CoachMessageEdit", () => {
     expect(onSubmit).not.toHaveBeenCalled();
 
     fireEvent.keyDown(field(), { key: "Enter" });
+    expect(onSubmit).toHaveBeenCalledWith("Hi");
+  });
+
+  it("writes a newline on Enter where there is no shift to hold", () => {
+    stubPointer(true);
+    const onSubmit = vi.fn();
+    render(
+      <CoachMessageEdit onCancel={vi.fn()} onSubmit={onSubmit} text="Hi" />,
+    );
+
+    const event = fireEvent.keyDown(field(), { key: "Enter" });
+
+    expect(event).toBe(true);
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(field().getAttribute("enterkeyhint")).toBe("enter");
+    // The button is what sends now, and it is drawn right below the box.
+    fireEvent.click(screen.getByRole("button", { name: "Ask again" }));
     expect(onSubmit).toHaveBeenCalledWith("Hi");
   });
 

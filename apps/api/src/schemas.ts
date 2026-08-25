@@ -158,8 +158,8 @@ export const VideoThemeSchema = z
   .enum(THEME_NAMES)
   .openapi("VideoTheme", { example: DEFAULT_THEME });
 
-/** What the heartbeat in a film with sound keeps time to: the run as it
- *  happened, its average, or its peak. */
+/** Which rate the heartbeat in a film with sound holds — the run's average, or
+ *  its peak. Both are constant, and in real time. */
 export const VideoPulseSchema = z
   .enum(PULSE_MODES)
   .openapi("VideoPulse", { example: DEFAULT_PULSE });
@@ -539,14 +539,49 @@ export const CoachContextPatchSchema = CoachContextSchema.omit({
   .partial()
   .openapi("CoachContextPatch");
 
+/**
+ * What a planned session is, beneath whatever the coach called it.
+ *
+ * `type` is the label the card draws and the model writes it in the athlete's
+ * language — so nothing can be read off it. The kind is the machine-readable
+ * half: it is what lets the UI find the long run without sniffing strings, and
+ * what tells the coach's tools that a week can hold more than steady runs.
+ */
+export const SESSION_KINDS = [
+  "easy",
+  "recovery",
+  "long",
+  "tempo",
+  "intervals",
+  "fartlek",
+  "hills",
+  "race",
+  "rest",
+] as const;
+
+export const SessionKindSchema = z.enum(SESSION_KINDS).openapi("SessionKind");
+
+export type SessionKind = z.infer<typeof SessionKindSchema>;
+
 /** One session of a coach-written week. */
 export const PlannedSessionSchema = z
   .object({
     /** 0 = Monday … 6 = Sunday. */
     day: z.number().int().min(0).max(6),
-    type: z.string().max(40).openapi({ example: "8 × 400" }),
-    /** Kilometres; 0 on a rest day. */
+    type: z.string().max(40).openapi({ example: "Intervals" }),
+    /** Optional because stored weeks and transcripts predate the field. */
+    kind: SessionKindSchema.optional(),
+    /** Kilometres for the whole day, warm-up and cool-down included; 0 on a rest day. */
     km: z.number().min(0).max(200),
+    /**
+     * The structure of a session that has one — reps, recoveries, terrain.
+     * Absent on a plain run or a rest day.
+     */
+    workout: z
+      .string()
+      .max(80)
+      .optional()
+      .openapi({ example: "6 × 800 m · 400 m jog" }),
     /** A target pace, or a note like "legs up" on a rest day. */
     pace: z.string().max(40).openapi({ example: "4:35 /km" }),
     /** A session the week is built around — quality days and the long run. */
@@ -584,6 +619,8 @@ export const PlanProgressSchema = z
         actual_km: z.number(),
         /** As the coach wrote it: "4:35 /km", or a note like "legs up". */
         planned_pace: z.string(),
+        /** The session's structure as the coach wrote it; "" on a plain run. */
+        planned_workout: z.string(),
         /** `m:ss` per km over the day's runs, null when none were logged. */
         actual_pace: z.string().nullable(),
         run_ids: z.array(z.number().int()),

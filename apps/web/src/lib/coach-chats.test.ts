@@ -4,7 +4,9 @@ import type { ChatStatus, UIMessage } from "ai";
 import {
   adoptTranscript,
   coachChatFor,
+  coachQuestionsDismissed,
   disposeCoachChat,
+  setCoachQuestionsDismissed,
   wroteAthleteContext,
 } from "@/lib/coach-chats";
 
@@ -91,6 +93,40 @@ describe("adoptTranscript", () => {
 
     adoptTranscript(chat, [message("m1", "hello"), message("m2", "late")]);
     expect(chat.messages).toHaveLength(1);
+  });
+});
+
+describe("setCoachQuestionsDismissed", () => {
+  it("remembers a dismissal past the mount that took it", () => {
+    coachChatFor("thread-q", [message("m1", "hello")]);
+    setCoachQuestionsDismissed("thread-q", "a1", true);
+
+    // What a remount reads — the athlete came back to the thread, and the
+    // form they waved off must not be standing there again.
+    expect(coachQuestionsDismissed("thread-q").has("a1")).toBe(true);
+  });
+
+  it("hands back a fresh set, so React sees the change", () => {
+    coachChatFor("thread-r", []);
+    const before = coachQuestionsDismissed("thread-r");
+    const after = setCoachQuestionsDismissed("thread-r", "a1", true);
+
+    expect(after).not.toBe(before);
+    expect(before.has("a1")).toBe(false);
+  });
+
+  it("puts one back without forgetting the others", () => {
+    coachChatFor("thread-s", []);
+    setCoachQuestionsDismissed("thread-s", "a1", true);
+    setCoachQuestionsDismissed("thread-s", "a2", true);
+    const left = setCoachQuestionsDismissed("thread-s", "a2", false);
+
+    expect([...left]).toEqual(["a1"]);
+  });
+
+  it("says nothing about a conversation that was never opened", () => {
+    expect(coachQuestionsDismissed("thread-never").size).toBe(0);
+    expect(setCoachQuestionsDismissed("thread-never", "a1", true).size).toBe(0);
   });
 });
 

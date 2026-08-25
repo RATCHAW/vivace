@@ -678,8 +678,16 @@ export const en = {
      *  didn't think to offer. Its own words, never the model's. */
     questionnaireOther: "Something else…",
     questionnaireAnswerOrSkip: "Answer this one, or skip it.",
+    /** The X in the form's corner, which is a label rather than a tooltip: an
+     *  icon-only control that hands the composer back has to say so out loud
+     *  to anyone who can't see the shape. */
+    questionnaireDismiss: "Dismiss these questions",
     questionnaireAwaiting: "Awaiting your answer",
     questionnaireAnswered: "Answered",
+    questionnaireDismissed: "Dismissed",
+    /** Stands the dismissed form back up, while the ask is still the last
+     *  thing the coach said. */
+    questionnaireReopen: "Reopen",
     questionnaireAnswers: "Here are my answers:",
     questionnaireSkipped: "skipped",
   },

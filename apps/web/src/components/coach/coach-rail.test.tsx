@@ -30,6 +30,7 @@ function day(over: Partial<PlanDay> & { day: number }): PlanDay {
     planned_km: 0,
     actual_km: 0,
     planned_pace: "",
+    planned_workout: "",
     actual_pace: null,
     run_ids: [],
     ...over,
@@ -432,6 +433,39 @@ describe("this week", () => {
     expect(screen.getByText("8 km · 6:00 /km")).toBeDefined();
     expect(screen.getByText("6 km · 6:30 /km")).toBeDefined();
     expect(screen.getByText("2 sessions left")).toBeDefined();
+  });
+
+  it("names a structured session by its workout, not its label alone", () => {
+    onDay(0);
+    render(
+      <CoachRail
+        briefing={briefing({
+          plan: plan({
+            days: [
+              day({ day: 0 }),
+              day({
+                day: 1,
+                type: "Intervals",
+                planned_km: 9,
+                planned_pace: "4:35 /km",
+                planned_workout: "8 × 400 m · 200 m jog",
+              }),
+              day({ day: 2 }),
+              day({ day: 3 }),
+              day({ day: 4 }),
+              day({ day: 5, type: "Long", planned_km: 8 }),
+              day({ day: 6 }),
+            ],
+          }),
+        })}
+        onAsk={vi.fn()}
+      />,
+    );
+
+    // "Intervals" alone tells the athlete nothing they can run — the line
+    // carries the reps, and the plain day beside it stays a bare label.
+    expect(screen.getByText("Intervals · 8 × 400 m · 200 m jog")).toBeDefined();
+    expect(screen.getByText("Long")).toBeDefined();
   });
 
   it("shows the pace that was run, not the one that was asked for", () => {

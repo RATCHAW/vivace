@@ -426,6 +426,7 @@ export function Coach() {
                             type: day.type,
                             km: day.planned_km,
                             pace: day.planned_pace,
+                            workout: day.planned_workout,
                           })),
                         },
                       ]

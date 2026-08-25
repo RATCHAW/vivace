@@ -216,6 +216,7 @@ export type PlanProgress = {
         planned_km: number;
         actual_km: number;
         planned_pace: string;
+        planned_workout: string;
         actual_pace: string | null;
         run_ids: Array<number>;
     }>;
@@ -260,10 +261,14 @@ export type CoachPlan = {
 export type PlannedSession = {
     day: number;
     type: string;
+    kind?: SessionKind;
     km: number;
+    workout?: string;
     pace: string;
     key: boolean;
 };
+
+export type SessionKind = 'easy' | 'recovery' | 'long' | 'tempo' | 'intervals' | 'fartlek' | 'hills' | 'race' | 'rest';
 
 export type CoachChatRequest = {
     thread_id: string;

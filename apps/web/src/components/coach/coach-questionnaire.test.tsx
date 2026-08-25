@@ -60,7 +60,11 @@ describe("CoachQuestionnaire", () => {
   it("sends the labels the coach wrote, not the form's own values", () => {
     const onAnswer = vi.fn();
     render(
-      <CoachQuestionnaire card={card([question()])} onAnswer={onAnswer} />,
+      <CoachQuestionnaire
+        card={card([question()])}
+        onAnswer={onAnswer}
+        onDismiss={vi.fn()}
+      />,
     );
 
     fireEvent.click(screen.getByText("Marathon"));
@@ -85,6 +89,7 @@ describe("CoachQuestionnaire", () => {
           }),
         ])}
         onAnswer={onAnswer}
+        onDismiss={vi.fn()}
       />,
     );
 
@@ -118,6 +123,7 @@ describe("CoachQuestionnaire", () => {
           }),
         ])}
         onAnswer={onAnswer}
+        onDismiss={vi.fn()}
       />,
     );
 
@@ -134,7 +140,11 @@ describe("CoachQuestionnaire", () => {
   it("answers once — a second submit would write the context twice", () => {
     const onAnswer = vi.fn();
     const { container } = render(
-      <CoachQuestionnaire card={card([question()])} onAnswer={onAnswer} />,
+      <CoachQuestionnaire
+        card={card([question()])}
+        onAnswer={onAnswer}
+        onDismiss={vi.fn()}
+      />,
     );
 
     fireEvent.click(screen.getByText("Half"));
@@ -147,7 +157,11 @@ describe("CoachQuestionnaire", () => {
   it("takes an answer the coach never offered, over the ones it did", () => {
     const onAnswer = vi.fn();
     render(
-      <CoachQuestionnaire card={card([question()])} onAnswer={onAnswer} />,
+      <CoachQuestionnaire
+        card={card([question()])}
+        onAnswer={onAnswer}
+        onDismiss={vi.fn()}
+      />,
     );
 
     fireEvent.click(screen.getByText("Half"));
@@ -171,6 +185,7 @@ describe("CoachQuestionnaire", () => {
           question({ kind: "multi", question: "Which days can you run?" }),
         ])}
         onAnswer={onAnswer}
+        onDismiss={vi.fn()}
       />,
     );
 
@@ -190,14 +205,77 @@ describe("CoachQuestionnaire", () => {
       <CoachQuestionnaire
         card={card([question(), question({ id: "q2" })], "Two quick things.")}
         onAnswer={vi.fn()}
+        onDismiss={vi.fn()}
       />,
     );
 
-    // Skip on every question and a free-text box on every choice question are
-    // the two ways past a form that stands where the composer does. There is
-    // no dismiss, because neither of those can run out.
+    // Three ways out, each answering a different question. Skip and the
+    // free-text box are ways past the questions; the third is the way past the
+    // form itself, for when they were the wrong questions to begin with.
     expect(screen.getByRole("button", { name: "Skip" })).toBeDefined();
     expect(screen.getAllByPlaceholderText("Something else…")).toHaveLength(2);
+    expect(
+      screen.getByRole("button", { name: "Dismiss these questions" }),
+    ).toBeDefined();
+  });
+
+  it("hands the composer back without answering anything", () => {
+    const onAnswer = vi.fn();
+    const onDismiss = vi.fn();
+    render(
+      <CoachQuestionnaire
+        card={card([question()])}
+        onAnswer={onAnswer}
+        onDismiss={onDismiss}
+      />,
+    );
+
+    fireEvent.click(screen.getByText("Half"));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Dismiss these questions" }),
+    );
+
+    expect(onDismiss).toHaveBeenCalledOnce();
+    // Nothing typed on the way out is sent on the way out — dismissing is the
+    // athlete saying the form was beside the point, not a half-filled answer.
+    expect(onAnswer).not.toHaveBeenCalled();
+  });
+
+  it("leaves on Escape, as every other takeover in the app does", () => {
+    const onDismiss = vi.fn();
+    render(
+      <CoachQuestionnaire
+        card={card([question()])}
+        onAnswer={vi.fn()}
+        onDismiss={onDismiss}
+      />,
+    );
+
+    fireEvent.keyDown(screen.getByPlaceholderText("Something else…"), {
+      key: "Escape",
+    });
+
+    expect(onDismiss).toHaveBeenCalledOnce();
+  });
+
+  it("dismisses rather than submits — the X sits inside the form", () => {
+    const onAnswer = vi.fn();
+    const { container } = render(
+      <CoachQuestionnaire
+        card={card([question()])}
+        onAnswer={onAnswer}
+        onDismiss={vi.fn()}
+      />,
+    );
+
+    // A button with no type inside a `<form>` is a submit button, which would
+    // send the answers it was pressed to escape.
+    const dismiss = screen.getByRole("button", {
+      name: "Dismiss these questions",
+    });
+    expect(dismiss.getAttribute("type")).toBe("button");
+    expect(container.querySelector("form")).not.toBeNull();
+    expect(onAnswer).not.toHaveBeenCalled();
   });
 
   it("draws its own chrome in French", async () => {
@@ -206,24 +284,46 @@ describe("CoachQuestionnaire", () => {
       <CoachQuestionnaire
         card={card([question(), question({ id: "q2" })])}
         onAnswer={vi.fn()}
+        onDismiss={vi.fn()}
       />,
     );
 
     expect(screen.getByRole("button", { name: "Passer" })).toBeDefined();
     expect(screen.getByRole("button", { name: "Suivant" })).toBeDefined();
     expect(screen.getByText("1 sur 2")).toBeDefined();
+    expect(
+      screen.getByRole("button", { name: "Écarter ces questions" }),
+    ).toBeDefined();
   });
 });
 
 describe("CoachQuestionnaireStatus", () => {
-  it("says which of the two states it is in, and nothing else", () => {
-    const { rerender } = render(<CoachQuestionnaireStatus answered={false} />);
+  it("says which of the three states it is in", () => {
+    const { rerender } = render(<CoachQuestionnaireStatus status="awaiting" />);
     expect(screen.getByText("Awaiting your answer")).toBeDefined();
 
-    rerender(<CoachQuestionnaireStatus answered />);
+    rerender(<CoachQuestionnaireStatus status="answered" />);
     expect(screen.getByText("Answered")).toBeDefined();
     // A line in the transcript, not a control: the questions live in the
     // composer, and there is nothing here to press.
+    expect(screen.queryByRole("button")).toBeNull();
+
+    rerender(<CoachQuestionnaireStatus status="dismissed" />);
+    expect(screen.getByText("Dismissed")).toBeDefined();
+  });
+
+  it("offers the way back only while there is one", () => {
+    const onRestore = vi.fn();
+    const { rerender } = render(
+      <CoachQuestionnaireStatus onRestore={onRestore} status="dismissed" />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Reopen" }));
+    expect(onRestore).toHaveBeenCalledOnce();
+
+    // Once the conversation has moved past the ask, reopening it would put
+    // questions the athlete has already answered in prose back on screen.
+    rerender(<CoachQuestionnaireStatus status="dismissed" />);
     expect(screen.queryByRole("button")).toBeNull();
   });
 });
