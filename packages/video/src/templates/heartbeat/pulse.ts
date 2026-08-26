@@ -83,15 +83,33 @@ export function hasHeartRate(
   streams: VideoStreams,
 ): boolean {
   if ((activity.average_heartrate ?? 0) > 0) return true;
-  return usableHeartrate(streams).length >= 2;
+  return usableHeartrate(streams).values.length >= 2;
 }
 
-/** The heart rate stream with the dropouts taken out. A strap that lost contact
- *  writes zeroes, and a zero is not a slow heart. */
-function usableHeartrate(streams: VideoStreams): number[] {
+/**
+ * The heart rate stream with the dropouts taken out. A strap that lost contact
+ * writes zeroes, and a zero is not a slow heart.
+ *
+ * `at` is where each reading came from in the stream it was filtered out of, and
+ * it is what lets the curve be read against a *different* stream afterwards —
+ * throwing the zeroes away shortens the array, so without it the distance scale
+ * would name every kilometre a few samples early on any run whose strap blinked.
+ */
+function usableHeartrate(streams: VideoStreams): {
+  values: number[];
+  at: number[];
+} {
   const data = streams.heartrate?.data;
-  if (!data) return [];
-  return data.filter((value) => Number.isFinite(value) && value > 0);
+  const values: number[] = [];
+  const at: number[] = [];
+  if (!data) return { values, at };
+  for (let i = 0; i < data.length; i += 1) {
+    if (Number.isFinite(data[i]) && data[i] > 0) {
+      values.push(data[i]);
+      at.push(i);
+    }
+  }
+  return { values, at };
 }
 
 /** How many points the curve is drawn from. Enough that a 900-pixel trace is
@@ -102,6 +120,15 @@ export const TRACE_POINTS = 180;
 export interface HeartSeries {
   /** Beats per minute, resampled onto `TRACE_POINTS` across the whole run. */
   samples: number[];
+  /**
+   * Which stream sample each of those points was read from.
+   *
+   * The one thing that ties the curve back to the rest of the run: the samples
+   * are resampled off a *filtered* heart rate array, so index `i` of the curve
+   * is index `sourceIndex[i]` of `streams.distance`. `[0]` when there is no
+   * curve, which is the only length `samples` has then.
+   */
+  sourceIndex: number[];
   average: number;
   max: number;
   min: number;
@@ -131,7 +158,7 @@ export function heartSeries(
   activity: VideoActivity,
   streams: VideoStreams,
 ): HeartSeries {
-  const raw = usableHeartrate(streams);
+  const { values: raw, at } = usableHeartrate(streams);
   const stated = activity.average_heartrate ?? 0;
 
   if (raw.length < 2) {
@@ -139,6 +166,7 @@ export function heartSeries(
     const peak = clampBpm(activity.max_heartrate ?? flat);
     return {
       samples: [flat],
+      sourceIndex: [0],
       average: flat,
       max: Math.max(flat, peak),
       min: flat,
@@ -151,9 +179,11 @@ export function heartSeries(
   // that is what turns a jittery 1 Hz trace into a line.
   const halfWidth = Math.max(1, Math.round(raw.length / TRACE_POINTS / 2));
   const samples: number[] = [];
+  const sourceIndex: number[] = [];
   for (let i = 0; i < TRACE_POINTS; i += 1) {
     const centre = sampleIndex(raw.length, i / (TRACE_POINTS - 1));
     samples.push(clampBpm(windowMean(raw, centre, halfWidth) ?? stated));
+    sourceIndex.push(at[centre]);
   }
 
   // The peak needs its position as well as its value — it is the one point the
@@ -202,6 +232,7 @@ export function heartSeries(
   const mean = raw.reduce((sum, value) => sum + value, 0) / raw.length;
   return {
     samples,
+    sourceIndex,
     average: clampBpm(stated > 0 ? stated : mean),
     max,
     min,
@@ -280,6 +311,8 @@ export interface HeartbeatBoxes {
   /** Null on a run that carries an average and no curve — there is nothing to
    *  draw, and an empty band is worse than no band. */
   trace: Box | null;
+  /** The distance scale under the curve, and null wherever the curve is. */
+  axis: Box | null;
   stats: Box;
 }
 
@@ -287,6 +320,14 @@ const CONTENT: Pick<Box, "left" | "width"> = {
   left: PAGE_INSET,
   width: SAFE_WIDTH,
 };
+
+/** Air between the curve's floor and the numerals under it — enough for the
+ *  ticks to hang off the rule without touching the type. */
+const AXIS_GAP = 16;
+
+/** The band the scale's numerals sit in. A band and not a font size, so the
+ *  test that says the closing row is clear of it has something to measure. */
+const AXIS_HEIGHT = 34;
 
 /** Everything sits between `SAFE_TOP` and the lockup — asserted by the tests
  *  rather than eyeballed, which is why the boxes are a value and not CSS. */
@@ -300,13 +341,20 @@ export function heartbeatBoxes(charted: boolean): HeartbeatBoxes {
       header,
       numeral: { ...CONTENT, top: 640, height: 480 },
       trace: null,
+      axis: null,
       stats,
     };
   }
+  const trace = { ...CONTENT, top: 900, height: 300 };
   return {
     header,
     numeral: { ...CONTENT, top: 460, height: 320 },
-    trace: { ...CONTENT, top: 900, height: 320 },
+    trace,
+    axis: {
+      ...CONTENT,
+      top: trace.top + trace.height + AXIS_GAP,
+      height: AXIS_HEIGHT,
+    },
     stats,
   };
 }
@@ -382,6 +430,135 @@ export function tracePath(
   return `${body} L${head.x.toFixed(2)} ${head.y.toFixed(2)}`;
 }
 
+/* ---- The distance scale -------------------------------------------------- */
+
+/**
+ * The steps the scale is allowed to count in, in metres.
+ *
+ * A ladder rather than `total / n`, because the whole value of the scale is that
+ * the athlete reads the numbers without decoding them: "1, 2, 3, 4" is a
+ * distance, "1.7, 3.4, 5.1" is arithmetic somebody has to do at a glance while
+ * a story plays. Every step here divides into whole kilometres for the same
+ * reason.
+ */
+const TICK_STEPS_METERS = [1000, 2000, 5000, 10_000, 20_000, 50_000];
+
+/** Above this many numerals the scale stops being a scale and becomes a ruler
+ *  — a marathon counts in tens, not in forty-two ones. */
+const MAX_TICKS = 6;
+
+/** Two numerals closer than this collide. A step is chosen so they don't, but
+ *  the *positions* are the run's rather than the ruler's, so a kilometre run
+ *  flat out can still land on top of the one before it. */
+const MIN_TICK_GAP = 130;
+
+export interface DistanceTick {
+  /** Metres from the start — a whole multiple of the step. */
+  meters: number;
+  /** Where the athlete reached it, in composition pixels. */
+  x: number;
+  /** …and how far along the drawn curve that is, 0–1: what its reveal waits
+   *  for, so a kilometre is never named before the line has run it. */
+  progress: number;
+  /** "1", "2", … and the unit on the first one, which is where it is read. */
+  label: string;
+}
+
+/**
+ * How far the athlete had run at each point of the drawn curve.
+ *
+ * Off the distance stream by way of `sourceIndex`, which is what makes the scale
+ * uneven and therefore worth drawing: the gap between 4 and 5 is narrow because
+ * that kilometre went by in less of the run, not because a ruler says so. Held
+ * monotonic, since a receiver that jumps backwards is a fix, not a step back.
+ *
+ * With no distance stream — a treadmill upload that carries only totals — the
+ * run is spread at its own average pace, the same fallback `core/metrics.ts`
+ * makes, and the scale comes out even because that is what a fixed speed is.
+ */
+function coveredMeters(
+  series: HeartSeries,
+  activity: VideoActivity,
+  streams: VideoStreams,
+): number[] {
+  const count = series.samples.length;
+  const total = Math.max(0, activity.distance);
+  const even = series.samples.map((_, index) =>
+    count <= 1 ? total : (total * index) / (count - 1),
+  );
+
+  const data = streams.distance?.data;
+  if (!data || data.length === 0) return even;
+  let running = 0;
+  const covered = series.samples.map((_, index) => {
+    const value = data[series.sourceIndex[index] ?? 0];
+    if (Number.isFinite(value)) running = Math.max(running, value);
+    return running;
+  });
+  // A stream of zeroes is not a run that stood still; it is a stream with
+  // nothing in it, and the totals know better.
+  return covered[covered.length - 1] > 0 ? covered : even;
+}
+
+/** Where along the curve `meters` was reached, 0–1 — interpolated inside the
+ *  point it falls in, so a tick sits on the metre rather than on the sample. */
+function reachedAt(covered: readonly number[], meters: number): number {
+  const last = covered.length - 1;
+  if (last < 1) return 1;
+  for (let i = 1; i <= last; i += 1) {
+    if (covered[i] < meters) continue;
+    const span = covered[i] - covered[i - 1];
+    const within = span > 0 ? (meters - covered[i - 1]) / span : 0;
+    return (i - 1 + within) / last;
+  }
+  return 1;
+}
+
+/**
+ * The numbers under the chart: which kilometre marks to name, and where on the
+ * curve each one fell.
+ *
+ * The x axis is the run, and until now it was an unlabelled one — the curve said
+ * the heart rate climbed but never said *by when*. These are the answer, and
+ * they are placed by the distance stream rather than spread evenly, which is
+ * what makes the spacing itself readable.
+ */
+export function distanceTicks(
+  series: HeartSeries,
+  activity: VideoActivity,
+  streams: VideoStreams,
+  box: Box,
+): DistanceTick[] {
+  const covered = coveredMeters(series, activity, streams);
+  const total = covered[covered.length - 1] ?? 0;
+  // Nothing to name: a run the curve covers less than a kilometre of, and the
+  // heart-rate-only upload that has no distance at all. Both draw no scale
+  // rather than a scale of one mark reading `0`.
+  if (covered.length < 2 || total < TICK_STEPS_METERS[0]) return [];
+
+  const step =
+    TICK_STEPS_METERS.find((candidate) => total / candidate <= MAX_TICKS) ??
+    TICK_STEPS_METERS[TICK_STEPS_METERS.length - 1];
+
+  const ticks: DistanceTick[] = [];
+  for (let meters = step; meters <= total; meters += step) {
+    const progress = reachedAt(covered, meters);
+    const x = box.left + progress * box.width;
+    if (ticks.length > 0 && x - ticks[ticks.length - 1].x < MIN_TICK_GAP) {
+      continue;
+    }
+    ticks.push({
+      meters,
+      x,
+      progress,
+      // The unit once, on the first mark, where the eye starts: every number
+      // after it is read in kilometres without being told so again.
+      label: ticks.length === 0 ? `${meters / 1000} km` : String(meters / 1000),
+    });
+  }
+  return ticks;
+}
+
 /* ---- The beat plan ------------------------------------------------------- */
 
 export interface PulseBeat {
@@ -405,6 +582,9 @@ export interface HeartbeatPlan {
   mode: PulseMode;
   boxes: HeartbeatBoxes;
   points: TracePoint[];
+  /** The kilometre marks under the curve. Empty when there is no curve, and on
+   *  a run too short to have one. */
+  ticks: DistanceTick[];
   beats: Beat[];
   pulses: PulseBeat[];
   /** What the film settles on, and what to call it. */
@@ -499,6 +679,9 @@ export function heartbeatPlan(
     mode,
     boxes,
     points: boxes.trace ? tracePoints(series, boxes.trace) : [],
+    ticks: boxes.trace
+      ? distanceTicks(series, activity, streams, boxes.trace)
+      : [],
     beats,
     pulses: pulseBeats(series, mode, fps, durationInFrames),
     headline: pulseReading(series, mode),
