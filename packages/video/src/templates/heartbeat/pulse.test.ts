@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { estimateDurationInFrames } from "../../duration";
 import { templateEligibility } from "../../eligibility";
-import { FIXTURE_A, FIXTURE_B, FIXTURE_C, FIXTURE_K } from "../../fixtures";
+import {
+  FIXTURE_A,
+  FIXTURE_B,
+  FIXTURE_C,
+  FIXTURE_E,
+  FIXTURE_F,
+  FIXTURE_K,
+} from "../../fixtures";
 import { SAFE_TOP, withinSafeArea } from "../../core/layout";
 import type { VideoActivity, VideoStreams } from "../../types";
 import {
@@ -298,6 +305,7 @@ describe("the layout", () => {
         expect(withinSafeArea(box)).toBe(true);
       }
       if (boxes.trace) expect(withinSafeArea(boxes.trace)).toBe(true);
+      if (boxes.axis) expect(withinSafeArea(boxes.axis)).toBe(true);
       // …and clear of the lockup, which every template signs the frame with.
       expect(boxes.stats.top + boxes.stats.height).toBeLessThanOrEqual(
         CONTENT_BOTTOM,
@@ -311,7 +319,20 @@ describe("the layout", () => {
     const withCurve = heartbeatBoxes(true);
     const without = heartbeatBoxes(false);
     expect(without.trace).toBeNull();
+    // …and no axis under it either: a scale with no curve over it is a row of
+    // numbers with nothing to measure.
+    expect(without.axis).toBeNull();
     expect(without.numeral.height).toBeGreaterThan(withCurve.numeral.height);
+  });
+
+  it("hangs the scale off the curve's floor, clear of the closing row", () => {
+    const boxes = heartbeatBoxes(true);
+    const trace = boxes.trace!;
+    const axis = boxes.axis!;
+    expect(axis.top).toBeGreaterThan(trace.top + trace.height);
+    expect(axis.top + axis.height).toBeLessThanOrEqual(boxes.stats.top);
+    expect(axis.left).toBe(trace.left);
+    expect(axis.width).toBe(trace.width);
   });
 
   it("draws the curve inside its own box", () => {
@@ -365,6 +386,159 @@ describe("the trace", () => {
     expect(tracePath([{ x: 1, y: 2 }], 1)).toBe("");
     expect(tracePath([], 1)).toBe("");
     expect(traceHead([], 0.5)).toEqual({ x: 0, y: 0 });
+  });
+});
+
+describe("the distance scale", () => {
+  /** A run at one pace with a clean strap, so a test can say where a kilometre
+   *  ought to land without deriving it from the fixture's own shape. */
+  const steady = (meters: number, samples = 400) => ({
+    activity: {
+      ...FIXTURE_K.activity,
+      distance: meters,
+      average_heartrate: 150,
+    },
+    streams: {
+      heartrate: { data: Array<number>(samples).fill(150) },
+      distance: {
+        data: Array.from(
+          { length: samples },
+          (_, i) => (meters * i) / (samples - 1),
+        ),
+      },
+    },
+  });
+
+  it("names whole kilometres, and says the unit once", () => {
+    // Where the eye starts, and nowhere after it: "1 km, 2, 3, 4, 5" is a
+    // distance, and a "km" on every mark is the same word five times.
+    expect(plan(FIXTURE_A).ticks.map((tick) => tick.label)).toEqual([
+      "1 km",
+      "2",
+      "3",
+      "4",
+      "5",
+    ]);
+  });
+
+  it("counts in tens on a marathon rather than printing forty-two numbers", () => {
+    expect(plan(FIXTURE_C).ticks.map((tick) => tick.meters)).toEqual([
+      10_000, 20_000, 30_000, 40_000,
+    ]);
+  });
+
+  it("puts a mark where the athlete reached it, not on an even ruler", () => {
+    // Eight hundred metres in the first half of the run and three thousand two
+    // hundred in the second — the spacing *is* the reading, and a ruler would
+    // print the same five numbers for both halves.
+    const samples = 400;
+    const built = plan({
+      activity: {
+        ...FIXTURE_K.activity,
+        distance: 4000,
+        average_heartrate: 150,
+      },
+      streams: {
+        heartrate: { data: Array<number>(samples).fill(150) },
+        distance: {
+          data: Array.from({ length: samples }, (_, i) =>
+            i < samples / 2
+              ? (800 * i) / (samples / 2)
+              : 800 + (3200 * (i - samples / 2)) / (samples / 2 - 1),
+          ),
+        },
+      },
+    });
+    expect(built.ticks[0].meters).toBe(1000);
+    // An even ruler would put the first kilometre a quarter of the way along.
+    expect(built.ticks[0].progress).toBeGreaterThan(0.5);
+    // …and the three kilometres after it crowd into what's left of the band,
+    // which is what a run that finished hard looks like.
+    expect(built.ticks[1].progress - built.ticks[0].progress).toBeLessThan(
+      built.ticks[0].progress,
+    );
+  });
+
+  it("re-aligns with the distance stream across a strap's dropouts", () => {
+    // The first quarter of the stream is zeroes, so the curve is drawn from the
+    // last three quarters — which begin a kilometre into the run. Reading the
+    // distance stream by position in the *filtered* array instead of by the
+    // sample each point came from would name that kilometre a third of the way
+    // along a curve that opens on it.
+    const samples = 400;
+    const built = plan({
+      activity: {
+        ...FIXTURE_K.activity,
+        distance: 4000,
+        average_heartrate: 150,
+      },
+      streams: {
+        heartrate: {
+          data: Array.from({ length: samples }, (_, i) =>
+            i < samples / 4 ? 0 : 150,
+          ),
+        },
+        distance: {
+          data: Array.from(
+            { length: samples },
+            (_, i) => (4000 * i) / (samples - 1),
+          ),
+        },
+      },
+    });
+    expect(built.ticks[0].meters).toBe(1000);
+    expect(built.ticks[0].progress).toBeLessThan(0.02);
+    expect(built.ticks[built.ticks.length - 1].meters).toBe(4000);
+  });
+
+  it("draws every mark inside the band it labels", () => {
+    for (const fixture of [FIXTURE_A, FIXTURE_C, FIXTURE_E, FIXTURE_F]) {
+      const built = plan(fixture);
+      const box = built.boxes.trace!;
+      expect(built.ticks.length).toBeGreaterThan(0);
+      for (const tick of built.ticks) {
+        expect(tick.x).toBeGreaterThanOrEqual(box.left);
+        expect(tick.x).toBeLessThanOrEqual(box.left + box.width);
+        expect(tick.progress).toBeGreaterThanOrEqual(0);
+        expect(tick.progress).toBeLessThanOrEqual(1);
+      }
+      // Never so many that they touch, and never in the wrong order.
+      expect(built.ticks.length).toBeLessThanOrEqual(6);
+      for (let i = 1; i < built.ticks.length; i += 1) {
+        expect(built.ticks[i].x - built.ticks[i - 1].x).toBeGreaterThanOrEqual(
+          130,
+        );
+      }
+    }
+  });
+
+  it("spreads a treadmill's kilometres evenly, because that is what it ran", () => {
+    // No distance stream at all — the run is laid out at its own average pace,
+    // the same fallback the replay's overlay makes.
+    const built = plan({
+      activity: {
+        ...FIXTURE_K.activity,
+        distance: 5000,
+        average_heartrate: 150,
+      },
+      streams: { heartrate: { data: Array<number>(400).fill(150) } },
+    });
+    expect(built.ticks).toHaveLength(5);
+    expect(built.ticks[0].progress).toBeCloseTo(0.2, 2);
+    expect(built.ticks[4].progress).toBeCloseTo(1, 2);
+  });
+
+  it("says nothing when there is nothing to name", () => {
+    // A run with no distance on it, a run shorter than the smallest step, and
+    // the summary-only upload that has no curve to hang a scale under.
+    expect(plan({ ...steady(0) }).ticks).toEqual([]);
+    expect(plan({ ...steady(600) }).ticks).toEqual([]);
+    expect(
+      plan({
+        activity: { ...FIXTURE_K.activity, average_heartrate: 150 },
+        streams: {},
+      }).ticks,
+    ).toEqual([]);
   });
 });
 

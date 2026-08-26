@@ -1,8 +1,13 @@
-import { useMemo } from "react";
+import { Fragment, useMemo } from "react";
 import { Audio, Sequence, useCurrentFrame, useVideoConfig } from "remotion";
 import { heartbeatClip, HEARTBEAT_SECONDS } from "../../core/audio";
 import { formatDay } from "../../core/format";
-import { fitFontSize, SAFE_WIDTH, TYPE } from "../../core/layout";
+import {
+  fitFontSize,
+  LABEL_TRACKING,
+  SAFE_WIDTH,
+  TYPE,
+} from "../../core/layout";
 import { countUpValue, MetricValue, Numeral, Unit } from "../../core/numerals";
 import { hashSeed } from "../../core/seed";
 import { MetricLabel, Rule, Stage } from "../../core/Stage";
@@ -24,6 +29,7 @@ import {
   runProgress,
   traceHead,
   tracePath,
+  type Box,
   type HeartbeatPlan,
 } from "./pulse";
 
@@ -148,14 +154,23 @@ export function Heartbeat({
       />
 
       {plan.boxes.trace && (
-        <Trace
-          plan={plan}
-          theme={theme}
-          progress={progress}
-          opacity={enter * charted}
-          pulse={pulseEnvelope}
-          revealed={settling}
-        />
+        <>
+          <Trace
+            plan={plan}
+            theme={theme}
+            progress={progress}
+            opacity={enter * charted}
+            pulse={pulseEnvelope}
+            revealed={settling}
+          />
+          <Scale
+            plan={plan}
+            theme={theme}
+            frame={frame}
+            fps={fps}
+            opacity={enter * charted}
+          />
+        </>
       )}
 
       <Stats plan={plan} theme={theme} opacity={settling} />
@@ -346,6 +361,16 @@ function HeartMark({
  *  be centred on its marker and clamped to the band in one expression. */
 const PEAK_LABEL_WIDTH = 260;
 
+/** Where a fixed-measure label goes to sit over `x` without leaving the band —
+ *  what stops a peak in the first kilometre, or a kilometre mark at the finish,
+ *  hanging its type off the side of the frame. */
+function centredOn(box: Box, x: number, width: number): number {
+  return Math.max(
+    box.left,
+    Math.min(box.left + box.width - width, x - width / 2),
+  );
+}
+
 function Trace({
   plan,
   theme,
@@ -456,13 +481,7 @@ function Trace({
           style={{
             position: "absolute",
             top: peak.y - 68,
-            left: Math.max(
-              box.left,
-              Math.min(
-                box.left + box.width - PEAK_LABEL_WIDTH,
-                peak.x - PEAK_LABEL_WIDTH / 2,
-              ),
-            ),
+            left: centredOn(box, peak.x, PEAK_LABEL_WIDTH),
             width: PEAK_LABEL_WIDTH,
             opacity: peakShown,
           }}
@@ -481,6 +500,114 @@ function Trace({
           </MetricLabel>
         </div>
       )}
+    </div>
+  );
+}
+
+/* ---- The scale ----------------------------------------------------------- */
+
+/** How long a mark takes to arrive, in seconds of film — not in a fraction of
+ *  the run, which is the same mistake as the removed `live` tempo in miniature:
+ *  the last kilometre is reached *at* the end of the curve, so a reveal measured
+ *  against the run's own progress would leave it at a tenth of its opacity for
+ *  the whole closing hold. Real time, and it lands during that hold. */
+const TICK_REVEAL_SECONDS = 0.28;
+
+/** The mark itself, hanging off the floor rule. */
+const TICK_LENGTH = 12;
+
+const TICK_LABEL_SIZE = 24;
+
+/** JetBrains Mono is monospaced, so a label's measure is its length — no
+ *  estimator to consult and no DOM to measure with, which there isn't one of on
+ *  Lambda. Sized to the type rather than to a generous fixed box, because the
+ *  clamp below is what decides whether a numeral still sits over its own mark. */
+function tickLabelWidth(label: string): number {
+  return Math.ceil(label.length * TICK_LABEL_SIZE * (0.62 + LABEL_TRACKING));
+}
+
+/**
+ * The distance under the curve.
+ *
+ * The chart's x axis is the run, and without these it is an unlabelled one: the
+ * line says the heart rate climbed, and never says by when. Each mark is placed
+ * where the athlete *reached* that kilometre rather than on an even ruler, so
+ * the spacing is itself a reading — the narrow gaps are the fast kilometres.
+ *
+ * Each one is held back until the line has run it, which is the same rule the
+ * peak marker obeys: naming a kilometre the curve hasn't reached would put the
+ * chart's ending on screen before it happened. The film settles long before the
+ * last of them lands, so the frame a story is paused on carries the whole scale.
+ */
+function Scale({
+  plan,
+  theme,
+  frame,
+  fps,
+  opacity,
+}: {
+  plan: HeartbeatPlan;
+  theme: Theme;
+  frame: number;
+  fps: number;
+  opacity: number;
+}) {
+  const box = plan.boxes.axis;
+  const trace = plan.boxes.trace;
+  const drawn = findBeat(plan.beats, "trace");
+  if (!box || !trace || plan.ticks.length === 0) return null;
+  const floor = trace.top + trace.height;
+  // The frame the curve runs each mark past, which is where its reveal starts.
+  const reached = (progress: number) =>
+    drawn ? drawn.from + progress * (drawn.to - drawn.from) : 0;
+
+  return (
+    <div style={{ position: "absolute", inset: 0, opacity }}>
+      {plan.ticks.map((tick) => {
+        const shown = easeOutCubic(
+          ramp(
+            frame,
+            reached(tick.progress),
+            secondsToFrames(TICK_REVEAL_SECONDS, fps),
+          ),
+        );
+        if (shown <= 0) return null;
+        const width = tickLabelWidth(tick.label);
+        return (
+          <Fragment key={tick.meters}>
+            {/* Drawn down out of the rule it belongs to rather than faded in
+                over it: a mark that arrives at full length is a mark that came
+                from nowhere, and it is one line of arithmetic to avoid. */}
+            <div
+              style={{
+                position: "absolute",
+                top: floor,
+                left: tick.x - 1,
+                width: 2,
+                height: TICK_LENGTH * shown,
+                backgroundColor: theme.hairline,
+              }}
+            />
+            <div
+              style={{
+                position: "absolute",
+                top: box.top,
+                left: centredOn(box, tick.x, width),
+                width,
+                opacity: shown,
+                transform: `translateY(${(1 - shown) * 8}px)`,
+                // The measure is estimated, and "1 KM" breaking at its space
+                // would put the unit on a second line under the numeral.
+                whiteSpace: "nowrap",
+              }}
+            >
+              <MetricLabel theme={theme} size={TICK_LABEL_SIZE} align="center">
+                {tick.label}
+              </MetricLabel>
+            </div>
+          </Fragment>
+        );
+      })}
     </div>
   );
 }
