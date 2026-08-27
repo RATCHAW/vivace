@@ -1,9 +1,9 @@
 // Persistence for run invitations — see db/schema/invite.ts for what one is.
 import { randomBytes } from "node:crypto";
 import { and, eq, or, sql } from "drizzle-orm";
-import { db } from "./db/index.js";
-import { user } from "./db/schema/auth.js";
-import { runInvite, type InviteStatus } from "./db/schema/invite.js";
+import { db } from "../db/index.js";
+import { user } from "../db/schema/auth.js";
+import { runInvite, type InviteStatus } from "../db/schema/invite.js";
 
 export type InviteRow = typeof runInvite.$inferSelect;
 

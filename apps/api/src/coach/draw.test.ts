@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildDrawnCard, type ProposedCard } from "./coach-draw.js";
+import { buildDrawnCard, type ProposedCard } from "./draw.js";
 
 /** A card the model could plausibly send: heading, stats, chart, read, tap. */
 function validCard(): ProposedCard {

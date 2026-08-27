@@ -29,7 +29,7 @@ vi.mock("./posthog.js", () => ({
     captured.push({ event: "$ai_span", payload }),
 }));
 
-const { observeTurn } = await import("./ai-observability.js");
+const { observeTurn } = await import("./ai.js");
 
 const of = (event: Captured["event"]) =>
   captured.filter((one) => one.event === event).map((one) => one.payload);
@@ -188,7 +188,7 @@ describe("observeTurn", () => {
   });
 
   it("counts a tool that answered `{ error }` as a failure", async () => {
-    // stravaFailure in coach.ts: a dead upstream reaches the model as a
+    // stravaFailure in coach/coach.ts: a dead upstream reaches the model as a
     // sentence, and would otherwise reach the dashboard as a healthy call.
     await answer(toolThenAnswer(), () => ({
       error: "Strava is unavailable right now (503).",

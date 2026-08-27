@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { hasObscuredStart, matchScore, rankCandidates } from "./pairing.js";
-import type { Run } from "./schemas.js";
+import type { Run } from "../schemas.js";
 
 /** A run with only the fields the matcher reads set to anything meaningful. */
 function run(overrides: Partial<Run> & Pick<Run, "id">): Run {

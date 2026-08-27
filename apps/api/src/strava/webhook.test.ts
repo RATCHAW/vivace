@@ -5,7 +5,7 @@
 // body, and the claim that stops a retried event from being processed twice.
 import { createHmac } from "node:crypto";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { StravaEvent } from "./schemas.js";
+import type { StravaEvent } from "../schemas.js";
 
 process.env.BETTER_AUTH_SECRET ??= "test-secret-not-for-production";
 process.env.DATABASE_URL ??= "postgres://app:app@localhost:5433/app";
@@ -16,7 +16,7 @@ const ATHLETE_ID = 165387970;
 const USER_ID = "athlete-1";
 const ACTIVITY_ID = 987654321;
 
-vi.mock("./auth.js", () => ({
+vi.mock("../auth.js", () => ({
   auth: {
     api: {
       getSession: async () => null,
@@ -50,7 +50,7 @@ vi.mock("./webhook.js", async (importOriginal) => {
 let debriefed: { userId: string; activityId: number }[] = [];
 let existingDebrief: { thread_id: string; message_id: string } | null = null;
 
-vi.mock("./debrief.js", () => ({
+vi.mock("../coach/debrief.js", () => ({
   DEBRIEF_THREAD_TITLE: "Post-run debriefs",
   postRunDebrief: async (
     userId: string,
@@ -62,12 +62,13 @@ vi.mock("./debrief.js", () => ({
   },
 }));
 
-vi.mock("./chat-store.js", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("./chat-store.js")>();
+vi.mock("../coach/chat-store.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../coach/chat-store.js")>();
   return { ...actual, findDebrief: async () => existingDebrief };
 });
 
-const { app } = await import("./app.js");
+const { app } = await import("../app.js");
 
 /** The work behind the ack is deliberately not awaited by the handler. */
 async function settle() {

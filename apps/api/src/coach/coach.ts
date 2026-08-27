@@ -27,11 +27,11 @@ import {
   fetchRunStreams,
   StravaApiError,
   type BestEffort,
-} from "./strava.js";
+} from "../strava/client.js";
 import { fetchRunWeather, type RunWeather } from "./weather.js";
-import { buildDrawnCard } from "./coach-draw.js";
-import { getContext, getPlan, saveContext } from "./coach-store.js";
-import { getFeatureVariantFor } from "./posthog.js";
+import { buildDrawnCard } from "./draw.js";
+import { getContext, getPlan, saveContext } from "./store.js";
+import { getFeatureVariantFor } from "../observability/posthog.js";
 import {
   describeGoal,
   readTraining,
@@ -54,8 +54,8 @@ import {
   weeklyVolume,
   weekStart,
 } from "./training.js";
-import { SESSION_KINDS } from "./schemas.js";
-import type { CoachPlan, Run } from "./schemas.js";
+import { SESSION_KINDS } from "../schemas.js";
+import type { CoachPlan, Run } from "../schemas.js";
 
 // The pure helpers moved to training.ts, where they are unit-tested. Re-exported
 // here because they are the coach's own vocabulary and callers import them from

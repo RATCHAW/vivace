@@ -88,9 +88,10 @@ export interface ObservedTurn {
 /**
  * A tool that answered `{ error: "…" }` failed, whatever the SDK thinks.
  *
- * That shape is `stravaFailure` in coach.ts: it turns a dead upstream into a
- * sentence the model can read instead of an exception, which is right for the
- * athlete and wrong for a dashboard — the tool did not do what it was asked.
+ * That shape is `stravaFailure` in coach/coach.ts: it turns a dead upstream
+ * into a sentence the model can read instead of an exception, which is right
+ * for the athlete and wrong for a dashboard — the tool did not do what it was
+ * asked.
  * Without this the trace shows a green tool call and a vague answer.
  */
 function refusedWith(output: unknown): string | undefined {

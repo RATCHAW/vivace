@@ -8,7 +8,7 @@
 // Pure on purpose: no database, no Strava, no clock of its own. The rules below
 // are the interesting part of this feature and they are all testable without a
 // fixture.
-import type { Run } from "./schemas.js";
+import type { Run } from "../schemas.js";
 
 /**
  * How far apart two starts may be and still be the same run.

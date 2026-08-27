@@ -6,12 +6,12 @@
 // edited with no review and no deploy, so the rules are that a bad one changes
 // nothing and never passes silently.
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { FeatureVariant } from "./posthog.js";
+import type { FeatureVariant } from "../observability/posthog.js";
 
 /** What PostHog says the athlete's variant is, for the test that set it. */
 let evaluated: FeatureVariant | null = null;
 
-vi.mock("./posthog.js", () => ({
+vi.mock("../observability/posthog.js", () => ({
   getFeatureVariantFor: async () => evaluated,
 }));
 

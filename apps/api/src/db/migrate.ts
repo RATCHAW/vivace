@@ -13,7 +13,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { sql } from "drizzle-orm";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
-import { logger } from "../logger.js";
+import { logger } from "../observability/logger.js";
 import { db, pool } from "./index.js";
 
 /** Committed alongside the schema they were generated from, and copied into the

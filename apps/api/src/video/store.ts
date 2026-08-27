@@ -11,9 +11,9 @@ import {
   type ThemeName,
 } from "@repo/video";
 import { and, eq, sql } from "drizzle-orm";
-import { db } from "./db/index.js";
-import { runRender } from "./db/schema/render.js";
-import type { RunRender } from "./schemas.js";
+import { db } from "../db/index.js";
+import { runRender } from "../db/schema/render.js";
+import type { RunRender } from "../schemas.js";
 import type { RenderOptions } from "./render.js";
 
 type RunRenderSelect = typeof runRender.$inferSelect;

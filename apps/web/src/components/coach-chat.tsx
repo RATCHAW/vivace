@@ -164,7 +164,8 @@ function isToolName(value: string): value is ToolName {
  *
  * `run` is read as well as `runs` because it is what every transcript written
  * before a question could carry more than one holds — the same two fields the
- * API reads, for the same reason (`attachedRuns` in apps/api/src/coach.ts).
+ * API reads, for the same reason (`attachedRuns` in
+ * apps/api/src/coach/coach.ts).
  */
 function mentionsOf(message: UIMessage): RunMention[] {
   const metadata = message.metadata;
@@ -177,8 +178,9 @@ function mentionsOf(message: UIMessage): RunMention[] {
 /**
  * The part an automatically posted debrief travels in.
  *
- * Mirrors DEBRIEF_PART in apps/api/src/debrief.ts. It is a data part rather
- * than a tool part because nothing called a tool: the webhook built the card,
+ * Mirrors DEBRIEF_PART in apps/api/src/coach/debrief.ts. It is a data part
+ * rather than a tool part because nothing called a tool: the webhook built the
+ * card,
  * and a function call at the head of a thread with no question before it is
  * rejected by the model on the athlete's next message.
  */
@@ -204,7 +206,8 @@ function textOf(message: UIMessage): string {
     .join("\n\n");
 }
 
-/** The tool whose result is a questionnaire. Mirrors `askAthlete` in coach.ts. */
+/** The tool whose result is a questionnaire. Mirrors `askAthlete` in
+ *  apps/api/src/coach/coach.ts. */
 const QUESTIONNAIRE_TOOL = "askAthlete";
 
 /** The questionnaire a message asked, if it asked one. */
@@ -270,8 +273,9 @@ function sourcesOf(message: UIMessage, runs: Run[] | undefined): Run[] {
 
 /**
  * The sentence for each reason the API can give for an unanswered turn — the
- * `CoachFailure` union in `apps/api/src/coach.ts`. A reason the catalogue has
- * never heard of reads as `failed`, so the two can be added in either order.
+ * `CoachFailure` union in `apps/api/src/coach/coach.ts`. A reason the
+ * catalogue has never heard of reads as `failed`, so the two can be added in
+ * either order.
  */
 const FAILURE_COPY = {
   not_configured: "coach.errors.notConfigured",

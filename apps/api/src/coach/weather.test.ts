@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { Run } from "./schemas.js";
+import type { Run } from "../schemas.js";
 import { fetchRunWeather } from "./weather.js";
 
 /** A run with GPS, one hour long, leaving at 07:12 local. */

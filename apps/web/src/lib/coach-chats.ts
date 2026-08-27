@@ -42,7 +42,7 @@ interface CoachChatEntry {
 const entries = new Map<string, CoachChatEntry>();
 
 /** The tool the coach stores a goal race, a target time or a long-run day
- *  through. Mirrors `setAthleteContext` in apps/api/src/coach.ts. */
+ *  through. Mirrors `setAthleteContext` in apps/api/src/coach/coach.ts. */
 const CONTEXT_TOOL = "setAthleteContext";
 
 /**
@@ -100,7 +100,8 @@ function createEntry(
         // Read per request, not once at creation: a replay rotates, and a trace
         // pointing at yesterday's session is worse than one pointing at none.
         // The API reads it as `$session_id` on the turn's LLM events, which is
-        // what makes a slow answer watchable — see ai-observability.ts.
+        // what makes a slow answer watchable — see
+        // apps/api/src/observability/ai.ts.
         //
         // What is returned here replaces the transport's own headers, which is
         // safe because it sets none — `Content-Type` is the SDK's own and is

@@ -86,9 +86,10 @@ const GOAL_HINT_LIFE = 3000;
  * Not `title === null`, which is what this used to ask. A title is cut from the
  * *text* of the first message, and a message that is only an attachment — a
  * watch screenshot, a plan PDF — has none, so it is stored deliberately
- * untitled (`titleFrom` in apps/api/src/chat-store.ts). An untitled thread can
- * therefore have a whole conversation in it, and reusing that one would file a
- * question about the run just watched under history the coach then reads.
+ * untitled (`titleFrom` in apps/api/src/coach/chat-store.ts). An untitled
+ * thread can therefore have a whole conversation in it, and reusing that one
+ * would file a question about the run just watched under history the coach then
+ * reads.
  *
  * `updated_at` is bumped by `saveMessage` and by nothing else — pinning writes
  * only `pinned_at` — and a thread is created with both stamps from the same

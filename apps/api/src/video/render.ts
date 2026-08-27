@@ -20,7 +20,7 @@ import {
   type ThemeName,
   type VideoTemplate,
 } from "@repo/video";
-import type { Run, RunPartner, RunStreams } from "./schemas.js";
+import type { Run, RunPartner, RunStreams } from "../schemas.js";
 
 /** Everything one template needs to reach Lambda. */
 export interface RenderTarget {

@@ -4,8 +4,8 @@
 // no network, no clock of its own (today always arrives as an argument). That
 // is deliberate: a wrong split or a wrong ratio is a wrong answer in the
 // athlete's face, so all of it is unit-tested in coach.test.ts.
-import type { BestEffort } from "./strava.js";
-import type { Run, RunStreams, SessionKind } from "./schemas.js";
+import type { BestEffort } from "../strava/client.js";
+import type { Run, RunStreams, SessionKind } from "../schemas.js";
 
 // --- formatting ---------------------------------------------------------------
 

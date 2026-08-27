@@ -19,11 +19,11 @@
 // nothing generated to call.
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { and, eq, lt, sql } from "drizzle-orm";
-import { db } from "./db/index.js";
-import { account } from "./db/schema/auth.js";
-import { stravaWebhookEvent } from "./db/schema/webhook.js";
-import { logger } from "./logger.js";
-import type { StravaEvent } from "./schemas.js";
+import { db } from "../db/index.js";
+import { account } from "../db/schema/auth.js";
+import { stravaWebhookEvent } from "../db/schema/webhook.js";
+import { logger } from "../observability/logger.js";
+import type { StravaEvent } from "../schemas.js";
 
 const STRAVA_API = "https://www.strava.com/api/v3";
 const SUBSCRIPTIONS_URL = `${STRAVA_API}/push_subscriptions`;

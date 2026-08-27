@@ -1,5 +1,5 @@
-import { logger } from "./logger.js";
-import type { Run } from "./schemas.js";
+import { logger } from "../observability/logger.js";
+import type { Run } from "../schemas.js";
 
 /**
  * The weather a run was actually run in, from Open-Meteo — free, keyless, and
@@ -44,8 +44,8 @@ const REQUEST_TIMEOUT_MS = 4_000;
 
 /**
  * Past weather never changes, so the cache is about not asking twice rather
- * than freshness — same shape as the run-detail cache in strava.ts. Keys are
- * coordinate + day, so a loop run's two samples share one entry.
+ * than freshness — same shape as the run-detail cache in strava/client.ts.
+ * Keys are coordinate + day, so a loop run's two samples share one entry.
  */
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const CACHE_MAX = 500;

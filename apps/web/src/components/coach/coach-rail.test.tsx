@@ -217,7 +217,7 @@ describe("weeksToTaper", () => {
   });
 
   it("is zero once the athlete is inside the window", () => {
-    // Three weeks is where `briefing.ts` starts raising the taper itself.
+    // Three weeks is where `coach/briefing.ts` starts raising the taper itself.
     expect(weeksToTaper({ kind: "weeks", value: 3 })).toBe(0);
     expect(weeksToTaper({ kind: "days", value: 6 })).toBe(0);
     expect(weeksToTaper({ kind: "today" })).toBe(0);

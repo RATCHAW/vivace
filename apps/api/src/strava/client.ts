@@ -9,7 +9,7 @@ import {
   type StreamSet,
   type SummaryActivity,
 } from "@repo/strava-api";
-import type { Athlete, Run, RunStreams } from "./schemas.js";
+import type { Athlete, Run, RunStreams } from "../schemas.js";
 
 /**
  * Strava's published Swagger omits two fields the live API does return, so the
