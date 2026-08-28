@@ -25,8 +25,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { formatClock, formatPace } from "@repo/video";
 
 /** The API asks Strava for one page of this size — see `fetchRuns` in
- *  apps/api/src/strava.ts. A year that fills the page may be under-counted, and
- *  the strip says so rather than quietly reporting a short total. */
+ *  apps/api/src/strava/client.ts. A year that fills the page may be
+ *  under-counted, and the strip says so rather than quietly reporting a short
+ *  total. */
 const RUNS_PAGE_SIZE = 100;
 
 /** Where an athlete with nothing synced goes to log their first run. */

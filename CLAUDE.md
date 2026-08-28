@@ -31,13 +31,39 @@ Consequences:
 - **Never talk to Strava with bare `fetch`.** Use the generated SDK:
   `getLoggedInAthlete({ client: createStravaClient(token) })`. All 32 endpoints are
   already typed. Strava's spec omits some live fields (`username`, `bio`), so widen
-  the generated type where needed — see `apps/api/src/strava.ts`.
+  the generated type where needed — see `apps/api/src/strava/client.ts`.
 - **Never fetch our own API by hand from the browser.** Use the generated
   TanStack Query options: `useQuery(getStravaAthleteOptions())`. Import from
   `@/api` (the barrel that configures the client and normalises errors into
   `ApiRequestError`), never from `@/api/generated`.
 - New queries need no provider work — `QueryClientProvider` is already in
   `src/main.tsx` with the client from `src/lib/query-client.ts`.
+
+## apps/api — four things at the root, everything else in a folder
+
+`src/` holds only what the whole app is addressed through: `index.ts` boots it,
+`app.ts` is the Hono app and every route, `schemas.ts` is the contract those
+routes are typed against, `auth.ts` configures better-auth. Everything below
+them is grouped by the thing it serves:
+
+| Folder | What lives there |
+| --- | --- |
+| `db/` | Drizzle schema, migrations, seed — see the Database section |
+| `observability/` | `logger`, `request-logger`, `analytics`, `posthog`, `ai` |
+| `strava/` | `client.ts` (the SDK wrapper) and `webhook.ts` |
+| `coach/` | the model turn, `briefing`, `debrief`, `training`, `weather`, `draw`, and the two stores |
+| `video/` | `render.ts` (Lambda) and `store.ts` (`run_render` rows) |
+| `invites/` | `pairing.ts` (candidate ranking) and `store.ts` |
+
+- **A folder is named for a feature, not a layer.** There is no `services/` or
+  `utils/`; a store sits next to the code that reads it, which is why there are
+  three files called `store.ts` and no ambiguity about any of them.
+- **A test sits beside what it tests.** `coach/chat.test.ts` drives the chat
+  route through `app.ts`, and it lives with the coach because that is what it is
+  about.
+- **A comment naming a file across a folder boundary spells the path out**
+  (`strava/client.ts`, `apps/api/src/coach/coach.ts` from `apps/web`). Inside
+  one folder, the bare filename is enough.
 
 ## Video — one catalogue, in packages/video
 
@@ -188,9 +214,9 @@ is the source of truth; `apps/api/drizzle/` holds the generated SQL and is
 
 ## Logging — structured, never `console.log`
 
-pino in `apps/api/src/logger.ts` → JSON on stdout, and to Grafana Loki when
-`LOKI_URL` is set. Dashboards live in `ops/grafana/dashboards`; see the README
-for how to run the stack.
+pino in `apps/api/src/observability/logger.ts` → JSON on stdout, and to Grafana
+Loki when `LOKI_URL` is set. Dashboards live in `ops/grafana/dashboards`; see
+the README for how to run the stack.
 
 - **Every line carries an `event`** — a dotted, low-cardinality name
   (`render.started`, `strava.request_failed`, `ui.page_view`). Dashboards group
@@ -228,13 +254,14 @@ server-side with `source: "web"`:
 ## Analytics — PostHog, behind the same call sites
 
 PostHog is a *second sink* on the instrumentation that already exists, never a
-parallel one. `apps/api/src/posthog.ts` and `apps/web/src/lib/posthog.ts` own
-the SDKs; nothing else imports `posthog-js` or `posthog-node`.
+parallel one. `apps/api/src/observability/posthog.ts` and
+`apps/web/src/lib/posthog.ts` own the SDKs; nothing else imports `posthog-js` or
+`posthog-node`.
 
 - **Record a user action once.** `trackEvent(...)` in the browser and
-  `track(c, ...)` in the API (`apps/api/src/analytics.ts`) each write a log line
-  *and* a PostHog event. Never add a `posthog.capture` next to a `trackEvent` —
-  that is exactly the drift these helpers exist to prevent.
+  `track(c, ...)` in the API (`apps/api/src/observability/analytics.ts`) each
+  write a log line *and* a PostHog event. Never add a `posthog.capture` next to
+  a `trackEvent` — that is exactly the drift these helpers exist to prevent.
 - **Diagnostics stay out of PostHog.** `auth.unauthenticated`,
   `strava.request_failed`, `request.invalid`, a flaky poll — log those through
   `c.get("log")` directly. They describe the server, not the athlete, and in
@@ -248,7 +275,7 @@ the SDKs; nothing else imports `posthog-js` or `posthog-node`.
   `isEnabled()` — the latter reports an unknown flag as *off*, which would
   disable a feature the moment PostHog was switched on.
 - **A model call is traced through `observeTurn`, never by hand.**
-  `ai-observability.ts` owns the whole shape — one `$ai_trace` per turn, an
+  `observability/ai.ts` owns the whole shape — one `$ai_trace` per turn, an
   `$ai_generation` per model call under it, an `$ai_span` per tool call under
   *that* — and posthog.ts owns writing the three. Spread `turn.callbacks` into
   `streamText`/`generateText` and call `turn.end()`; a new model call anywhere

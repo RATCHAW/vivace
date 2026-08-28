@@ -1,8 +1,8 @@
 // The post-run debrief: the coach reading a run before the athlete asks.
 //
-// Triggered by a Strava webhook (see webhook.ts), which means nobody is waiting
-// on a response — so this is allowed to take its time, and every failure has to
-// be logged rather than surfaced.
+// Triggered by a Strava webhook (see strava/webhook.ts), which means nobody is
+// waiting on a response — so this is allowed to take its time, and every
+// failure has to be logged rather than surfaced.
 //
 // What lands in the thread is exactly what the athlete would have got by
 // asking: the same `getRunDebrief` card, followed by two sentences of read. The
@@ -10,9 +10,9 @@
 // model, and their absence is not a reason to withhold the card.
 import { generateText } from "ai";
 import { createIdGenerator, type UIMessage } from "ai";
-import { logger } from "./logger.js";
-import { captureUserEvent } from "./posthog.js";
-import { observeTurn } from "./ai-observability.js";
+import { logger } from "../observability/logger.js";
+import { captureUserEvent } from "../observability/posthog.js";
+import { observeTurn } from "../observability/ai.js";
 import {
   buildRunDebriefCard,
   getCoachConfig,
@@ -23,7 +23,7 @@ import {
   recordDebrief,
   saveMessage,
 } from "./chat-store.js";
-import { fetchRuns } from "./strava.js";
+import { fetchRuns } from "../strava/client.js";
 import { todayLocal } from "./briefing.js";
 import { localDate } from "./training.js";
 

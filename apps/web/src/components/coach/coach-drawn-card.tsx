@@ -1,15 +1,16 @@
 // The card the coach drew itself.
 //
 // Renders the `drawCard` tool result (`buildDrawnCard` in
-// apps/api/src/coach-draw.ts): a json-render spec over a whitelist of
+// apps/api/src/coach/draw.ts): a json-render spec over a whitelist of
 // components, each of which is implemented here with the same furniture as the
 // five prebuilt cards. The whitelist is what keeps a model-drawn card inside
 // DESIGN.md — the model chooses layout and words, and every colour, radius and
 // type style it can reach is a token this file chose.
 //
-// The catalogue below is the browser half of a contract with coach-draw.ts:
-// same component names, same props. Change one side and change the other with
-// it, the way every other card shape in coach-cards.tsx mirrors coach.ts.
+// The catalogue below is the browser half of a contract with
+// apps/api/src/coach/draw.ts: same component names, same props. Change one side
+// and change the other with it, the way every other card shape in
+// coach-cards.tsx mirrors apps/api/src/coach/coach.ts.
 import { createContext, useContext } from "react";
 import { defineCatalog } from "@json-render/core";
 import {
@@ -32,7 +33,7 @@ import { cn } from "@/lib/utils";
 
 // --- the vocabulary -----------------------------------------------------------
 
-/** Mirrors `COMPONENT_PROPS` in apps/api/src/coach-draw.ts. */
+/** Mirrors `COMPONENT_PROPS` in apps/api/src/coach/draw.ts. */
 const COMPONENT_PROPS = {
   Card: z.object({
     title: z.string().nullish(),

@@ -1,8 +1,9 @@
 // The coach's answers, drawn rather than written.
 //
-// Each of these renders one tool result from apps/api/src/coach.ts. The tool
-// outputs carry a `card` discriminator and every number already formatted for a
-// runner, so nothing here computes training — it lays out what the API measured.
+// Each of these renders one tool result from apps/api/src/coach/coach.ts. The
+// tool outputs carry a `card` discriminator and every number already formatted
+// for a runner, so nothing here computes training — it lays out what the API
+// measured.
 // Change a tool's output shape and the matching card has to move with it.
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -188,11 +189,11 @@ export interface CardActions {
 /**
  * A week as the seven days it asks for, so two of them can be compared.
  *
- * Mirrors `planSignature` in apps/api/src/training.ts, over the fields the
- * card draws — the briefing writes every day out and a plan card need not, so a
- * day nobody wrote is a rest day rather than a difference. `key` is out of it on
- * both sides: the briefing doesn't send the star back. An absent workout reads
- * as "", which is how a card sent before the field matches the briefing's
+ * Mirrors `planSignature` in apps/api/src/coach/training.ts, over the fields
+ * the card draws — the briefing writes every day out and a plan card need not,
+ * so a day nobody wrote is a rest day rather than a difference. `key` is out of
+ * it on both sides: the briefing doesn't send the star back. An absent workout
+ * reads as "", which is how a card sent before the field matches the briefing's
  * empty string.
  */
 function planSignature(

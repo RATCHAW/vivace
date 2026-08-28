@@ -11,15 +11,15 @@ import type {
   CoachQueueItem,
   CoachSignal,
   Run,
-} from "./schemas.js";
-import { getContext, listPlans } from "./coach-store.js";
+} from "../schemas.js";
+import { getContext, listPlans } from "./store.js";
 import { findDebrief } from "./chat-store.js";
 import {
   fetchRunStreams,
   fetchRuns,
   fetchShoes,
   StravaApiError,
-} from "./strava.js";
+} from "../strava/client.js";
 import {
   addDays,
   clock,

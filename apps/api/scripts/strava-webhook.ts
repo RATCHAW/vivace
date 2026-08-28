@@ -16,7 +16,7 @@ import {
   verifyToken,
   viewSubscriptions,
   WEBHOOK_PATH,
-} from "../src/webhook.js";
+} from "../src/strava/webhook.js";
 
 const [command, argument] = process.argv.slice(2);
 

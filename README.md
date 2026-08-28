@@ -206,8 +206,8 @@ makes codegen offline and deterministic and makes upstream API changes show up a
 reviewable diff.
 
 Note: Strava's spec is not exhaustive — `username` and `bio` are returned by the
-live API but absent from the spec, so `apps/api/src/strava.ts` widens the generated
-type rather than trusting it blindly.
+live API but absent from the spec, so `apps/api/src/strava/client.ts` widens the
+generated type rather than trusting it blindly.
 
 ### Regenerating
 
@@ -320,9 +320,10 @@ card the browser draws rather than a paragraph:
 | `predictRaces` | Strava's own best efforts inside the fastest recent runs, extrapolated with Riegel | Prediction table |
 | `proposeWeek` | — the coach writes seven days | Week plan, with Accept |
 
-The maths behind all of it is pure and unit-tested in `apps/api/src/training.ts`;
-`apps/api/src/briefing.ts` turns it into the two rails on `/coach`, so a number
-in the rail and the same number in an answer are the same object.
+The maths behind all of it is pure and unit-tested in
+`apps/api/src/coach/training.ts`; `apps/api/src/coach/briefing.ts` turns it into
+the two rails on `/coach`, so a number in the rail and the same number in an
+answer are the same object.
 
 Setup is one key (without it `/coach` loads and every message returns a 503;
 the rest of the app is unaffected):
@@ -350,8 +351,8 @@ sets it per athlete, so two pairings can run at once and be compared on real
 traffic without one.
 
 Swapping the gateway itself out is a change to `getCoachConfig()` in
-`apps/api/src/coach.ts` and nothing else — the tools, the prompt and both ends
-of the stream are provider-agnostic.
+`apps/api/src/coach/coach.ts` and nothing else — the tools, the prompt and both
+ends of the stream are provider-agnostic.
 
 How it flows, and why it looks like this:
 
@@ -455,9 +456,10 @@ its own. It has no session, no API client and no generated code: it never talks 
 ## Logging
 
 Every log line is JSON on stdout, written through pino
-(`apps/api/src/logger.ts`) — never `console.log`. Each line carries a dotted,
-low-cardinality `event` name (`render.started`, `strava.request_failed`,
-`ui.page_view`); ids and other variable values go in sibling fields. The API
+(`apps/api/src/observability/logger.ts`) — never `console.log`. Each line
+carries a dotted, low-cardinality `event` name (`render.started`,
+`strava.request_failed`, `ui.page_view`); ids and other variable values go in
+sibling fields. The API
 writes one `http_request` line per request with `route`, status, `durationMs`,
 `userId` and `requestId`, and every response carries the matching
 `x-request-id`. The browser batches its own actions and crashes to
@@ -618,9 +620,10 @@ later without a line of the app changing; a payload-only *remote config* flag
 is the same mechanism for "switch the model for everyone, no split, no deploy".
 
 - **A version key, not the prompt text.** `prompt` names an entry in
-  `SYSTEM_PROMPTS` in `apps/api/src/coach.ts`. The payload *could* hold the
-  whole prompt and be edited in PostHog — but it names the tools the code must
-  actually have, and in a flag textarea it loses review, diff and its tests.
+  `SYSTEM_PROMPTS` in `apps/api/src/coach/coach.ts`. The payload *could* hold
+  the whole prompt and be edited in PostHog — but it names the tools the code
+  must actually have, and in a flag textarea it loses review, diff and its
+  tests.
   Adding a variant's prompt is a pull request; choosing between them isn't.
 - **A payload nobody reviewed is a payload that gets validated.** A model id
   that isn't `vendor/model`, or a prompt version the catalogue has never heard
@@ -651,13 +654,13 @@ flag-per-version this section builds by hand. There is a playground for comparin
 models side by side, and evals with LLM-as-a-judge and datasets. Any claim that
 PostHog is only the live half is out of date.
 
-`SYSTEM_PROMPTS` stays in `apps/api/src/coach.ts` anyway, and the reason is the
-tools. The prompt names `askAthlete`, `proposeWeek` and `setAthleteContext` and
-states the rules those tools enforce — five questions, seven days numbered from
-Monday. A prompt fetched at runtime can go on naming a tool the deploy underneath
-it just removed, and the failure is a coach promising the athlete a form it can
-no longer draw. The catalogue cannot drift from `createCoachTools`, because one
-pull request moves both.
+`SYSTEM_PROMPTS` stays in `apps/api/src/coach/coach.ts` anyway, and the reason
+is the tools. The prompt names `askAthlete`, `proposeWeek` and
+`setAthleteContext` and states the rules those tools enforce — five questions,
+seven days numbered from Monday. A prompt fetched at runtime can go on naming a
+tool the deploy underneath it just removed, and the failure is a coach promising
+the athlete a form it can no longer draw. The catalogue cannot drift from
+`createCoachTools`, because one pull request moves both.
 
 What lives in PostHog is a **mirror**, not the source — `coach-system` and
 `coach-debrief` under
@@ -671,7 +674,7 @@ and no test fails if you skip it.
 ### AI observability
 
 Everything the coach does is one trace, built from the AI SDK's own lifecycle
-callbacks in `apps/api/src/ai-observability.ts` — no wrapper around the model,
+callbacks in `apps/api/src/observability/ai.ts` — no wrapper around the model,
 no OpenTelemetry exporter:
 
 ```
@@ -702,8 +705,8 @@ What that buys, over one event per turn:
   `X-POSTHOG-SESSION-ID` on the chat request — one header, rather than PostHog's
   `tracing_headers`, which patches every `fetch` on the page.
 
-The post-run debrief (`debrief.ts`) is traced the same way. It has no replay to
-link to and no conversation to sit in: nobody asked for it.
+The post-run debrief (`coach/debrief.ts`) is traced the same way. It has no
+replay to link to and no conversation to sit in: nobody asked for it.
 
 ### Was the answer any good?
 

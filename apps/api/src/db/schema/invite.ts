@@ -20,7 +20,7 @@ const tz = { withTimezone: true } as const;
  * There is no `expired` member on purpose: expiry is a fact about the clock, not
  * an event anybody writes. Nothing would ever run the UPDATE, so a row could sit
  * `pending` for a year and read as live. `expiresAt` is compared instead — see
- * `isOpen` in invite-store.ts.
+ * `isOpen` in invites/store.ts.
  */
 export type InviteStatus = "pending" | "accepted" | "declined" | "revoked";
 

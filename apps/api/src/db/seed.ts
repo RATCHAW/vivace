@@ -10,7 +10,7 @@
 // `refuseInProduction` is the only thing between this file and an empty
 // database.
 import { reset, seed } from "drizzle-seed";
-import { logger } from "../logger.js";
+import { logger } from "../observability/logger.js";
 import { db, pool } from "./index.js";
 import {
   account,

@@ -4,9 +4,9 @@
 // Both are keyed by user and read on every coach turn, which is what stops each
 // new thread from opening by asking "so what's the goal?" again.
 import { and, asc, between, eq, sql } from "drizzle-orm";
-import { db } from "./db/index.js";
-import { coachContext, coachPlan } from "./db/schema/coach.js";
-import type { CoachContext, CoachPlan } from "./schemas.js";
+import { db } from "../db/index.js";
+import { coachContext, coachPlan } from "../db/schema/coach.js";
+import type { CoachContext, CoachPlan } from "../schemas.js";
 
 /** An athlete who has never told the coach anything. */
 export const EMPTY_CONTEXT: CoachContext = {

@@ -93,7 +93,7 @@ const PICKER_RUNS = 8;
  * run it did not ask for, so this is where "compare these three" stops and
  * "read my season" starts — which is a question, not an attachment. The API
  * holds the same number for a request that didn't come from here
- * (`MAX_ATTACHED_RUNS` in apps/api/src/coach.ts).
+ * (`MAX_ATTACHED_RUNS` in apps/api/src/coach/coach.ts).
  */
 export const MAX_ATTACHED_RUNS = 5;
 

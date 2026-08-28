@@ -226,7 +226,7 @@ const captureLlmContent = process.env.POSTHOG_LLM_CAPTURE_CONTENT === "true";
  * A turn is a `$ai_trace` with a `$ai_generation` per model call and an
  * `$ai_span` per tool call hanging off it. All three carry the same
  * `traceId`, which is the only thing that groups them — omit it and every
- * event becomes its own one-line trace. ai-observability.ts is what fills
+ * event becomes its own one-line trace. ai.ts is what fills
  * these in; nothing else should be building them by hand.
  */
 interface LlmEventContext {

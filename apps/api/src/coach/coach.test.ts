@@ -30,8 +30,8 @@ import {
   type QuestionnaireCard,
 } from "./coach.js";
 import { titleFrom } from "./chat-store.js";
-import type { BestEffort } from "./strava.js";
-import type { PlannedSession, Run, RunStreams } from "./schemas.js";
+import type { BestEffort } from "../strava/client.js";
+import type { PlannedSession, Run, RunStreams } from "../schemas.js";
 
 /** A run on `date`, with everything the analysis reads and nothing else. */
 function run(date: string, km: number, over: Partial<Run> = {}): Run {

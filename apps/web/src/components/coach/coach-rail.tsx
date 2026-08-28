@@ -2,8 +2,8 @@
 // they accepted, and the four numbers worth knowing today.
 //
 // Everything here comes from GET /api/coach/briefing in one request — see
-// apps/api/src/briefing.ts. Nothing is computed twice: a signal shown here and
-// the same signal quoted in an answer are literally the same object.
+// apps/api/src/coach/briefing.ts. Nothing is computed twice: a signal shown
+// here and the same signal quoted in an answer are literally the same object.
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ChevronLeftIcon, ChevronRightIcon, PlusIcon } from "lucide-react";
@@ -73,7 +73,8 @@ export function countdown(
   return { kind: "weeks", value: Math.ceil(days / 7) };
 }
 
-/** Inside this many weeks the coach starts writing a taper — see briefing.ts. */
+/** Inside this many weeks the coach starts writing a taper — see
+ *  apps/api/src/coach/briefing.ts. */
 const TAPER_WEEKS = 3;
 /**
  * How many weeks fit the rail as marks that can still be counted. Past twelve

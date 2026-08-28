@@ -21,11 +21,18 @@ import {
   getTemplate,
 } from "@repo/video";
 import { auth } from "./auth.js";
-import { track, trackError } from "./analytics.js";
-import { logger } from "./logger.js";
-import { captureServerException, isFeatureEnabledFor } from "./posthog.js";
-import { observeTurn, POSTHOG_SESSION_HEADER } from "./ai-observability.js";
-import { identify, requestLogger, type AppEnv } from "./request-logger.js";
+import { track, trackError } from "./observability/analytics.js";
+import { logger } from "./observability/logger.js";
+import {
+  captureServerException,
+  isFeatureEnabledFor,
+} from "./observability/posthog.js";
+import { observeTurn, POSTHOG_SESSION_HEADER } from "./observability/ai.js";
+import {
+  identify,
+  requestLogger,
+  type AppEnv,
+} from "./observability/request-logger.js";
 import {
   AcceptRunInviteSchema,
   AthleteSchema,
@@ -66,19 +73,19 @@ import {
   fetchRuns,
   fetchRunStreams,
   StravaApiError,
-} from "./strava.js";
+} from "./strava/client.js";
 import {
   fetchLambdaProgress,
   renderPropsHash,
   resolveRenderTarget,
   startLambdaRender,
-} from "./render.js";
+} from "./video/render.js";
 import {
   getRunRender,
   saveStartedRender,
   toRunRender,
   updateRunRender,
-} from "./render-store.js";
+} from "./video/store.js";
 import {
   acceptedInviteForRun,
   acceptInvite,
@@ -90,8 +97,8 @@ import {
   revokeAllForUser,
   revokeInvite,
   type InviteRow,
-} from "./invite-store.js";
-import { rankCandidates } from "./pairing.js";
+} from "./invites/store.js";
+import { rankCandidates } from "./invites/pairing.js";
 import {
   attachedRuns,
   COACH_NOT_CONFIGURED,
@@ -104,11 +111,11 @@ import {
   getCoachConfig,
   resolveCoachVariant,
   type CoachFailure,
-} from "./coach.js";
-import { buildBriefing, todayLocal } from "./briefing.js";
-import { saveContext, savePlan } from "./coach-store.js";
-import { planProgress } from "./training.js";
-import { postRunDebrief } from "./debrief.js";
+} from "./coach/coach.js";
+import { buildBriefing, todayLocal } from "./coach/briefing.js";
+import { saveContext, savePlan } from "./coach/store.js";
+import { planProgress } from "./coach/training.js";
+import { postRunDebrief } from "./coach/debrief.js";
 import {
   claimEvent,
   pruneEvents,
@@ -117,7 +124,7 @@ import {
   verifyToken,
   WEBHOOK_PATH,
   webhookSigningSecret,
-} from "./webhook.js";
+} from "./strava/webhook.js";
 import {
   createThread,
   deleteThread,
@@ -130,7 +137,7 @@ import {
   setTitleIfUnset,
   titleFrom,
   truncateForRegenerate,
-} from "./chat-store.js";
+} from "./coach/chat-store.js";
 
 /** Where the OpenAPI document and Swagger UI live. */
 export const OPENAPI_DOCUMENT_PATH = "/api/openapi.json";
@@ -2194,8 +2201,9 @@ app.openapi(coachChatRoute, async (c) => {
       trigger: body.trigger,
       range_weeks: body.range_weeks,
       language: body.language,
-      // `contextProperties` in posthog.ts spreads these onto the `$ai_trace`,
-      // every `$ai_generation` under it *and* every `$ai_span` — so cost,
+      // `contextProperties` in observability/posthog.ts spreads these onto
+      // the `$ai_trace`, every `$ai_generation` under it *and* every
+      // `$ai_span` — so cost,
       // latency, stop reason and tool-call count all become filterable by
       // variant for one line here. `$feature/<key>` is the property name
       // PostHog's own experiment analysis reads, not one of ours.
@@ -2311,7 +2319,8 @@ app.openapi(coachChatRoute, async (c) => {
 
 // --- Strava webhook -----------------------------------------------------------
 // Both of these are called by Strava, never by the browser, so neither carries
-// a session. See webhook.ts for the two-second budget both of them work to.
+// a session. See strava/webhook.ts for the two-second budget both of them
+// work to.
 
 const webhookValidationRoute = createRoute({
   method: "get",

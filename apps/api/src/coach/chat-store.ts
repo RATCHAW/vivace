@@ -9,9 +9,9 @@ import { randomUUID } from "node:crypto";
 import type { UIMessage } from "ai";
 import { and, asc, eq, exists, gte, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
-import { db } from "./db/index.js";
-import { coachDebrief, coachMessage, coachThread } from "./db/schema/coach.js";
-import type { CoachThread } from "./schemas.js";
+import { db } from "../db/index.js";
+import { coachDebrief, coachMessage, coachThread } from "../db/schema/coach.js";
+import type { CoachThread } from "../schemas.js";
 
 /** A thread title is cut from the first thing the athlete says. */
 const TITLE_MAX_LENGTH = 60;

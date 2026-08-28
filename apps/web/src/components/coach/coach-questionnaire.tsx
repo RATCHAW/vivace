@@ -1,8 +1,8 @@
 // The coach asking, rather than answering.
 //
 // Renders the `askAthlete` tool result (`buildQuestionnaire` in
-// apps/api/src/coach.ts) as a form the athlete taps through one question at a
-// time. Their answers become the athlete's next message, which is what the
+// apps/api/src/coach/coach.ts) as a form the athlete taps through one question
+// at a time. Their answers become the athlete's next message, which is what the
 // model reads and what puts them into `setAthleteContext`. Nothing new is
 // persisted — the questions live in the transcript as the tool's output, and
 // the answers live in it as the message underneath them.
@@ -53,7 +53,7 @@ import {
 } from "@/components/ui/questionnaire";
 import { cn } from "@/lib/utils";
 
-/** Mirrors `AskedQuestion` in apps/api/src/coach.ts. */
+/** Mirrors `AskedQuestion` in apps/api/src/coach/coach.ts. */
 export interface AskedQuestion {
   id: string;
   question: string;

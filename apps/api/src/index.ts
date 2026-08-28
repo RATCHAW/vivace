@@ -1,8 +1,8 @@
 import { serve } from "@hono/node-server";
 import { app } from "./app.js";
 import { runMigrations } from "./db/migrate.js";
-import { installProcessLogging, logger } from "./logger.js";
-import { posthogEnabled, shutdownPostHog } from "./posthog.js";
+import { installProcessLogging, logger } from "./observability/logger.js";
+import { posthogEnabled, shutdownPostHog } from "./observability/posthog.js";
 
 installProcessLogging({ flush: shutdownPostHog });
 

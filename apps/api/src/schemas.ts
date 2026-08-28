@@ -407,7 +407,7 @@ const RunMentionSchema = z.object({
  *
  * `run` is the singular field this started as, kept because it is what every
  * transcript written before then holds. Nothing sends it now; `attachedRuns` in
- * coach.ts folds it into the list, and a message never carries both.
+ * coach/coach.ts folds it into the list, and a message never carries both.
  */
 export const CoachMessageMetadataSchema = z
   .object({
@@ -419,7 +419,7 @@ export const CoachMessageMetadataSchema = z
      * It rides on the message because that is what outlives the stream: an
      * athlete rates an answer minutes later, or after a reload, and the rating
      * is only worth anything if it names the trace that produced it. Written by
-     * the API (see `observeTurn` in ai-observability.ts), never by the browser.
+     * the API (see `observeTurn` in observability/ai.ts), never by the browser.
      */
     trace_id: z.string().optional(),
   })
@@ -498,7 +498,7 @@ export const CoachChatRequestSchema = z
 
 export type CoachChatRequest = z.infer<typeof CoachChatRequestSchema>;
 
-/** `YYYY-MM-DD`. Calendar dates, never timestamps — see coach-store.ts. */
+/** `YYYY-MM-DD`. Calendar dates, never timestamps — see coach/store.ts. */
 const CalendarDateSchema = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/)
@@ -531,7 +531,7 @@ export type CoachContext = z.infer<typeof CoachContextSchema>;
 
 /**
  * A change to the context. Every field is optional, and an omitted field is
- * left alone rather than cleared — see `saveContext` in coach-store.ts.
+ * left alone rather than cleared — see `saveContext` in coach/store.ts.
  */
 export const CoachContextPatchSchema = CoachContextSchema.omit({
   updated_at: true,

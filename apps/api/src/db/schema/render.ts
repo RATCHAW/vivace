@@ -19,7 +19,7 @@ const tz = { withTimezone: true } as const;
 /** The options column as it is *stored*, which is snake_case — these rows
  *  predate this schema file and their keys are not up for renaming. The
  *  camelCase `RenderOptions` the rest of the API speaks is mapped in
- *  render-store.ts. */
+ *  video/store.ts. */
 export interface StoredRenderOptions {
   show_avatar?: boolean;
   theme?: ThemeName;

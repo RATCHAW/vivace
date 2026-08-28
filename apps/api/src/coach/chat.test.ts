@@ -17,7 +17,7 @@ const THREAD_ID = "11111111-2222-3333-4444-555555555555";
 let session: { user: { id: string } } | null = { user: { id: USER_ID } };
 let accessToken: string | undefined = "strava-token";
 
-vi.mock("./auth.js", () => ({
+vi.mock("../auth.js", () => ({
   auth: {
     api: {
       getSession: async () => session,
@@ -65,14 +65,16 @@ vi.mock("./chat-store.js", async (importOriginal) => {
 });
 
 /** The variant PostHog hands back, for the test that set one. */
-let evaluated: import("./posthog.js").FeatureVariant | null = null;
+let evaluated: import("../observability/posthog.js").FeatureVariant | null =
+  null;
 /** The `$ai_trace` the turn filed, so its attribution can be read back. */
 let traced: Record<string, unknown>[] = [];
 
-vi.mock("./posthog.js", async (importOriginal) => {
+vi.mock("../observability/posthog.js", async (importOriginal) => {
   // The real module is already inert without POSTHOG_KEY; only the flag and the
   // trace are replaced, so the rest of the app's capture calls stay no-ops.
-  const actual = await importOriginal<typeof import("./posthog.js")>();
+  const actual =
+    await importOriginal<typeof import("../observability/posthog.js")>();
   return {
     ...actual,
     getFeatureVariantFor: async () => evaluated,
@@ -132,7 +134,7 @@ vi.mock("./coach.js", async (importOriginal) => {
   };
 });
 
-const { app } = await import("./app.js");
+const { app } = await import("../app.js");
 
 /** What the browser's `prepareSendMessagesRequest` puts on the wire. */
 function chat(body: Record<string, unknown>) {
