@@ -1,6 +1,6 @@
 services:
   db:
-    image: postgres:18-alpine@sha256:a1d02e4bd40c94d3bf2bdd3678c137388e76d9efcd23c285e9429d336a834b44
+    image: postgres:18-alpine@sha256:d3e1620b530c944afa6e887d22eb899824da68e19c52024bf98f5220c88a65b2
     environment:
       POSTGRES_USER: app
       POSTGRES_PASSWORD: app
@@ -29,7 +29,7 @@ services:
   # does. `tmpfs` because none of it is worth surviving a reboot.
   db-e2e:
     profiles: ["e2e"]
-    image: postgres:18-alpine@sha256:a1d02e4bd40c94d3bf2bdd3678c137388e76d9efcd23c285e9429d336a834b44
+    image: postgres:18-alpine@sha256:d3e1620b530c944afa6e887d22eb899824da68e19c52024bf98f5220c88a65b2
     environment:
       POSTGRES_USER: app
       POSTGRES_PASSWORD: app
@@ -62,7 +62,7 @@ services:
   # into by hand should still know who you are tomorrow.
   db-dev-fake:
     profiles: ["dev-fake"]
-    image: postgres:18-alpine@sha256:a1d02e4bd40c94d3bf2bdd3678c137388e76d9efcd23c285e9429d336a834b44
+    image: postgres:18-alpine@sha256:d3e1620b530c944afa6e887d22eb899824da68e19c52024bf98f5220c88a65b2
     environment:
       POSTGRES_USER: app
       POSTGRES_PASSWORD: app
