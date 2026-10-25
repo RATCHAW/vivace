@@ -44,7 +44,7 @@
     "auth": "1.6.27",
     "drizzle-kit": "^0.31.10",
     "drizzle-seed": "^0.3.1",
-    "typescript": "^5.7.0",
+    "typescript": "^7.0.2",
     "vitest": "^3.0.0"
   }
 }
