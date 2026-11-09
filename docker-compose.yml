@@ -104,7 +104,7 @@ services:
   # comes up already pointed at Loki with both boards loaded.
   grafana:
     profiles: ["app", "observability"]
-    image: grafana/grafana:13.1@sha256:ab5cb380e3ff3172d6c8bd2e7cfd31cce977d2881b260e1f5bc089bf0b759b43
+    image: grafana/grafana:13.3@sha256:488984b716c0862639f91a698adbe2862677a5a07bad42da5f03f3030883b205
     environment:
       # Local-only convenience: no login wall in front of the dashboards.
       # Put Grafana behind real auth before exposing it anywhere else.
