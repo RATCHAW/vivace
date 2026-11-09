@@ -8,6 +8,9 @@ updates:
     cooldown:
       default-days: 7
     open-pull-requests-limit: 10
+    ignore:
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
     groups:
       non-major-dependencies:
         update-types: [minor, patch]
@@ -35,6 +38,9 @@ updates:
 
   - package-ecosystem: docker
     directory: /apps/api
+    ignore:
+      - dependency-name: node
+        update-types: ["version-update:semver-major"]
     schedule:
       interval: weekly
       day: monday
@@ -43,6 +49,9 @@ updates:
 
   - package-ecosystem: docker
     directory: /apps/web
+    ignore:
+      - dependency-name: node
+        update-types: ["version-update:semver-major"]
     schedule:
       interval: weekly
       day: monday
@@ -51,6 +60,9 @@ updates:
 
   - package-ecosystem: docker
     directory: /apps/landing
+    ignore:
+      - dependency-name: node
+        update-types: ["version-update:semver-major"]
     schedule:
       interval: weekly
       day: monday

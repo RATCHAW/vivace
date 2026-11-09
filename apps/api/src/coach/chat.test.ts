@@ -17,6 +17,20 @@ const THREAD_ID = "11111111-2222-3333-4444-555555555555";
 let session: { user: { id: string } } | null = { user: { id: USER_ID } };
 let accessToken: string | undefined = "strava-token";
 
+vi.mock("../db/index.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../db/index.js")>();
+  return {
+    ...actual,
+    db: {
+      ...actual.db,
+      query: {
+        ...actual.db.query,
+        account: { findFirst: async () => ({ id: "strava-account-1" }) },
+      },
+    },
+  };
+});
+
 vi.mock("../auth.js", () => ({
   auth: {
     api: {

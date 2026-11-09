@@ -1,4 +1,4 @@
-FROM node:22-alpine@sha256:ce8d97f7cfc7c5386421eb932df20a29df99b1a7f469f6157d5c9956702ffadc AS build
+FROM node:22-alpine@sha256:0e1754758c2df4cfa3e68d59e2e1b7374bb7fd9ea6328eaaacf15cc934af8202 AS build
 WORKDIR /repo
 
 ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
@@ -8,13 +8,15 @@ RUN corepack enable
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json ./
 COPY apps/api/package.json apps/api/package.json
 COPY apps/web/package.json apps/web/package.json
+COPY apps/landing/package.json apps/landing/package.json
 COPY packages/strava-api/package.json packages/strava-api/package.json
 COPY packages/video/package.json packages/video/package.json
-RUN pnpm install --frozen-lockfile --filter @repo/web...
+RUN pnpm install --frozen-lockfile --filter @repo/web... --filter @repo/landing
 
 COPY packages/strava-api packages/strava-api
 COPY packages/video packages/video
 COPY apps/web apps/web
+COPY apps/landing/src apps/landing/src
 
 # Vite inlines VITE_* at build time, so the PostHog project is a build input
 # rather than a runtime variable. Unset simply builds without analytics.
@@ -34,7 +36,7 @@ ENV VITE_APP_ENV=$VITE_APP_ENV
 
 RUN pnpm --filter @repo/web build
 
-FROM nginx:alpine@sha256:4a73073bd557c65b759505da037898b61f1be6cbcc3c2c3aeac22d2a470c1752
+FROM nginx:alpine@sha256:713fc2ebfd92e8217db451477182ee91944b123d2b1ee9fd5a8c6e91ca6c3a11
 COPY apps/web/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /repo/apps/web/dist /usr/share/nginx/html
 EXPOSE 80

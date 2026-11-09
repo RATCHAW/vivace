@@ -231,6 +231,7 @@ describe("coach feedback", () => {
       ] as never);
     });
 
+    capture.mockClear();
     return { ...(await import("@/lib/posthog")), capture };
   }
 

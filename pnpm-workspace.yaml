@@ -3,7 +3,10 @@ packages:
   - "packages/*"
 
 overrides:
-  js-yaml: 4.3.1
+  js-yaml: 4.3.2
+  zod@<4.6.6: 4.6.7
+  esbuild@<0.24.3: 0.28.2
+  minimatch@>=7 <11.0.1: 11.0.5
   lodash: 4.18.1
 
 # pnpm 11 requires an explicit decision for every dependency install hook.
@@ -14,3 +17,37 @@ allowBuilds:
   better-sqlite3: false
   core-js: false
   esbuild: true
+
+minimumReleaseAgeExclude:
+  - "@remotion/bundler@4.0.542"
+  - "@remotion/captions@4.0.542"
+  - "@remotion/cli@4.0.542"
+  - "@remotion/codemods@4.0.542"
+  - "@remotion/compositor-darwin-arm64@4.0.542"
+  - "@remotion/compositor-darwin-x64@4.0.542"
+  - "@remotion/compositor-linux-arm64-gnu@4.0.542"
+  - "@remotion/compositor-linux-arm64-musl@4.0.542"
+  - "@remotion/compositor-linux-x64-gnu@4.0.542"
+  - "@remotion/compositor-linux-x64-musl@4.0.542"
+  - "@remotion/compositor-win32-x64-msvc@4.0.542"
+  - "@remotion/effects@4.0.542"
+  - "@remotion/elevenlabs@4.0.542"
+  - "@remotion/lambda-client@4.0.542"
+  - "@remotion/lambda@4.0.542"
+  - "@remotion/licensing@4.0.542"
+  - "@remotion/media-utils@4.0.542"
+  - "@remotion/media@4.0.542"
+  - "@remotion/openai-whisper@4.0.542"
+  - "@remotion/paths@4.0.542"
+  - "@remotion/player@4.0.542"
+  - "@remotion/renderer@4.0.542"
+  - "@remotion/sdk@4.0.542"
+  - "@remotion/streaming@4.0.542"
+  - "@remotion/studio-protocol@4.0.542"
+  - "@remotion/studio-server@4.0.542"
+  - "@remotion/studio-shared@4.0.542"
+  - "@remotion/studio@4.0.542"
+  - "@remotion/timeline-utils@4.0.542"
+  - "@remotion/web-renderer@4.0.542"
+  - "@remotion/zod-types@4.0.542"
+  - remotion@4.0.542

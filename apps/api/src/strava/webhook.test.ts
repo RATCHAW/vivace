@@ -16,6 +16,20 @@ const ATHLETE_ID = 165387970;
 const USER_ID = "athlete-1";
 const ACTIVITY_ID = 987654321;
 
+vi.mock("../db/index.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../db/index.js")>();
+  return {
+    ...actual,
+    db: {
+      ...actual.db,
+      query: {
+        ...actual.db.query,
+        account: { findFirst: async () => ({ id: "strava-account-1" }) },
+      },
+    },
+  };
+});
+
 vi.mock("../auth.js", () => ({
   auth: {
     api: {

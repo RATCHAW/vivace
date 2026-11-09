@@ -27,6 +27,7 @@ beforeAll(() => {
 
 afterEach(() => {
   cleanup();
+  vi.unstubAllGlobals();
   animate.mockClear();
   cancel.mockClear();
 });
@@ -138,9 +139,10 @@ describe("useReorderAnimation", () => {
   });
 
   it("reorders without travelling when motion is reduced", () => {
-    vi.spyOn(window, "matchMedia").mockReturnValue({
-      matches: true,
-    } as MediaQueryList);
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn(() => ({ matches: true })),
+    );
 
     const { rerender } = render(<List order={["a", "b", "c"]} />);
     rerender(<List order={["c", "a", "b"]} />);

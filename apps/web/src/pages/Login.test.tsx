@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@/lib/auth-client", () => ({
   authClient: {
-    signIn: { oauth2: mocks.signInWithOAuth },
+    signIn: { social: mocks.signInWithOAuth },
   },
 }));
 
@@ -57,7 +57,7 @@ describe("Login page", () => {
       expect(mocks.signInWithOAuth).toHaveBeenCalledOnce();
     });
     expect(mocks.signInWithOAuth).toHaveBeenCalledWith({
-      providerId: "strava",
+      provider: "strava",
       callbackURL: `${window.location.origin}/`,
       errorCallbackURL: `${window.location.origin}/login`,
     });
