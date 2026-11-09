@@ -20,7 +20,10 @@ import {
   DEFAULT_THEME,
   getTemplate,
 } from "@repo/video";
+import { and, eq } from "drizzle-orm";
 import { auth } from "./auth.js";
+import { db } from "./db/index.js";
+import { account } from "./db/schema/auth.js";
 import { track, trackError } from "./observability/analytics.js";
 import { logger } from "./observability/logger.js";
 import {
@@ -302,8 +305,13 @@ async function stravaAccessToken(
   userId: string,
 ): Promise<string | null> {
   try {
+    const linkedAccount = await db.query.account.findFirst({
+      columns: { id: true },
+      where: and(eq(account.userId, userId), eq(account.providerId, "strava")),
+    });
+    if (!linkedAccount) return null;
     const { accessToken } = await auth.api.getAccessToken({
-      body: { providerId: "strava", userId },
+      body: { accountId: linkedAccount.id, userId },
     });
     if (!accessToken) {
       c.get("log").warn(
@@ -330,8 +338,13 @@ async function stravaAccessToken(
  */
 async function stravaTokenFor(userId: string): Promise<string | null> {
   try {
+    const linkedAccount = await db.query.account.findFirst({
+      columns: { id: true },
+      where: and(eq(account.userId, userId), eq(account.providerId, "strava")),
+    });
+    if (!linkedAccount) return null;
     const { accessToken } = await auth.api.getAccessToken({
-      body: { providerId: "strava", userId },
+      body: { accountId: linkedAccount.id, userId },
     });
     return accessToken ?? null;
   } catch (err) {

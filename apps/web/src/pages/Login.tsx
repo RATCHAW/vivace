@@ -36,8 +36,8 @@ export function Login() {
     // sign-in started with no session created after it.
     trackEvent("auth.sign_in_started", { provider: "strava", next });
 
-    const { error } = await authClient.signIn.oauth2({
-      providerId: "strava",
+    const { error } = await authClient.signIn.social({
+      provider: "strava",
       callbackURL: `${window.location.origin}${next}`,
       errorCallbackURL: `${window.location.origin}/login`,
     });

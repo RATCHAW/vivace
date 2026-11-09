@@ -117,9 +117,9 @@ with threads, messages, goals and render history. It refuses to run unless
 
 ## How the auth flow works
 
-1. The login button calls `authClient.signIn.oauth2({ providerId: "strava" })`.
+1. The login button calls `authClient.signIn.social({ provider: "strava" })`.
 2. The API (better-auth mounted at `/api/auth/*` in Hono) redirects to Strava's OAuth
-   page and handles the callback at `/api/auth/oauth2/callback/strava`.
+   page and handles the callback at `/api/auth/callback/strava`.
 3. Strava doesn't expose the athlete's email, so a stable placeholder
    (`strava-<id>@users.noreply.strava.local`) is stored instead.
 4. `GET /api/me/strava` reads your session, gets the stored Strava access token
